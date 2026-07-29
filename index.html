@@ -5991,10 +5991,12 @@
         // ================================================================
         //  初始化（远程 data.json 优先 + localStorage 后备 + 硬编码兜底）
         // ================================================================
+        // ================================================================
+        //  初始化（远程 data.json 优先 + localStorage 后备 + 硬编码兜底）
+        // ================================================================
         function init() {
-            // ---------- 公共初始化函数（避免重复代码） ----------
+            // ---------- 公共初始化函数 ----------
             function finishInit(message) {
-                // 确保 UI 渲染完成
                 renderSeriesManager();
                 renderTables();
                 renderChart();
@@ -6004,39 +6006,42 @@
                 initResizer();
                 setStatus('info', message || '就绪');
                 updateViewUI();
-                // 保存状态到 localStorage（将最新数据缓存）
-                saveState();
-                // 延迟刷新股价（可选）
+                saveState(); // 将最新数据存入 localStorage 作为缓存
                 setTimeout(() => {refreshPrices();}, 2500);
                 console.log('✅ 初始化完成，数据来源：' + message);
             }
 
-            // ---------- 1. 优先从远程 data.json 加载（添加时间戳防止浏览器缓存） ----------
+            // ---------- 1. 优先从远程 data.json 加载 ----------
             fetch('data.json?t=' + Date.now())
                 .then(res => {
-                    if (!res.ok) throw new Error('HTTP ' + res.status);
+                    if (!res.ok) {
+                        throw new Error(`HTTP ${res.status} - ${res.statusText}`);
+                    }
+                    // 检查 Content-Type 是否为 JSON
+                    const contentType = res.headers.get('content-type');
+                    if (contentType && !contentType.includes('application/json')) {
+                        console.warn('⚠️ 响应不是 JSON 格式，实际类型：', contentType);
+                    }
                     return res.json();
                 })
                 .then(state => {
-                    if (!validateState(state)) throw new Error('数据格式无效');
-                    // 加载状态
+                    if (!validateState(state)) {
+                        throw new Error('数据格式无效（validateState 返回 false）');
+                    }
                     if (loadStateFromObject(state)) {
-                        // 处理头像（此时头像路径可能是相对路径，processAllAvatars 会加载图片）
                         processAllAvatars(() => {
                             finishInit('data.json（远程）');
                         });
                     } else {
-                        throw new Error('状态应用失败');
+                        throw new Error('loadStateFromObject 执行失败');
                     }
                 })
                 .catch(err => {
-                    console.warn('远程 data.json 加载失败，尝试 localStorage:', err);
+                    console.error('❌ 远程 data.json 加载失败:', err);
                     // ---------- 2. 后备：从 localStorage 恢复 ----------
                     const loaded = loadState();
                     if (loaded) {
-                        // 有本地缓存，但需要处理头像（可能本地存储的 base64）
                         processAllAvatars(() => {
-                            // 重新渲染（确保与最新状态同步）
                             renderSeriesManager();
                             renderTables();
                             renderChart();
@@ -6049,20 +6054,16 @@
                             saveState();
                             setTimeout(() => {refreshPrices();}, 2500);
                         });
-                        return; // 已完成初始化
+                        return;
                     }
-
                     // ---------- 3. 最后：硬编码默认数据 ----------
-                    console.warn('本地缓存也无数据，使用硬编码默认数据');
+                    console.warn('⚠️ 本地缓存也无数据，使用硬编码默认数据');
                     resetToDefaultData();
                     processAllAvatars(() => {
                         finishInit('硬编码默认数据');
                     });
                 });
         }
-        /**
-         * 重置全局数据为硬编码默认值（与原来 if(!loaded) 分支一致）
-         */
         function resetToDefaultData() {
             // 重新设置初始数据（从文件开头的几个变量恢复）
             dates = ['2026-06-23', '2026-06-24', '2026-06-25', '2026-06-26', '2026-06-29', '2026-06-30', '2026-07-01'];
