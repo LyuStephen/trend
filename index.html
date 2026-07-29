@@ -2882,7 +2882,7 @@
             dates = state.dates;
             seriesList = state.seriesList.map(s => ({
                 ...s,
-                avatarUrl: s.avatarUrl || DEFAULT_AVATAR_SVG,
+                avatarUrl: s.avatarUrl || '',
                 remark: s.remark || '',
                 code: s.code || '',
                 danmaku: s.danmaku || []
@@ -3699,34 +3699,34 @@
                     diffColor = diffValue >= 0 ? '#ef4444' : '#22c55e';
                 }
                 html += `
-                        <div class="series-item" data-series="${s.name}" data-index="${idx}">
-                            <div class="row-main">
-                                <span class="drag-handle">⠿</span>
-                                <div class="avatar-sm"><img src="${s.avatarUrl}" alt="${s.name}" /></div>
-                                <input class="series-name-input" type="text" value="${s.name}" data-oldname="${s.name}" />
-                                <input class="color-picker" type="color" value="${s.color}" />
-                                
-                                <span class="code-wrapper">
-                                    <input class="code-input" type="text" placeholder="股票代码/名称" value="${s.code || ''}" data-series="${s.name}" autocomplete="off" />
-                                    <div class="code-dropdown" data-series="${s.name}"></div>
-                                    <button class="${btnClass}" ${btnDisabled} data-link="${link}" title="查看雪球行情">${btnText}</button>
-                                </span>
-                                <span class="upload-btn"><button class="btn-icon">📤</button><input type="file" accept="image/*" data-series="${s.name}" /></span>
-                                <button class="btn-icon" style="background:transparent;" data-reset-avatar="${s.name}">↩️</button>
-                            </div>
-                            
-                            <div class="series-stats" data-series="${s.name}" style="padding: 4px 8px; font-size: 13px; font-weight: 500; color: var(--text-secondary); border-top: 1px dashed var(--border-color); margin-top: 4px;">
-                                🏆 登顶 ${firstPlaceDays[s.name] || 0} 天 &nbsp;·&nbsp; 跑赢上证 <span style="color:${diffColor};">${diffToSH}</span>
-                            </div>
-                            <div class="danmaku-section">
-                                <div class="danmaku-row">
-                                    <input class="danmaku-input" placeholder="输入弹幕文字" data-series="${s.name}" />
-                                    <button class="danmaku-add-btn" data-series="${s.name}">添加</button>
+                            <div class="series-item" data-series="${s.name}" data-index="${idx}">
+                                <div class="row-main">
+                                    <span class="drag-handle">⠿</span>
+                                    <div class="avatar-sm"><img src="${s.avatarUrl}" alt="${s.name}" /></div>
+                                    <input class="series-name-input" type="text" value="${s.name}" data-oldname="${s.name}" />
+                                    <input class="color-picker" type="color" value="${s.color}" />
+                                    
+                                    <span class="code-wrapper">
+                                        <input class="code-input" type="text" placeholder="股票代码/名称" value="${s.code || ''}" data-series="${s.name}" autocomplete="off" />
+                                        <div class="code-dropdown" data-series="${s.name}"></div>
+                                        <button class="${btnClass}" ${btnDisabled} data-link="${link}" title="查看雪球行情">${btnText}</button>
+                                    </span>
+                                    <span class="upload-btn"><button class="btn-icon">📤</button><input type="file" accept="image/*" data-series="${s.name}" /></span>
+                                    <button class="btn-icon" style="background:transparent;" data-reset-avatar="${s.name}">↩️</button>
                                 </div>
-                                <div class="danmaku-list">${danmakuTags}</div>
+                                
+                                <div class="series-stats" data-series="${s.name}" style="padding: 4px 8px; font-size: 13px; font-weight: 500; color: var(--text-secondary); border-top: 1px dashed var(--border-color); margin-top: 4px;">
+                                    🏆 登顶 ${firstPlaceDays[s.name] || 0} 天 &nbsp;·&nbsp; 跑赢上证 <span style="color:${diffColor};">${diffToSH}</span>
+                                </div>
+                                <div class="danmaku-section">
+                                    <div class="danmaku-row">
+                                        <input class="danmaku-input" placeholder="输入弹幕文字" data-series="${s.name}" />
+                                        <button class="danmaku-add-btn" data-series="${s.name}">添加</button>
+                                    </div>
+                                    <div class="danmaku-list">${danmakuTags}</div>
+                                </div>
                             </div>
-                        </div>
-                    `;
+                        `;
             });
             seriesManager.innerHTML = html;
 
@@ -4090,8 +4090,8 @@
                 let html = `<tr><th style="text-align:left; padding-left:8px;">📊 指标</th>`;
                 dateCols.forEach(dateStr => {
                     html += `<th data-col="${dateStr}" style="cursor:pointer;">
-                    <span class="date-editor" contenteditable="false">${dateStr}</span>
-                </th>`;
+                        <span class="date-editor" contenteditable="false">${dateStr}</span>
+                    </th>`;
                 });
                 html += `</tr>`;
                 return html;
@@ -4110,8 +4110,8 @@
                     const color = s.color || '#3b82f6';
                     html += `<tr data-row="${key}" data-index="${idx}">`;
                     html += `<td class="row-label" style="text-align:left; padding-left:8px; font-weight:600;">
-                                <span class="color-dot" style="background:${color};"></span> ${key}
-                            </td>`;
+                                    <span class="color-dot" style="background:${color};"></span> ${key}
+                                </td>`;
                     dates.forEach((date, i) => {
                         let value;
                         let disabled = '';
@@ -4137,8 +4137,8 @@
                             if (i === 0) disabled = 'disabled';
                         }
                         html += `<td><input type="number" step="0.0000000001" value="${formatDisplay(value)}" 
-                                    data-row="${key}" data-col="${date}" data-type="${type}" 
-                                    class="${inputClass}" ${disabled} /></td>`;
+                                        data-row="${key}" data-col="${date}" data-type="${type}" 
+                                        class="${inputClass}" ${disabled} /></td>`;
                     });
                     html += `</tr>`;
                 });
@@ -4387,8 +4387,8 @@
                 const color = s.color || '#3b82f6';
                 bodyHtml += `<tr data-row="${key}">`;
                 bodyHtml += `<td class="row-label" style="text-align:left; padding-left:8px; font-weight:600;">
-                        <span class="color-dot" style="background:${color};"></span> ${key}
-                    </td>`;
+                            <span class="color-dot" style="background:${color};"></span> ${key}
+                        </td>`;
                 dates.forEach((date, idx) => {
                     let displayText = '';
                     let rankColor = '#1e293b';
@@ -4493,12 +4493,12 @@
             const isPercent = statsDisplayMode === 'percent';
             const modeLabel = isPercent ? '（%）' : '（天数）';
             let headHtml = `<tr>
-            <th style="text-align:left; padding-left:8px;">📊 指标</th>
-            <th style="text-align:center;">🏆 登顶 ${modeLabel}</th>
-            <th style="text-align:center;">📈 收益为正 ${modeLabel}</th>
-            <th style="text-align:center;">📉 收益为负 ${modeLabel}</th>
-            <th style="text-align:center;">📊 跑赢上证 ${modeLabel}</th>
-        </tr>`;
+                <th style="text-align:left; padding-left:8px;">📊 指标</th>
+                <th style="text-align:center;">🏆 登顶 ${modeLabel}</th>
+                <th style="text-align:center;">📈 收益为正 ${modeLabel}</th>
+                <th style="text-align:center;">📉 收益为负 ${modeLabel}</th>
+                <th style="text-align:center;">📊 跑赢上证 ${modeLabel}</th>
+            </tr>`;
             statsHead.innerHTML = headHtml;
 
             const formatValue = (count, total = tradingDays) => {
@@ -4520,14 +4520,14 @@
                 const beatCount = beatSHCount[key] || 0;
 
                 bodyHtml += `<tr>
-                <td style="text-align:left; padding-left:8px; font-weight:600;">
-                    <span class="color-dot" style="background:${color};"></span> ${key}
-                </td>
-                <td style="text-align:center; font-weight:600; color:#f59e0b;">${formatValue(firstCount, tradingDays)}</td>
-                <td style="text-align:center; font-weight:600; color:#16a34a;">${formatValue(posCount, tradingDays)}</td>
-                <td style="text-align:center; font-weight:600; color:#dc2626;">${formatValue(negCount, tradingDays)}</td>
-                <td style="text-align:center; font-weight:600; color:#3b82f6;">${shSeries ? formatValue(beatCount, tradingDays) : '—'}</td>
-            </tr>`;
+                    <td style="text-align:left; padding-left:8px; font-weight:600;">
+                        <span class="color-dot" style="background:${color};"></span> ${key}
+                    </td>
+                    <td style="text-align:center; font-weight:600; color:#f59e0b;">${formatValue(firstCount, tradingDays)}</td>
+                    <td style="text-align:center; font-weight:600; color:#16a34a;">${formatValue(posCount, tradingDays)}</td>
+                    <td style="text-align:center; font-weight:600; color:#dc2626;">${formatValue(negCount, tradingDays)}</td>
+                    <td style="text-align:center; font-weight:600; color:#3b82f6;">${shSeries ? formatValue(beatCount, tradingDays) : '—'}</td>
+                </tr>`;
             });
             statsBody.innerHTML = bodyHtml;
             if (statsScroll) statsScroll.scrollTop = statsScroll.scrollHeight;
@@ -5263,10 +5263,10 @@
                     matched.forEach((item) => {
                         const color = item.color || '#3b82f6';
                         html += `<div class="tooltip-item">
-                                        <span class="color-dot" style="background:${color};"></span>
-                                        <span class="series-name">${item.seriesName}</span>
-                                        ${item.remark ? `<span class="remark">· ${item.remark}</span>` : ''}
-                                    </div>`;
+                                            <span class="color-dot" style="background:${color};"></span>
+                                            <span class="series-name">${item.seriesName}</span>
+                                            ${item.remark ? `<span class="remark">· ${item.remark}</span>` : ''}
+                                        </div>`;
                     });
                     customTooltip.innerHTML = html;
                     customTooltip.style.display = 'block';
@@ -5701,6 +5701,14 @@
             // 趋势图
             const latestIdx = getLatestIdx();
             const latestDate = dates[latestIdx];
+            // 辅助函数：获取实际可用的头像 URL（用于图表 markPoint）
+            function getAvatarSrc(url) {
+                if (url && typeof url === 'string' && url.trim() !== '') {
+                    // 如果是 data:image、http 开头的完整 URL，或相对路径（如 images/1.png），直接返回
+                    return url;
+                }
+                return DEFAULT_AVATAR_SVG; // 空或无效时返回默认 SVG
+            }
             const series = seriesKeys.map(key => {
                 const s = getSeries(key);
                 if (!s) return null;
@@ -5723,16 +5731,17 @@
                             {offset: 1, color: s.color + '05'}
                         ])
                     },
+                    
                     markPoint: {
-                        symbol: 'image://' + s.avatarUrl,
+                        symbol: 'image://' + getAvatarSrc(s.avatarUrl),  // 使用辅助函数
                         symbolSize: isMobileView() ? 30 : 42,
                         label: {show: false},
                         tooltip: {show: false},
                         data: [{
                             name: s.name + '_latest',
                             coord: [latestDate, latestChange],
-                            symbol: 'image://' + s.avatarUrl,
-                            symbolSize: 42
+                            symbol: 'image://' + getAvatarSrc(s.avatarUrl), // 同样处理
+                            symbolSize: 42  // 可保持固定大小，或也用 isMobileView()
                         }],
                         itemStyle: {
                             borderColor: '#fff',
