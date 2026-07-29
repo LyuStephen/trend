@@ -2834,15 +2834,22 @@
         function getCurrentState() {
             return {
                 dates: dates,
-                seriesList: seriesList.map(s => ({
-                    name: s.name,
-                    color: s.color,
-                    data: s.data,
-                    avatarUrl: s.avatarUrl === DEFAULT_AVATAR_SVG ? '' : s.avatarUrl,
-                    remark: s.remark,
-                    code: s.code || '',
-                    danmaku: s.danmaku || []
-                })),
+                seriesList: seriesList.map(s => {
+                    // ★★★ 过滤掉 Base64 数据，仅保留 URL 或空字符串 ★★★
+                    let avatar = s.avatarUrl;
+                    if (avatar && avatar.startsWith('data:image')) {
+                        avatar = '';  // 丢弃 Base64，不再存入 localStorage
+                    }
+                    return {
+                        name: s.name,
+                        color: s.color,
+                        data: s.data,
+                        avatarUrl: avatar === DEFAULT_AVATAR_SVG ? '' : avatar,
+                        remark: s.remark,
+                        code: s.code || '',
+                        danmaku: s.danmaku || []
+                    };
+                }),
                 yMin: yMin,
                 yMax: yMax,
                 mainTitle: mainTitle,
