@@ -371,6 +371,71 @@
             border: 1px solid var(--border-color);
         }
 
+        /* 移动端按钮折叠 */
+        .chart-reset-buttons .toggle-reset-btn {
+            order: -1;
+            /* 让折叠按钮始终显示 */
+            background: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(4px);
+            border: 1px solid var(--border-color);
+            border-radius: 50%;
+            width: 32px;
+            height: 32px;
+            font-size: 14px;
+            cursor: pointer;
+            transition: transform 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--text-primary);
+        }
+
+        .chart-reset-buttons .toggle-reset-btn:hover {
+            background: #fff;
+        }
+
+        body.dark .chart-reset-buttons .toggle-reset-btn {
+            background: rgba(30, 41, 59, 0.85);
+            color: #e2e8f0;
+        }
+
+        .chart-reset-buttons.collapsed .toggle-reset-btn {
+            transform: rotate(180deg);
+        }
+
+        .chart-reset-buttons.collapsed .btn-refresh-icon,
+        .chart-reset-buttons.collapsed .btn-reset:not(.toggle-reset-btn) {
+            display: none;
+        }
+
+        /* 移动端调整按钮尺寸 */
+        @media (max-width: 820px) {
+            .chart-reset-buttons .toggle-reset-btn {
+                width: 28px;
+                height: 28px;
+                font-size: 12px;
+            }
+
+            .chart-reset-buttons .btn-reset,
+            .chart-reset-buttons .btn-refresh-icon {
+                width: 28px;
+                height: 28px;
+                font-size: 14px;
+            }
+        }
+
+        /* 系列管理头像缩小 */
+        .series-item .avatar-sm {
+            width: 24px !important;
+            height: 24px !important;
+        }
+
+        .series-item .avatar-sm img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
         body.dark .chart-reset-buttons .btn-reset,
         body.dark .chart-reset-buttons .btn-refresh-icon {
             background: rgba(30, 41, 59, 0.85);
@@ -1976,7 +2041,8 @@
             <div class="chart-container" id="chartContainer">
                 <div id="trendChart"></div>
                 <canvas id="danmakuCanvas"></canvas>
-                <div class="chart-reset-buttons">
+                <div class="chart-reset-buttons" id="resetButtonsGroup">
+                    <button class="btn-reset toggle-reset-btn" id="toggleResetBtns" title="收起/展开快捷按钮">◀</button>
                     <button class="btn-refresh-icon" id="refreshPriceIconBtn" title="刷新股价">🔄</button>
                     <button class="btn-refresh-icon" id="verifyHistoryBtn" title="校验历史数据">📜</button>
                     <button class="btn-reset" id="resetYBtnChart" title="重置Y轴">↕</button>
@@ -2176,6 +2242,16 @@
     </div>
 
     <script>
+        // 移动端复位按钮折叠切换
+        const resetButtonsGroup = document.getElementById('resetButtonsGroup');
+        const toggleResetBtn = document.getElementById('toggleResetBtns');
+        if (resetButtonsGroup && toggleResetBtn) {
+            toggleResetBtn.addEventListener('click', function (e) {
+                e.stopPropagation();
+                resetButtonsGroup.classList.toggle('collapsed');
+                this.textContent = resetButtonsGroup.classList.contains('collapsed') ? '▶' : '◀';
+            });
+        }
         // ================================================================
         //  微信浏览器检测
         // ================================================================
@@ -5329,7 +5405,7 @@
                         show: true,
                         position: 'right',
                         formatter: p => p.value.toFixed(2) + '%',
-                        fontSize: 12,
+                        fontSize: isMobileView() ? 10 : 12,
                         color: isDark ? '#cbd5e1' : '#1e293b'
                     },
                     barWidth: 16,
@@ -5641,7 +5717,7 @@
                     },
                     markPoint: {
                         symbol: 'image://' + s.avatarUrl,
-                        symbolSize: 42,
+                        symbolSize: isMobileView() ? 30 : 42,
                         label: {show: false},
                         tooltip: {show: false},
                         data: [{
@@ -5675,7 +5751,10 @@
                     backgroundColor: 'var(--tooltip-bg)',
                     borderColor: 'var(--border-color)',
                     borderWidth: 1,
-                    textStyle: {color: 'var(--text-primary)', fontSize: 13},
+                    textStyle: {
+                        color: 'var(--text-primary)',
+                        fontSize: isMobileView() ? 11 : 13
+                    },
                     formatter: function (params) {
                         if (!params || params.length === 0) return '';
                         const sorted = params.slice().sort((a, b) => b.value - a.value);
