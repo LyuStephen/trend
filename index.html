@@ -2835,16 +2835,16 @@
             return {
                 dates: dates,
                 seriesList: seriesList.map(s => {
-                    // ★★★ 过滤掉 Base64 数据，仅保留 URL 或空字符串 ★★★
                     let avatar = s.avatarUrl;
+                    // 只过滤 Base64 图片数据，保留 URL 路径（如 images/1.png）
                     if (avatar && avatar.startsWith('data:image')) {
-                        avatar = '';  // 丢弃 Base64，不再存入 localStorage
+                        avatar = '';
                     }
                     return {
                         name: s.name,
                         color: s.color,
                         data: s.data,
-                        avatarUrl: avatar === DEFAULT_AVATAR_SVG ? '' : avatar,
+                        avatarUrl: avatar,  // 直接保留过滤后的值（路径或空字符串）
                         remark: s.remark,
                         code: s.code || '',
                         danmaku: s.danmaku || []
