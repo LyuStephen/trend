@@ -5990,103 +5990,170 @@
         // ================================================================
         //  初始化
         // ================================================================
+        // ================================================================
+        //  初始化（支持远程 data.json 加载 + localStorage + 硬编码后备）
+        // ================================================================
         function init() {
-            const loaded = loadState();
-            if (!loaded) {
-                processAllAvatars(() => {
-                    yMinSlider.value = -50;
-                    yMaxSlider.value = 150;
-                    yMinValue.textContent = '-50';
-                    yMaxValue.textContent = '150';
-                    yMin = -50;
-                    yMax = 150;
-                    mainTitleInput.value = mainTitle;
-                    gridToggle.textContent = showGrid ? '📏 网格线' : '📏 隐藏网格';
-                    rawDetails.open = true;
-                    dailyDetails.open = true;
-                    totalDetails.open = true;
-                    rankDetails.open = true;
-                    statsDetails.open = true;
-                    viewMode = 'trend';
-                    waterfallSeriesName = seriesKeys[0] || '';
-                    rankingDate = dates[dates.length - 1] || '';
-                    if (rankingDateInput) rankingDateInput.value = rankingDate;
-                    trendLegendSelected = new Set();
-
-                    renderSeriesManager();
-                    renderTables();
-                    renderChart();
-                    initCustomTooltip();
-                    initChartClick();
-                    initResizeHandles();
-                    initResizer();
-                    setStatus('info', '就绪');
-                    danmakuEnabled = true;
-                    danmakuToggle.classList.remove('disabled');
-                    danmakuToggle.textContent = '💬';
-                    updateViewUI();
-                    saveState();
-                    console.log('✅ 初始化完成（默认数据）');
-                    setTimeout(() => {refreshPrices();}, 2500);
-                });
-            } else {
-                processAllAvatars(() => {
-                    yMinSlider.value = yMin;
-                    yMaxSlider.value = yMax;
-                    yMinValue.textContent = yMin;
-                    yMaxValue.textContent = yMax;
-                    mainTitleInput.value = mainTitle;
-                    gridToggle.textContent = showGrid ? '📏 网格线' : '📏 隐藏网格';
-                    rankingDate = dates[dates.length - 1] || '';
-                    if (rankingDateInput) rankingDateInput.value = rankingDate;
-                    renderSeriesManager();
-                    renderTables();
-                    renderChart();
-                    initCustomTooltip();
-                    initChartClick();
-                    initResizeHandles();
-                    initResizer();
-                    setStatus('info', '就绪');
-                    updateViewUI();
-                    console.log('✅ 数据已从 localStorage 恢复');
-                    setTimeout(() => {refreshPrices();}, 2500);
-                });
-            }
-
-            document.getElementById('deleteSelectedSeriesBtn').addEventListener('click', function () {
-                const selectedItems = seriesManager.querySelectorAll('.series-item.selected');
-                if (selectedItems.length === 0) {
-                    alert('请先点击选择要删除的指标（点击指标行可选中/取消选中）');
-                    return;
-                }
-                if (seriesKeys.length - selectedItems.length < 1) {
-                    alert('至少保留一个指标');
-                    return;
-                }
-                const names = Array.from(selectedItems).map(el => el.dataset.series);
-                if (!confirm(`确定要删除选中的 ${names.length} 个指标吗？\n\n${names.join('、')}`)) return;
-                const sorted = names.sort((a, b) => seriesKeys.indexOf(b) - seriesKeys.indexOf(a));
-                for (const name of sorted) {
-                    const idx = seriesKeys.indexOf(name);
-                    if (idx !== -1) {
-                        seriesKeys.splice(idx, 1);
-                        const sIdx = seriesList.findIndex(s => s.name === name);
-                        if (sIdx !== -1) seriesList.splice(sIdx, 1);
-                        if (trendLegendSelected.has(name)) trendLegendSelected.delete(name);
-                        if (waterfallSeriesName === name) {
-                            waterfallSeriesName = seriesKeys[0] || '';
-                        }
-                    }
-                }
+            // ---------- 公共初始化函数（避免重复代码） ----------
+            function finishInit(message) {
+                // 确保 UI 渲染完成
                 renderSeriesManager();
                 renderTables();
                 renderChart();
-                resetDanmaku();
-                updateWaterfallSelect();
+                initCustomTooltip();
+                initChartClick();
+                initResizeHandles();
+                initResizer();
+                setStatus('info', message || '就绪');
+                updateViewUI();
+                // 保存状态到 localStorage（如果是远程加载的，也存一份）
                 saveState();
-            });
+                // 延迟刷新股价（可选）
+                setTimeout(() => {refreshPrices();}, 2500);
+                console.log('✅ 初始化完成，数据来源：' + message);
+            }
+
+            // ---------- 1. 尝试从 localStorage 恢复 ----------
+            const loaded = loadState();
+            if (loaded) {
+                // 如果有本地缓存，直接使用，但还需要处理头像（可能本地存储的 base64）
+                processAllAvatars(() => {
+                    // 重新渲染（确保与最新状态同步）
+                    renderSeriesManager();
+                    renderTables();
+                    renderChart();
+                    initCustomTooltip();
+                    initChartClick();
+                    initResizeHandles();
+                    initResizer();
+                    setStatus('info', '已从本地缓存恢复');
+                    updateViewUI();
+                    saveState();
+                    setTimeout(() => {refreshPrices();}, 2500);
+                });
+                return; // 已完成初始化
+            }
+
+            // ---------- 2. 尝试从远程 data.json 加载 ----------
+            fetch('data.json')
+                .then(res => {
+                    if (!res.ok) throw new Error('HTTP ' + res.status);
+                    return res.json();
+                })
+                .then(state => {
+                    if (!validateState(state)) throw new Error('数据格式无效');
+                    // 加载状态
+                    if (loadStateFromObject(state)) {
+                        // 处理头像（此时头像路径可能是相对路径，processAllAvatars 会加载图片）
+                        processAllAvatars(() => {
+                            finishInit('data.json');
+                        });
+                    } else {
+                        throw new Error('状态应用失败');
+                    }
+                })
+                .catch(err => {
+                    console.warn('远程 data.json 加载失败，使用硬编码默认数据:', err);
+                    // ---------- 3. 后备：硬编码默认数据 ----------
+                    // 重置为初始硬编码数据（原来的默认数据）
+                    // 这里直接将 seriesList 等重置为初始值，并重新初始化
+                    // 注意：loadStateFromObject 已经失败，我们手动设置初始数据
+                    // 但为了避免污染，重新构建初始数据（与原来 if(!loaded) 中的代码一致）
+                    // 我们可以复用原来的默认数据生成逻辑，但为了简洁，直接使用一个预设的初始状态
+                    // 如果你希望保留原来硬编码的数据，可以直接复制那段代码。
+                    // 这里使用一个简化版本：使用 initialDates 和 initialSeriesData 等重新构建
+                    // 因为全局变量可能已被修改，需要重置
+                    resetToDefaultData();
+                    processAllAvatars(() => {
+                        finishInit('硬编码默认数据');
+                    });
+                });
         }
 
+        /**
+         * 重置全局数据为硬编码默认值（与原来 if(!loaded) 分支一致）
+         */
+        function resetToDefaultData() {
+            // 重新设置初始数据（从文件开头的几个变量恢复）
+            dates = ['2026-06-23', '2026-06-24', '2026-06-25', '2026-06-26', '2026-06-29', '2026-06-30', '2026-07-01'];
+            const defaultSeriesData = {
+                '英伟达': [208.65, 200.04, 199, 195.74, 192.53, 194.97, 200.09],
+                '中际旭创': [1310.01, 1312.18, 1323.4, 1253.89, 1220, 1270, 1223.17],
+                '小米集团': [22.62, 22.96, 22.3, 21.42, 21.86, 21.64, 21.64],
+                '消费指数': [0.6169, 0.6079, 0.6099, 0.6029, 0.622, 0.615, 0.63],
+                '医疗指数': [5881.32, 5935.43, 5979.94, 5827.57, 6127.38, 6049.63, 6222.21],
+                '比亚迪': [85, 83.3, 82.2, 78.2, 79.64, 79.7, 80.66],
+                '上证': [4106.25, 4110.77, 4120.22, 4027.26, 4073.9, 4094.4, 4112.45],
+                '长安汽车': [7.27, 7.02, 7.03, 6.86, 7.23, 7.17, 7.19],
+                '中国铁建': [6.3, 6.23, 6.14, 6.02, 6.04, 5.95, 6.05],
+                '飘小仙': [1, 1, 1, 1, 1, 1, 1]
+            };
+            const defaultColors = {
+                '英伟达': '#288500',
+                '中际旭创': '#ccf82a',
+                '小米集团': '#3b82f6',
+                '消费指数': '#9970d7',
+                '医疗指数': '#7ec101',
+                '比亚迪': '#e9ec27',
+                '上证': '#3be1f7',
+                '长安汽车': '#e6740a',
+                '中国铁建': '#f50aab',
+                '飘小仙': '#ef4444'
+            };
+            const defaultRemarks = {
+                '英伟达': '不去科技半导体没有明天',
+                '中际旭创': '中！继续创！',
+                '小米集团': 'R U OK?',
+                '消费指数': '定投指数得永生',
+                '医疗指数': '定投指数得永生',
+                '比亚迪': '套在byd',
+                '上证': '缅A',
+                '长安汽车': '长安改名以后叫长套',
+                '中国铁建': '我在中国铁建死扛',
+                '飘小仙': '有没有可能最终我因一分没投荣获本群投资大赛的第1名'
+            };
+            const defaultCodes = {
+                '英伟达': 'usNVDA',
+                '中际旭创': 'sz300308',
+                '小米集团': 'hk01810',
+                '消费指数': 'sz159928',
+                '医疗指数': 'sz399989',
+                '比亚迪': 'sz002594',
+                '上证': 'SH000001',
+                '长安汽车': 'sz000625',
+                '中国铁建': 'sh601186',
+                '飘小仙': ''
+            };
+
+            // 重新构建 seriesList
+            seriesList = Object.keys(defaultSeriesData).map(name => ({
+                name: name,
+                color: defaultColors[name] || '#3b82f6',
+                data: [...defaultSeriesData[name]],
+                avatarUrl: DEFAULT_AVATAR_SVG,
+                remark: defaultRemarks[name] || '',
+                code: defaultCodes[name] || '',
+                danmaku: []
+            }));
+            seriesKeys = seriesList.map(s => s.name);
+            yMin = -50;
+            yMax = 150;
+            yMinSlider.value = -50;
+            yMaxSlider.value = 150;
+            yMinValue.textContent = '-50';
+            yMaxValue.textContent = '150';
+            mainTitle = '📈 总变化率趋势';
+            mainTitleInput.value = mainTitle;
+            showGrid = true;
+            gridToggle.textContent = '📏 网格线';
+            viewMode = 'trend';
+            waterfallSeriesName = seriesKeys[0] || '';
+            rankingDate = dates[dates.length - 1] || '';
+            if (rankingDateInput) rankingDateInput.value = rankingDate;
+            trendLegendSelected = new Set();
+            // 清除可能存在的 localStorage 错误状态
+            try {localStorage.removeItem('trendState');} catch (e) { }
+        }
         // 布局稳定后再次 resize
         setTimeout(function () {
             try {myChart.resize();} catch (e) { }
