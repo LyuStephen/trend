@@ -2380,11 +2380,13 @@
             name: name,
             color: seriesColors[name] || '#3b82f6',
             data: [...initialSeriesData[name]],
-            avatarUrl: DEFAULT_AVATAR_SVG,
+            avatarUrl: seriesRemarks[name] ? '' : '', // 初始为空，由后续加载图片路径时填入
+            avatarData: null, // 新增字段，存储圆形Base64
             remark: seriesRemarks[name] || '',
             code: seriesCodes[name] || '',
             danmaku: []
         }));
+        // 注意：initialSeriesData 中的头像路径由 data.json 提供，这里不预设
         let seriesKeys = seriesList.map(s => s.name);
 
         let yMin = -50,
@@ -2513,7 +2515,8 @@
                 if (s.danmaku && s.danmaku.length > 0) {
                     s.danmaku.forEach(text => {
                         if (text && text.trim()) {
-                            result.push({text: text.trim(), avatarUrl: s.avatarUrl, name: s.name, color: s.color});
+                            result.push({text: text.trim(), avatarUrl: s.avatarData || s.avatarUrl || DEFAULT_AVATAR_SVG,
+                                name: s.name, color: s.color});
                         }
                     });
                 }
@@ -2835,16 +2838,17 @@
             return {
                 dates: dates,
                 seriesList: seriesList.map(s => {
+                    // 导出时优先使用 avatarUrl（文件路径），若为空则使用 avatarData（Base64）
                     let avatar = s.avatarUrl;
-                    // 只过滤 Base64 图片数据，保留 URL 路径（如 images/1.png）
-                    if (avatar && avatar.startsWith('data:image')) {
-                        avatar = '';
+                    if (!avatar && s.avatarData) {
+                        avatar = s.avatarData;
                     }
+                    // 如果 avatarData 也是空，则保留空字符串
                     return {
                         name: s.name,
                         color: s.color,
                         data: s.data,
-                        avatarUrl: avatar,  // 直接保留过滤后的值（路径或空字符串）
+                        avatarUrl: avatar,
                         remark: s.remark,
                         code: s.code || '',
                         danmaku: s.danmaku || []
@@ -2882,6 +2886,7 @@
             dates = state.dates;
             seriesList = state.seriesList.map(s => ({
                 ...s,
+                avatarData: null, // 新字段，初始为 null，由后续 processAllAvatars 生成
                 avatarUrl: s.avatarUrl || '',
                 remark: s.remark || '',
                 code: s.code || '',
@@ -3296,7 +3301,8 @@
                                 name: col,
                                 color: color,
                                 data: newDataMap[col],
-                                avatarUrl: DEFAULT_AVATAR_SVG,
+                                avatarUrl: '',
+                                avatarData: null,
                                 remark: '',
                                 code: '',
                                 danmaku: []
@@ -3541,7 +3547,7 @@
         });
 
         // ================================================================
-        //  头像处理
+        //  头像处理（修改：不覆盖avatarUrl，存入avatarData）
         // ================================================================
         function processAvatarUrl(src, callback) {
             if (!src || src === DEFAULT_AVATAR_SVG) {callback(DEFAULT_AVATAR_SVG); return;}
@@ -3553,12 +3559,29 @@
             const total = seriesList.length;
             if (total === 0) {callback(); return;}
             seriesList.forEach((s) => {
-                processAvatarUrl(s.avatarUrl, (newUrl) => {
-                    s.avatarUrl = newUrl;
-                    count++;
-                    if (count === total) {callback();}
-                });
+                // 如果avatarUrl是有效路径（非data:image，且不为空），生成圆形图存入avatarData
+                if (s.avatarUrl && !s.avatarUrl.startsWith('data:image') && s.avatarUrl !== DEFAULT_AVATAR_SVG) {
+                    processAvatarUrl(s.avatarUrl, (circularUrl) => {
+                        s.avatarData = circularUrl;
+                        count++;
+                        if (count === total) {callback();}
+                    });
+                } else {
+                    // 否则使用默认头像生成avatarData
+                    makeCircularImage(DEFAULT_AVATAR_SVG, (circularUrl) => {
+                        s.avatarData = circularUrl;
+                        count++;
+                        if (count === total) {callback();}
+                    });
+                }
             });
+        }
+
+        // 辅助函数：获取显示用的头像（优先avatarData，其次avatarUrl，最后默认）
+        function getAvatarSrc(series) {
+            if (series.avatarData) return series.avatarData;
+            if (series.avatarUrl) return series.avatarUrl;
+            return DEFAULT_AVATAR_SVG;
         }
 
         // ================================================================
@@ -3698,11 +3721,13 @@
                     diffToSH = (diffValue >= 0 ? '+' : '') + diffValue.toFixed(2) + '%';
                     diffColor = diffValue >= 0 ? '#ef4444' : '#22c55e';
                 }
+                // 头像显示：优先avatarData，其次avatarUrl
+                const avatar = getAvatarSrc(s);
                 html += `
                             <div class="series-item" data-series="${s.name}" data-index="${idx}">
                                 <div class="row-main">
                                     <span class="drag-handle">⠿</span>
-                                    <div class="avatar-sm"><img src="${s.avatarUrl}" alt="${s.name}" /></div>
+                                    <div class="avatar-sm"><img src="${avatar}" alt="${s.name}" /></div>
                                     <input class="series-name-input" type="text" value="${s.name}" data-oldname="${s.name}" />
                                     <input class="color-picker" type="color" value="${s.color}" />
                                     
@@ -3963,7 +3988,8 @@
                             processAvatarUrl(compressedUrl, (circularUrl) => {
                                 const s = getSeries(key);
                                 if (s) {
-                                    s.avatarUrl = circularUrl;
+                                    s.avatarData = circularUrl;
+                                    s.avatarUrl = ''; // 清空路径，表示已自定义头像
                                     renderSeriesManager();
                                     renderChart();
                                     resetDanmaku();
@@ -3979,15 +4005,15 @@
             seriesManager.querySelectorAll('[data-reset-avatar]').forEach(btn => {
                 btn.addEventListener('click', function () {
                     const key = this.dataset.resetAvatar;
-                    processAvatarUrl(DEFAULT_AVATAR_SVG, (circularUrl) => {
-                        const s = getSeries(key);
-                        if (s) {
-                            s.avatarUrl = circularUrl;
-                            renderSeriesManager();
-                            renderChart();
-                            resetDanmaku();
-                            saveState();
-                        }
+                    const s = getSeries(key);
+                    if (!s) return;
+                    makeCircularImage(DEFAULT_AVATAR_SVG, (circularUrl) => {
+                        s.avatarData = circularUrl;
+                        s.avatarUrl = ''; // 清空路径，表示使用默认
+                        renderSeriesManager();
+                        renderChart();
+                        resetDanmaku();
+                        saveState();
                     });
                 });
             });
@@ -4623,13 +4649,14 @@
                 name: newName,
                 color: newColor,
                 data: newData,
-                avatarUrl: DEFAULT_AVATAR_SVG,
+                avatarUrl: '',
+                avatarData: null,
                 remark: '新指标',
                 code: '',
                 danmaku: []
             };
-            processAvatarUrl(DEFAULT_AVATAR_SVG, (circularUrl) => {
-                newSeries.avatarUrl = circularUrl;
+            makeCircularImage(DEFAULT_AVATAR_SVG, (circularUrl) => {
+                newSeries.avatarData = circularUrl;
                 seriesList.push(newSeries);
                 seriesKeys.push(newName);
                 if (!waterfallSeriesName) waterfallSeriesName = newName;
@@ -5702,12 +5729,10 @@
             const latestIdx = getLatestIdx();
             const latestDate = dates[latestIdx];
             // 辅助函数：获取实际可用的头像 URL（用于图表 markPoint）
-            function getAvatarSrc(url) {
-                if (url && typeof url === 'string' && url.trim() !== '') {
-                    // 如果是 data:image、http 开头的完整 URL，或相对路径（如 images/1.png），直接返回
-                    return url;
-                }
-                return DEFAULT_AVATAR_SVG; // 空或无效时返回默认 SVG
+            function getAvatarSrcForChart(series) {
+                if (series.avatarData) return series.avatarData;
+                if (series.avatarUrl) return series.avatarUrl;
+                return DEFAULT_AVATAR_SVG;
             }
             const series = seriesKeys.map(key => {
                 const s = getSeries(key);
@@ -5733,15 +5758,15 @@
                     },
                     
                     markPoint: {
-                        symbol: 'image://' + getAvatarSrc(s.avatarUrl),  // 使用辅助函数
+                        symbol: 'image://' + getAvatarSrcForChart(s),
                         symbolSize: isMobileView() ? 30 : 42,
                         label: {show: false},
                         tooltip: {show: false},
                         data: [{
                             name: s.name + '_latest',
                             coord: [latestDate, latestChange],
-                            symbol: 'image://' + getAvatarSrc(s.avatarUrl), // 同样处理
-                            symbolSize: 42  // 可保持固定大小，或也用 isMobileView()
+                            symbol: 'image://' + getAvatarSrcForChart(s),
+                            symbolSize: 42
                         }],
                         itemStyle: {
                             borderColor: '#fff',
@@ -6088,9 +6113,6 @@
         // ================================================================
         //  初始化（远程 data.json 优先 + localStorage 后备 + 硬编码兜底）
         // ================================================================
-        // ================================================================
-        //  初始化（远程 data.json 优先 + localStorage 后备 + 硬编码兜底）
-        // ================================================================
         function init() {
             // ---------- 公共初始化函数 ----------
             function finishInit(message) {
@@ -6114,7 +6136,6 @@
                     if (!res.ok) {
                         throw new Error(`HTTP ${res.status} - ${res.statusText}`);
                     }
-                    // 检查 Content-Type 是否为 JSON
                     const contentType = res.headers.get('content-type');
                     if (contentType && !contentType.includes('application/json')) {
                         console.warn('⚠️ 响应不是 JSON 格式，实际类型：', contentType);
@@ -6218,7 +6239,8 @@
                 name: name,
                 color: defaultColors[name] || '#3b82f6',
                 data: [...defaultSeriesData[name]],
-                avatarUrl: DEFAULT_AVATAR_SVG,
+                avatarUrl: '',
+                avatarData: null,
                 remark: defaultRemarks[name] || '',
                 code: defaultCodes[name] || '',
                 danmaku: []
@@ -6305,7 +6327,7 @@
                 const s = getSeries(k);
                 if (!s) return null;
                 const change = calcTotalChange(s.data[firstIdx], s.data[lastIdx]);
-                return {name: k, color: s.color, avatar: s.avatarUrl, change: change, first: firstPlaceDays[k] || 0};
+                return {name: k, color: s.color, avatar: getAvatarSrc(s), change: change, first: firstPlaceDays[k] || 0};
             }).filter(Boolean).sort(function (a, b) {return b.change - a.change;});
 
             if (rankingDateSubEl) rankingDateSubEl.textContent = (dates[lastIdx] || '') + ' · 登顶天数';
