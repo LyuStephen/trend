@@ -4729,6 +4729,7 @@
         //  实时股价更新
         // ================================================================
         async function refreshPrices() {
+            alignDataLengths();
             if (isRefreshing) return;
 
             const codeMap = {};
