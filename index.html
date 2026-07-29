@@ -5987,11 +5987,9 @@
             });
         });
 
+
         // ================================================================
-        //  初始化
-        // ================================================================
-        // ================================================================
-        //  初始化（支持远程 data.json 加载 + localStorage + 硬编码后备）
+        //  初始化（远程 data.json 优先 + localStorage 后备 + 硬编码兜底）
         // ================================================================
         function init() {
             // ---------- 公共初始化函数（避免重复代码） ----------
@@ -6006,36 +6004,15 @@
                 initResizer();
                 setStatus('info', message || '就绪');
                 updateViewUI();
-                // 保存状态到 localStorage（如果是远程加载的，也存一份）
+                // 保存状态到 localStorage（将最新数据缓存）
                 saveState();
                 // 延迟刷新股价（可选）
                 setTimeout(() => {refreshPrices();}, 2500);
                 console.log('✅ 初始化完成，数据来源：' + message);
             }
 
-            // ---------- 1. 尝试从 localStorage 恢复 ----------
-            const loaded = loadState();
-            if (loaded) {
-                // 如果有本地缓存，直接使用，但还需要处理头像（可能本地存储的 base64）
-                processAllAvatars(() => {
-                    // 重新渲染（确保与最新状态同步）
-                    renderSeriesManager();
-                    renderTables();
-                    renderChart();
-                    initCustomTooltip();
-                    initChartClick();
-                    initResizeHandles();
-                    initResizer();
-                    setStatus('info', '已从本地缓存恢复');
-                    updateViewUI();
-                    saveState();
-                    setTimeout(() => {refreshPrices();}, 2500);
-                });
-                return; // 已完成初始化
-            }
-
-            // ---------- 2. 尝试从远程 data.json 加载 ----------
-            fetch('data.json')
+            // ---------- 1. 优先从远程 data.json 加载（添加时间戳防止浏览器缓存） ----------
+            fetch('data.json?t=' + Date.now())
                 .then(res => {
                     if (!res.ok) throw new Error('HTTP ' + res.status);
                     return res.json();
@@ -6046,30 +6023,43 @@
                     if (loadStateFromObject(state)) {
                         // 处理头像（此时头像路径可能是相对路径，processAllAvatars 会加载图片）
                         processAllAvatars(() => {
-                            finishInit('data.json');
+                            finishInit('data.json（远程）');
                         });
                     } else {
                         throw new Error('状态应用失败');
                     }
                 })
                 .catch(err => {
-                    console.warn('远程 data.json 加载失败，使用硬编码默认数据:', err);
-                    // ---------- 3. 后备：硬编码默认数据 ----------
-                    // 重置为初始硬编码数据（原来的默认数据）
-                    // 这里直接将 seriesList 等重置为初始值，并重新初始化
-                    // 注意：loadStateFromObject 已经失败，我们手动设置初始数据
-                    // 但为了避免污染，重新构建初始数据（与原来 if(!loaded) 中的代码一致）
-                    // 我们可以复用原来的默认数据生成逻辑，但为了简洁，直接使用一个预设的初始状态
-                    // 如果你希望保留原来硬编码的数据，可以直接复制那段代码。
-                    // 这里使用一个简化版本：使用 initialDates 和 initialSeriesData 等重新构建
-                    // 因为全局变量可能已被修改，需要重置
+                    console.warn('远程 data.json 加载失败，尝试 localStorage:', err);
+                    // ---------- 2. 后备：从 localStorage 恢复 ----------
+                    const loaded = loadState();
+                    if (loaded) {
+                        // 有本地缓存，但需要处理头像（可能本地存储的 base64）
+                        processAllAvatars(() => {
+                            // 重新渲染（确保与最新状态同步）
+                            renderSeriesManager();
+                            renderTables();
+                            renderChart();
+                            initCustomTooltip();
+                            initChartClick();
+                            initResizeHandles();
+                            initResizer();
+                            setStatus('info', '已从本地缓存恢复（远程不可用）');
+                            updateViewUI();
+                            saveState();
+                            setTimeout(() => {refreshPrices();}, 2500);
+                        });
+                        return; // 已完成初始化
+                    }
+
+                    // ---------- 3. 最后：硬编码默认数据 ----------
+                    console.warn('本地缓存也无数据，使用硬编码默认数据');
                     resetToDefaultData();
                     processAllAvatars(() => {
                         finishInit('硬编码默认数据');
                     });
                 });
         }
-
         /**
          * 重置全局数据为硬编码默认值（与原来 if(!loaded) 分支一致）
          */
