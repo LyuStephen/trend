@@ -2946,7 +2946,8 @@
             if (px) {
                 px.data = px.data.map(() => 1);
             }
-
+            rankingDate = dates[dates.length - 1] || '';
+            if (rankingDateInput) rankingDateInput.value = rankingDate;
             updateViewUI();
             return true;
         }
