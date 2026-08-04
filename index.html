@@ -5937,47 +5937,47 @@
                 series: series
             };
             myChart.setOption(option, true);
-            myChart.resize();
 
-            myChart.off('legendselectchanged');
-            myChart.on('legendselectchanged', function (params) {
-                if (params.name) {
-                    const name = params.name;
-                    const isCtrl = ctrlPressed;
+// ★★★ 清除之前的 graphic ★★★
+myChart.setOption({ graphic: [] });
 
-                    if (isCtrl) {
-                        if (trendLegendSelected.has(name)) {
-                            trendLegendSelected.delete(name);
-                        } else {
-                            trendLegendSelected.add(name);
-                        }
-                    } else {
-                        if (trendLegendSelected.size === 1 && trendLegendSelected.has(name)) {
-                            trendLegendSelected.clear();
-                        } else {
-                            trendLegendSelected.clear();
-                            trendLegendSelected.add(name);
-                        }
-                    }
+// ★★★ 渲染完成后添加头像 graphic ★★★
+myChart.on('finished', function onFinished() {
+    myChart.off('finished', onFinished);
+    const graphicElements = [];
+    const isMobile = isMobileView();
+    const avatarSize = isMobile ? 22 : 28;
+    const leftOffset = isMobile ? 26 : 34;
 
-                    const newSelected = {};
-                    if (trendLegendSelected.size === 0) {
-                        seriesKeys.forEach(key => {newSelected[key] = true;});
-                    } else {
-                        seriesKeys.forEach(key => {
-                            newSelected[key] = trendLegendSelected.has(key);
-                        });
-                    }
-
-                    myChart.setOption({legend: {selected: newSelected}});
-                    saveState();
-                }
+    items.forEach((item, index) => {
+        const s = getSeries(item.name);
+        if (!s) return;
+        const avatar = getAvatarSrc(s);
+        if (!avatar || avatar === DEFAULT_AVATAR_SVG) return;
+        const coord = myChart.convertToPixel('grid', [0, index]);
+        if (coord && !isNaN(coord[0]) && !isNaN(coord[1])) {
+            graphicElements.push({
+                type: 'image',
+                style: {
+                    image: avatar,
+                    x: coord[0] - leftOffset,
+                    y: coord[1] - avatarSize / 2,
+                    width: avatarSize,
+                    height: avatarSize,
+                    borderRadius: avatarSize / 2
+                },
+                z: 100,
+                zlevel: 10
             });
+        }
+    });
+    if (graphicElements.length > 0) {
+        myChart.setOption({ graphic: graphicElements });
+    }
+});
 
-            setTimeout(() => {
-                updateAvatarPositions();
-                resetDanmaku();
-            }, 100);
+myChart.resize();
+setTimeout(() => {resetDanmaku();}, 100);
         }
 
         // ================================================================
