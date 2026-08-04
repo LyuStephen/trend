@@ -2515,8 +2515,10 @@
                 if (s.danmaku && s.danmaku.length > 0) {
                     s.danmaku.forEach(text => {
                         if (text && text.trim()) {
-                            result.push({text: text.trim(), avatarUrl: s.avatarData || s.avatarUrl || DEFAULT_AVATAR_SVG,
-                                name: s.name, color: s.color});
+                            result.push({
+                                text: text.trim(), avatarUrl: s.avatarData || s.avatarUrl || DEFAULT_AVATAR_SVG,
+                                name: s.name, color: s.color
+                            });
                         }
                     });
                 }
@@ -2527,7 +2529,17 @@
         function pickRandomDanmaku(n) {
             const all = getAllDanmaku();
             if (all.length === 0) return [];
-            const shuffled = all.sort(() => Math.random() - 0.5);
+            // ★★★ 按弹幕文本去重，避免移动端显示重复内容 ★★★
+            const unique = [];
+            const seen = new Set();
+            all.forEach(item => {
+                if (!seen.has(item.text)) {
+                    seen.add(item.text);
+                    unique.push(item);
+                }
+            });
+            if (unique.length === 0) return [];
+            const shuffled = unique.sort(() => Math.random() - 0.5);
             return shuffled.slice(0, n);
         }
 
@@ -2958,7 +2970,9 @@
             if (px) {
                 px.data = px.data.map(() => 1);
             }
-            rankingDate = dates[dates.length - 1] || '';
+            // ★★★ 默认选中“今天”（如果存在），否则使用最后一天 ★★★
+            const today = getTodayStr();
+            rankingDate = dates.includes(today) ? today : (dates[dates.length - 1] || '');
             if (rankingDateInput) rankingDateInput.value = rankingDate;
             updateViewUI();
             return true;
@@ -5394,8 +5408,8 @@
                     textStyle: {color: isDark ? '#e2e8f0' : '#1e293b'}
                 },
                 grid: {
-                    left: 120,
-                    right: isMobileView() ? 60 : 40,   // ★ 移动端增加右侧留白
+                    left: isMobileView() ? 90 : 154,
+                    right: isMobileView() ? 60 : 40,
                     top: 20,
                     bottom: 30
                 },
@@ -5452,6 +5466,46 @@
             };
 
             myChart.setOption(option, true);
+
+            // ★★★ 清除之前的 graphic ★★★
+            myChart.setOption({graphic: []});
+
+            // ★★★ 渲染完成后添加头像 graphic ★★★
+            myChart.on('finished', function onFinished() {
+                myChart.off('finished', onFinished);
+                const graphicElements = [];
+                const isMobile = isMobileView();
+                const avatarSize = isMobile ? 22 : 28;
+                const leftOffset = isMobile ? 26 : 34;
+
+                items.forEach((item, index) => {
+                    const s = getSeries(item.name);
+                    if (!s) return;
+                    const avatar = getAvatarSrc(s);
+                    // 如果是默认头像则跳过，避免显示灰色占位
+                    if (!avatar || avatar === DEFAULT_AVATAR_SVG) return;
+                    const coord = myChart.convertToPixel('grid', [0, index]);
+                    if (coord && !isNaN(coord[0]) && !isNaN(coord[1])) {
+                        graphicElements.push({
+                            type: 'image',
+                            style: {
+                                image: avatar,
+                                x: coord[0] - leftOffset,
+                                y: coord[1] - avatarSize / 2,
+                                width: avatarSize,
+                                height: avatarSize,
+                                borderRadius: avatarSize / 2
+                            },
+                            z: 100,
+                            zlevel: 10
+                        });
+                    }
+                });
+                if (graphicElements.length > 0) {
+                    myChart.setOption({graphic: graphicElements});
+                }
+            });
+
             myChart.resize();
             setTimeout(() => {resetDanmaku();}, 100);
         }
@@ -5756,7 +5810,7 @@
                             {offset: 1, color: s.color + '05'}
                         ])
                     },
-                    
+
                     markPoint: {
                         symbol: 'image://' + getAvatarSrcForChart(s),
                         symbolSize: isMobileView() ? 30 : 42,
@@ -6258,7 +6312,9 @@
             gridToggle.textContent = '📏 网格线';
             viewMode = 'trend';
             waterfallSeriesName = seriesKeys[0] || '';
-            rankingDate = dates[dates.length - 1] || '';
+            // ★★★ 默认选中“今天”（如果存在），否则使用最后一天 ★★★
+            const today = getTodayStr();
+            rankingDate = dates.includes(today) ? today : (dates[dates.length - 1] || '');
             if (rankingDateInput) rankingDateInput.value = rankingDate;
             trendLegendSelected = new Set();
             // 清除可能存在的 localStorage 错误状态
