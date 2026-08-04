@@ -2400,6 +2400,7 @@
         let viewMode = 'trend'; // 'trend' | 'waterfall' | 'ranking'
         let waterfallSeriesName = seriesKeys[0] || '';
         let rankingDate = dates[dates.length - 1] || '';
+        let rankingAutoSetDone = false;  // 标记是否已自动设置过今天
 
         // ★★★ 趋势图图例选中状态 ★★★
         let trendLegendSelected = new Set();
@@ -3048,20 +3049,33 @@
         }
 
         viewToggleGroup.addEventListener('click', function (e) {
-            const btn = e.target.closest('.view-btn');
-            if (!btn) return;
-            const v = btn.dataset.view;
-            if (v === viewMode) return;
-            viewMode = v;
-            if (viewMode === 'waterfall' && !waterfallSeriesName && seriesKeys.length > 0) {
-                waterfallSeriesName = seriesKeys[0];
-            }
-            if (viewMode === 'trend') {
-                trendLegendSelected = new Set();
-            }
-            updateViewUI();
-            resetDanmaku();
-        });
+    const btn = e.target.closest('.view-btn');
+    if (!btn) return;
+    const v = btn.dataset.view;
+    if (v === viewMode) return;
+    viewMode = v;
+    if (viewMode === 'waterfall' && !waterfallSeriesName && seriesKeys.length > 0) {
+        waterfallSeriesName = seriesKeys[0];
+    }
+    if (viewMode === 'trend') {
+        trendLegendSelected = new Set();
+    }
+    // ★★★ 当切换到排行时，若尚未自动设置过，则自动设为今天 ★★★
+    if (viewMode === 'ranking' && !rankingAutoSetDone) {
+        const today = getTodayStr();
+        if (dates.includes(today)) {
+            rankingDate = today;
+            if (rankingDateInput) rankingDateInput.value = today;
+            rankingAutoSetDone = true;   // 标记已自动设置过
+        } else {
+            // 若今天不在数据中，则选最后一天，但不标记 done，以便日后有机会自动设今天
+            rankingDate = dates[dates.length - 1] || '';
+            if (rankingDateInput) rankingDateInput.value = rankingDate;
+        }
+    }
+    updateViewUI();
+    resetDanmaku();
+});
 
         waterfallSeriesSelect.addEventListener('change', function () {
             waterfallSeriesName = this.value;
