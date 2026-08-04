@@ -2528,21 +2528,21 @@
         }
 
         function pickRandomDanmaku(n) {
-            const all = getAllDanmaku();
-            if (all.length === 0) return [];
-            // ★★★ 按弹幕文本去重，避免移动端显示重复内容 ★★★
-            const unique = [];
-            const seen = new Set();
-            all.forEach(item => {
-                if (!seen.has(item.text)) {
-                    seen.add(item.text);
-                    unique.push(item);
-                }
-            });
-            if (unique.length === 0) return [];
-            const shuffled = unique.sort(() => Math.random() - 0.5);
-            return shuffled.slice(0, n);
+    const all = getAllDanmaku();
+    if (all.length === 0) return [];
+    // ★★★ 按弹幕文本去重，避免移动端显示重复内容 ★★★
+    const unique = [];
+    const seen = new Set();
+    all.forEach(item => {
+        if (!seen.has(item.text)) {
+            seen.add(item.text);
+            unique.push(item);
         }
+    });
+    if (unique.length === 0) return [];
+    const shuffled = unique.sort(() => Math.random() - 0.5);
+    return shuffled.slice(0, n);
+}
 
         class Danmaku {
             constructor(text, avatarUrl, name, color, canvasWidth, canvasHeight) {
