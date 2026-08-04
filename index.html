@@ -1803,9 +1803,9 @@
                 height: 32px;
                 border-radius: 50%;
                 border: 1px solid var(--border-color);
+                object-fit: cover;
                 flex-shrink: 0;
-                background: var(--bg-panel);
-                overflow: hidden;
+                background: #fff;
             }
 
             .ranking-item .r-name {
@@ -2503,8 +2503,8 @@
         function getDanmakuConfig() {
             const mobile = isMobileView();
             return {
-                count: mobile ? 5 : 6,          // 移动端提升至 5 条
-                speedFactor: mobile ? 0.7 : 1.0, // 速度略微提升
+                count: mobile ? 2 : 6,
+                speedFactor: mobile ? 0.6 : 1.0,
                 avatarSize: mobile ? 24 : 30
             };
         }
@@ -2515,10 +2515,8 @@
                 if (s.danmaku && s.danmaku.length > 0) {
                     s.danmaku.forEach(text => {
                         if (text && text.trim()) {
-                            result.push({
-                                text: text.trim(), avatarUrl: s.avatarData || s.avatarUrl || DEFAULT_AVATAR_SVG,
-                                name: s.name, color: s.color
-                            });
+                            result.push({text: text.trim(), avatarUrl: s.avatarData || s.avatarUrl || DEFAULT_AVATAR_SVG,
+                                name: s.name, color: s.color});
                         }
                     });
                 }
@@ -2529,18 +2527,7 @@
         function pickRandomDanmaku(n) {
             const all = getAllDanmaku();
             if (all.length === 0) return [];
-            // 去重（按 text 去重，保留第一个）
-            const uniqueMap = new Map();
-            all.forEach(item => {
-                if (!uniqueMap.has(item.text)) {
-                    uniqueMap.set(item.text, item);
-                }
-            });
-            const unique = Array.from(uniqueMap.values());
-            if (unique.length === 0) return [];
-            // 如果去重后数量少于 n，则允许重复，但尽量多选不同
-            const pool = unique.length >= n ? unique : unique.concat(all.slice(0, n - unique.length));
-            const shuffled = pool.sort(() => Math.random() - 0.5);
+            const shuffled = all.sort(() => Math.random() - 0.5);
             return shuffled.slice(0, n);
         }
 
@@ -5345,17 +5332,11 @@
             if (viewMode !== 'ranking') return;
             myChart.clear();
 
-            // 自动尝试使用今天
-            const todayStr = getTodayStr();
+            // 确定日期
             let targetDate = rankingDate;
-            // 如果 rankingDate 无效，或不是今天，且今天有数据，则优先使用今天
-            if (!targetDate || !dates.includes(targetDate) || targetDate !== todayStr) {
-                if (dates.includes(todayStr)) {
-                    targetDate = todayStr;
-                } else {
-                    targetDate = dates[dates.length - 1] || '';
-                }
-                rankingDate = targetDate;
+            if (!targetDate || !dates.includes(targetDate)) {
+                rankingDate = dates[dates.length - 1] || '';
+                targetDate = rankingDate;
                 if (rankingDateInput) rankingDateInput.value = targetDate;
             }
             if (!targetDate || !dates.includes(targetDate)) {
@@ -5775,7 +5756,7 @@
                             {offset: 1, color: s.color + '05'}
                         ])
                     },
-
+                    
                     markPoint: {
                         symbol: 'image://' + getAvatarSrcForChart(s),
                         symbolSize: isMobileView() ? 30 : 42,
@@ -6358,13 +6339,8 @@
             rankingListEl.innerHTML = items.map(function (it) {
                 const up = it.change >= 0;
                 const sign = up ? '+' : '';
-                // 使用 div + background-image 方式，并增加纯色备用
-                const avatarStyle = it.avatar ?
-                    `background-image: url(${it.avatar}); background-size: cover; background-position: center;` :
-                    `background: ${it.color}40; display: flex; align-items: center; justify-content: center; font-size: 14px; color: ${it.color};`;
-                const avatarHtml = `<div class="r-avatar" style="${avatarStyle}"></div>`;
-                // ...
-                '<div class="ranking-item">' +
+                const avatarHtml = it.avatar ? '<img class="r-avatar" src="' + it.avatar + '" alt="">' : '';
+                return '<div class="ranking-item">' +
                     '<span class="r-dot" style="background:' + it.color + ';"></span>' +
                     avatarHtml +
                     '<span class="r-name">' + it.name + '</span>' +
