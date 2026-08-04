@@ -3085,15 +3085,17 @@
 
         // 排行日期选择
         rankingDateInput.addEventListener('change', function () {
-            rankingDate = this.value;
-            if (rankingDate && dates.includes(rankingDate)) {
-                updateViewUI();
-                resetDanmaku();
-            } else {
-                alert('所选日期不在数据范围内，请选择有效日期');
-                this.value = rankingDate;
-            }
-        });
+    const val = this.value;
+    if (val && dates.includes(val)) {
+        rankingDate = val;
+        rankingAutoSetDone = true;   // 用户手动选择，今后不再自动覆盖
+        updateViewUI();
+        resetDanmaku();
+    } else {
+        alert('所选日期不在数据范围内，请选择有效日期');
+        this.value = rankingDate;
+    }
+});
 
         // ================================================================
         //  导入导出（与之前相同，略）
