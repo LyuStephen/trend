@@ -5937,48 +5937,11 @@
                 series: series
             };
             myChart.setOption(option, true);
-
-// ★★★ 清除之前的 graphic ★★★
-myChart.setOption({ graphic: [] });
-
-// ★★★ 渲染完成后添加头像 graphic ★★★
-myChart.on('finished', function onFinished() {
-    myChart.off('finished', onFinished);
-    const graphicElements = [];
-    const isMobile = isMobileView();
-    const avatarSize = isMobile ? 22 : 28;
-    const leftOffset = isMobile ? 26 : 34;
-
-    items.forEach((item, index) => {
-        const s = getSeries(item.name);
-        if (!s) return;
-        const avatar = getAvatarSrc(s);
-        if (!avatar || avatar === DEFAULT_AVATAR_SVG) return;
-        const coord = myChart.convertToPixel('grid', [0, index]);
-        if (coord && !isNaN(coord[0]) && !isNaN(coord[1])) {
-            graphicElements.push({
-                type: 'image',
-                style: {
-                    image: avatar,
-                    x: coord[0] - leftOffset,
-                    y: coord[1] - avatarSize / 2,
-                    width: avatarSize,
-                    height: avatarSize,
-                    borderRadius: avatarSize / 2
-                },
-                z: 100,
-                zlevel: 10
-            });
+            myChart.resize();
+            setTimeout(() => {resetDanmaku();}, 100);
         }
-    });
-    if (graphicElements.length > 0) {
-        myChart.setOption({ graphic: graphicElements });
-    }
-});
 
-myChart.resize();
-setTimeout(() => {resetDanmaku();}, 100);
-        }
+
 
         // ================================================================
         //  Y轴控制 & 重置 & 滚轮缩放
