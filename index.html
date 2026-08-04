@@ -3049,33 +3049,33 @@
         }
 
         viewToggleGroup.addEventListener('click', function (e) {
-    const btn = e.target.closest('.view-btn');
-    if (!btn) return;
-    const v = btn.dataset.view;
-    if (v === viewMode) return;
-    viewMode = v;
-    if (viewMode === 'waterfall' && !waterfallSeriesName && seriesKeys.length > 0) {
-        waterfallSeriesName = seriesKeys[0];
-    }
-    if (viewMode === 'trend') {
-        trendLegendSelected = new Set();
-    }
-    // ★★★ 切换到排行时，若尚未自动设置过，则自动设为今天 ★★★
-    if (viewMode === 'ranking' && !rankingAutoSetDone) {
-        const today = getTodayStr();
-        if (dates.includes(today)) {
-            rankingDate = today;
-            if (rankingDateInput) rankingDateInput.value = today;
-            rankingAutoSetDone = true;   // 标记已自动设置过
-        } else {
-            // 若今天不在数据中，则选最后一天，但不标记 done，以便日后有机会自动设今天
-            rankingDate = dates[dates.length - 1] || '';
-            if (rankingDateInput) rankingDateInput.value = rankingDate;
-        }
-    }
-    updateViewUI();
-    resetDanmaku();
-});
+            const btn = e.target.closest('.view-btn');
+            if (!btn) return;
+            const v = btn.dataset.view;
+            if (v === viewMode) return;
+            viewMode = v;
+            if (viewMode === 'waterfall' && !waterfallSeriesName && seriesKeys.length > 0) {
+                waterfallSeriesName = seriesKeys[0];
+            }
+            if (viewMode === 'trend') {
+                trendLegendSelected = new Set();
+            }
+            // ★★★ 切换到排行时，若尚未自动设置过，则自动设为今天 ★★★
+            if (viewMode === 'ranking' && !rankingAutoSetDone) {
+                const today = getTodayStr();
+                if (dates.includes(today)) {
+                    rankingDate = today;
+                    if (rankingDateInput) rankingDateInput.value = today;
+                    rankingAutoSetDone = true;   // 标记已自动设置过
+                } else {
+                    // 若今天不在数据中，则选最后一天，但不标记 done，以便日后有机会自动设今天
+                    rankingDate = dates[dates.length - 1] || '';
+                    if (rankingDateInput) rankingDateInput.value = rankingDate;
+                }
+            }
+            updateViewUI();
+            resetDanmaku();
+        });
 
         waterfallSeriesSelect.addEventListener('change', function () {
             waterfallSeriesName = this.value;
@@ -3085,17 +3085,17 @@
 
         // 排行日期选择
         rankingDateInput.addEventListener('change', function () {
-    const val = this.value;
-    if (val && dates.includes(val)) {
-        rankingDate = val;
-        rankingAutoSetDone = true;   // 用户手动选择，今后不再自动覆盖
-        updateViewUI();
-        resetDanmaku();
-    } else {
-        alert('所选日期不在数据范围内，请选择有效日期');
-        this.value = rankingDate;
-    }
-});
+            const val = this.value;
+            if (val && dates.includes(val)) {
+                rankingDate = val;
+                rankingAutoSetDone = true;   // 用户手动选择，今后不再自动覆盖
+                updateViewUI();
+                resetDanmaku();
+            } else {
+                alert('所选日期不在数据范围内，请选择有效日期');
+                this.value = rankingDate;
+            }
+        });
 
         // ================================================================
         //  导入导出（与之前相同，略）
@@ -5424,7 +5424,7 @@
                     textStyle: {color: isDark ? '#e2e8f0' : '#1e293b'}
                 },
                 grid: {
-                    left: isMobileView() ? 90 : 154,
+                    left: isMobileView() ? 120 : 200,   // 留出头像空间
                     right: isMobileView() ? 60 : 40,
                     top: 20,
                     bottom: 30
@@ -5488,47 +5488,56 @@
 
             // ★★★ 渲染完成后添加头像 graphic ★★★
             myChart.on('finished', function onFinished() {
-    myChart.off('finished', onFinished);
-    const graphicElements = [];
-    const isMobile = isMobileView();
-    const avatarSize = isMobile ? 22 : 28;
-    const padding = isMobile ? 6 : 10;
-    
-    // 获取 grid 的像素矩形，得到左边界位置
-    const gridModel = myChart.getModel().getComponent('grid');
-    if (!gridModel) return;
-    const gridRect = gridModel.getCoordSys().getRect();
-    const gridLeft = gridRect.x; // grid 左边界像素
-    
-    items.forEach((item, index) => {
-        const s = getSeries(item.name);
-        if (!s) return;
-        const avatar = getAvatarSrc(s);
-        if (!avatar || avatar === DEFAULT_AVATAR_SVG) return;
-        // 获取 y 坐标（类别轴对应的像素位置）
-        const coord = myChart.convertToPixel('grid', [0, index]);
-        if (coord && !isNaN(coord[0]) && !isNaN(coord[1])) {
-            const x = gridLeft - avatarSize - padding; // 放在 grid 左侧外部
-            const y = coord[1] - avatarSize / 2;
-            graphicElements.push({
-                type: 'image',
-                style: {
-                    image: avatar,
-                    x: x,
-                    y: y,
-                    width: avatarSize,
-                    height: avatarSize,
-                    borderRadius: avatarSize / 2
-                },
-                z: 100,
-                zlevel: 10
+                myChart.off('finished', onFinished);
+                const graphicElements = [];
+                const isMobile = isMobileView();
+                const avatarSize = isMobile ? 22 : 28;
+                const gap = isMobile ? 8 : 14;        // 与 grid 左侧的间距
+
+                // 获取 grid 组件
+                const gridModel = myChart.getModel().getComponent('grid');
+                if (!gridModel) return;
+                const gridCoordSys = gridModel.getCoordSys();
+                // 获取 grid 的像素边界（相对于图表容器）
+                const gridRect = gridCoordSys.getRect();
+                // 头像摆放的 x 坐标：grid 左边框外侧
+                const avatarX = gridRect.x - avatarSize - gap;
+
+                // 遍历 items（已排序，顺序与 yAxis 类别一致）
+                items.forEach((item, index) => {
+                    const s = getSeries(item.name);
+                    if (!s) return;
+                    const avatar = getAvatarSrc(s);
+                    // 跳过无效头像（默认灰色或空）
+                    if (!avatar || avatar === DEFAULT_AVATAR_SVG) return;
+
+                    // 获取该类别对应的 y 轴像素位置（注意：yAxis 类别轴 index 从 0 开始）
+                    const coord = myChart.convertToPixel('grid', [0, index]);
+                    if (coord && !isNaN(coord[0]) && !isNaN(coord[1])) {
+                        const avatarY = coord[1] - avatarSize / 2;
+                        graphicElements.push({
+                            type: 'image',
+                            style: {
+                                image: avatar,
+                                x: avatarX,
+                                y: avatarY,
+                                width: avatarSize,
+                                height: avatarSize,
+                                borderRadius: avatarSize / 2,
+                                clip: false   // 防止被 grid 裁剪
+                            },
+                            z: 100,
+                            zlevel: 10
+                        });
+                    }
+                });
+
+                // 先清空旧 graphic，再设置新 graphic
+                if (graphicElements.length > 0) {
+                    myChart.setOption({graphic: []});
+                    myChart.setOption({graphic: graphicElements});
+                }
             });
-        }
-    });
-    if (graphicElements.length > 0) {
-        myChart.setOption({ graphic: graphicElements });
-    }
-});
 
             myChart.resize();
             setTimeout(() => {resetDanmaku();}, 100);
