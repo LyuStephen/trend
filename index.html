@@ -2389,6 +2389,8 @@
         // 注意：initialSeriesData 中的头像路径由 data.json 提供，这里不预设
         let seriesKeys = seriesList.map(s => s.name);
 
+        let legendChanging = false;
+
         let yMin = -50,
             yMax = 150;
         let mainTitle = '📈 总变化率趋势';
@@ -2400,7 +2402,7 @@
         let viewMode = 'trend'; // 'trend' | 'waterfall' | 'ranking'
         let waterfallSeriesName = seriesKeys[0] || '';
         let rankingDate = dates[dates.length - 1] || '';
-        let rankingAutoSetDone = false;
+        let rankingAutoSetDone = false;  // 标记是否已自动设置过今天
 
         // ★★★ 趋势图图例选中状态 ★★★
         let trendLegendSelected = new Set();
@@ -3060,7 +3062,7 @@
             if (viewMode === 'trend') {
                 trendLegendSelected = new Set();
             }
-            // ★★★ 切换到排行时，若尚未自动设置过，则自动设为今天 ★★★
+            // ★★★ 当切换到排行时，若尚未自动设置过，则自动设为今天 ★★★
             if (viewMode === 'ranking' && !rankingAutoSetDone) {
                 const today = getTodayStr();
                 if (dates.includes(today)) {
@@ -4108,36 +4110,32 @@
         // ================================================================
         //  更新关联单元格
         // ================================================================
-        function updateLinkedCells(row, key) {
-            const dailyInputs = dailyBody.querySelectorAll(`input[data-row="${row}"][data-series="${key}"]`);
-            dailyInputs.forEach(inp => {
-                const s = getSeries(key);
-                if (!s) return;
-                let dailyChange = 0;
-                if (row === 0) dailyChange = 0;
-                else {
-                    const prev = s.data[row - 1];
-                    const curr = s.data[row];
-                    dailyChange = calcDailyChange(prev, curr);
-                }
-                inp.value = formatDisplay(dailyChange);
-            });
-            const totalInputs = totalBody.querySelectorAll(`input[data-row="${row}"][data-series="${key}"]`);
-            totalInputs.forEach(inp => {
-                const s = getSeries(key);
-                if (!s) return;
-                const base = s.data[0];
-                const curr = s.data[row];
-                const totalChange = calcTotalChange(base, curr);
-                inp.value = formatDisplay(totalChange);
-            });
-            const rawInputs = rawBody.querySelectorAll(`input[data-row="${row}"][data-series="${key}"]`);
-            rawInputs.forEach(inp => {
-                const s = getSeries(key);
-                if (s) {inp.value = formatDisplay(s.data[row]);}
-            });
-        }
+        function updateLinkedCells(seriesName, date) {
+            const s = getSeries(seriesName);
+            if (!s) return;
+            const idx = dates.indexOf(date);
+            if (idx === -1) return;
 
+            // 更新原始值（确保显示最新数值）
+            const rawInput = rawBody.querySelector(`input[data-row="${seriesName}"][data-col="${date}"]`);
+            if (rawInput) rawInput.value = formatDisplay(s.data[idx]);
+
+            // 更新当日变化率
+            let dailyChange = 0;
+            if (idx > 0) {
+                const prev = s.data[idx - 1];
+                const curr = s.data[idx];
+                dailyChange = calcDailyChange(prev, curr);
+            }
+            const dailyInput = dailyBody.querySelector(`input[data-row="${seriesName}"][data-col="${date}"]`);
+            if (dailyInput) dailyInput.value = formatDisplay(dailyChange);
+
+            // 更新总变化率
+            const base = s.data[0];
+            const totalChange = calcTotalChange(base, s.data[idx]);
+            const totalInput = totalBody.querySelector(`input[data-row="${seriesName}"][data-col="${date}"]`);
+            if (totalInput) totalInput.value = formatDisplay(totalChange);
+        }
         // ================================================================
         //  渲染表格
         // ================================================================
@@ -5035,7 +5033,7 @@
                 const {name, price, s} = result;
                 if (price > 0) {
                     s.data[targetIdx] = price;
-                    updateLinkedCells(targetIdx, name);
+                    updateLinkedCells(name, targetDate); 
                     updatedCount++;
                     s.updateStatus = 'success';
                 } else {
@@ -5184,7 +5182,7 @@
                             s.data[i] = priceMap[d];
                             matched++;
                             totalMatched++;
-                            updateLinkedCells(i, name);
+                            updateLinkedCells(name, dates[i]); 
                         }
                     }
 
@@ -5424,7 +5422,7 @@
                     textStyle: {color: isDark ? '#e2e8f0' : '#1e293b'}
                 },
                 grid: {
-                    left: isMobileView() ? 120 : 200,   // 留出头像空间
+                    left: isMobileView() ? 90 : 154,
                     right: isMobileView() ? 60 : 40,
                     top: 20,
                     bottom: 30
@@ -5492,49 +5490,32 @@
                 const graphicElements = [];
                 const isMobile = isMobileView();
                 const avatarSize = isMobile ? 22 : 28;
-                const gap = isMobile ? 8 : 14;        // 与 grid 左侧的间距
+                const leftOffset = isMobile ? 26 : 34;
 
-                // 获取 grid 组件
-                const gridModel = myChart.getModel().getComponent('grid');
-                if (!gridModel) return;
-                const gridCoordSys = gridModel.getCoordSys();
-                // 获取 grid 的像素边界（相对于图表容器）
-                const gridRect = gridCoordSys.getRect();
-                // 头像摆放的 x 坐标：grid 左边框外侧
-                const avatarX = gridRect.x - avatarSize - gap;
-
-                // 遍历 items（已排序，顺序与 yAxis 类别一致）
                 items.forEach((item, index) => {
                     const s = getSeries(item.name);
                     if (!s) return;
                     const avatar = getAvatarSrc(s);
-                    // 跳过无效头像（默认灰色或空）
+                    // 如果是默认头像则跳过，避免显示灰色占位
                     if (!avatar || avatar === DEFAULT_AVATAR_SVG) return;
-
-                    // 获取该类别对应的 y 轴像素位置（注意：yAxis 类别轴 index 从 0 开始）
                     const coord = myChart.convertToPixel('grid', [0, index]);
                     if (coord && !isNaN(coord[0]) && !isNaN(coord[1])) {
-                        const avatarY = coord[1] - avatarSize / 2;
                         graphicElements.push({
                             type: 'image',
                             style: {
                                 image: avatar,
-                                x: avatarX,
-                                y: avatarY,
+                                x: coord[0] - leftOffset,
+                                y: coord[1] - avatarSize / 2,
                                 width: avatarSize,
                                 height: avatarSize,
-                                borderRadius: avatarSize / 2,
-                                clip: false   // 防止被 grid 裁剪
+                                borderRadius: avatarSize / 2
                             },
                             z: 100,
                             zlevel: 10
                         });
                     }
                 });
-
-                // 先清空旧 graphic，再设置新 graphic
                 if (graphicElements.length > 0) {
-                    myChart.setOption({graphic: []});
                     myChart.setOption({graphic: graphicElements});
                 }
             });
@@ -5955,47 +5936,10 @@
             };
             myChart.setOption(option, true);
             myChart.resize();
-
-            myChart.off('legendselectchanged');
-            myChart.on('legendselectchanged', function (params) {
-                if (params.name) {
-                    const name = params.name;
-                    const isCtrl = ctrlPressed;
-
-                    if (isCtrl) {
-                        if (trendLegendSelected.has(name)) {
-                            trendLegendSelected.delete(name);
-                        } else {
-                            trendLegendSelected.add(name);
-                        }
-                    } else {
-                        if (trendLegendSelected.size === 1 && trendLegendSelected.has(name)) {
-                            trendLegendSelected.clear();
-                        } else {
-                            trendLegendSelected.clear();
-                            trendLegendSelected.add(name);
-                        }
-                    }
-
-                    const newSelected = {};
-                    if (trendLegendSelected.size === 0) {
-                        seriesKeys.forEach(key => {newSelected[key] = true;});
-                    } else {
-                        seriesKeys.forEach(key => {
-                            newSelected[key] = trendLegendSelected.has(key);
-                        });
-                    }
-
-                    myChart.setOption({legend: {selected: newSelected}});
-                    saveState();
-                }
-            });
-
-            setTimeout(() => {
-                updateAvatarPositions();
-                resetDanmaku();
-            }, 100);
+            setTimeout(() => {resetDanmaku();}, 100);
         }
+
+
 
         // ================================================================
         //  Y轴控制 & 重置 & 滚轮缩放
@@ -6211,8 +6155,51 @@
                 initResizeHandles();
                 initResizer();
                 setStatus('info', message || '就绪');
+
+                // ★★★ 趋势图图例点击事件 ★★★
+                // 普通点击：只显示该曲线，再次点击同一曲线恢复全部显示
+                // Ctrl+点击：切换该曲线的显示/隐藏（多选模式）
+                myChart.off('legendselectchanged');
+                myChart.on('legendselectchanged', function (params) {
+                    if (legendChanging) return;
+                    if (viewMode !== 'trend') return;          // 仅在趋势图视图生效
+                    const name = params.name;
+                    if (!name) return;
+
+                    // 检测是否按住 Ctrl（或 Mac 的 ⌘）
+                    if (ctrlPressed) {
+                        // Ctrl 多选模式：切换该曲线的显示状态
+                        if (trendLegendSelected.has(name)) {
+                            trendLegendSelected.delete(name);
+                        } else {
+                            trendLegendSelected.add(name);
+                        }
+                        // 如果没有任何曲线被选中，则清空集合（表示全部显示）
+                        if (trendLegendSelected.size === 0) {
+                            // 保持为空，渲染时全部显示
+                        }
+                    } else {
+                        // 普通点击：独占模式
+                        // 判断当前是否只有该曲线被选中（即集合中仅有它）
+                        const onlyThis = trendLegendSelected.size === 1 && trendLegendSelected.has(name);
+                        if (onlyThis) {
+                            // 只有该曲线，则清空，恢复全部显示
+                            trendLegendSelected.clear();
+                        } else {
+                            // 否则只保留该曲线
+                            trendLegendSelected.clear();
+                            trendLegendSelected.add(name);
+                        }
+                    }
+
+                    legendChanging = true;
+                    renderChart();          // 重新渲染图表应用新选中状态
+                    legendChanging = false;
+                    saveState();
+                });
+
                 updateViewUI();
-                saveState(); // 将最新数据存入 localStorage 作为缓存
+                saveState();
                 setTimeout(() => {refreshPrices();}, 2500);
                 console.log('✅ 初始化完成，数据来源：' + message);
             }
