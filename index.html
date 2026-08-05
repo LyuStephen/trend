@@ -6160,7 +6160,9 @@
                 initResizer();
                 setStatus('info', message || '就绪');
 
-                // ★★★ 趋势图图例点击事件：点击图例只显示该曲线，再次点击同一图例恢复全部显示 ★★★
+                // ★★★ 趋势图图例点击事件 ★★★
+                // 普通点击：只显示该曲线，再次点击同一曲线恢复全部显示
+                // Ctrl+点击：切换该曲线的显示/隐藏（多选模式）
                 myChart.off('legendselectchanged');
                 myChart.on('legendselectchanged', function (params) {
                     if (legendChanging) return;
@@ -6168,20 +6170,30 @@
                     const name = params.name;
                     if (!name) return;
 
-                    // 获取当前所有图例选中状态
-                    const currentSelected = params.selected;
-                    // 判断当前是否只有该图例被选中（其他全为false）
-                    const onlyThis = Object.keys(currentSelected).every(key =>
-                        key === name ? currentSelected[key] : !currentSelected[key]
-                    );
-
-                    if (onlyThis) {
-                        // 如果只有该曲线显示，则切换为全部显示
-                        trendLegendSelected.clear();
+                    // 检测是否按住 Ctrl（或 Mac 的 ⌘）
+                    if (ctrlPressed) {
+                        // Ctrl 多选模式：切换该曲线的显示状态
+                        if (trendLegendSelected.has(name)) {
+                            trendLegendSelected.delete(name);
+                        } else {
+                            trendLegendSelected.add(name);
+                        }
+                        // 如果没有任何曲线被选中，则清空集合（表示全部显示）
+                        if (trendLegendSelected.size === 0) {
+                            // 保持为空，渲染时全部显示
+                        }
                     } else {
-                        // 否则只显示该曲线，其他隐藏
-                        trendLegendSelected.clear();
-                        trendLegendSelected.add(name);
+                        // 普通点击：独占模式
+                        // 判断当前是否只有该曲线被选中（即集合中仅有它）
+                        const onlyThis = trendLegendSelected.size === 1 && trendLegendSelected.has(name);
+                        if (onlyThis) {
+                            // 只有该曲线，则清空，恢复全部显示
+                            trendLegendSelected.clear();
+                        } else {
+                            // 否则只保留该曲线
+                            trendLegendSelected.clear();
+                            trendLegendSelected.add(name);
+                        }
                     }
 
                     legendChanging = true;
