@@ -5345,12 +5345,7 @@
         }
 
         function initChartClick() {
-            myChart.on('click', 'markPoint', function (params) {
-                const seriesName = params.seriesName;
-                if (!seriesName) return;
-                const s = getSeries(seriesName);
-                if (s && s.link) {window.open(s.link, '_blank');}
-            });
+            
         }
 
         // ================================================================
