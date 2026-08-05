@@ -2389,6 +2389,8 @@
         // 注意：initialSeriesData 中的头像路径由 data.json 提供，这里不预设
         let seriesKeys = seriesList.map(s => s.name);
 
+        let legendChanging = false;
+
         let yMin = -50,
             yMax = 150;
         let mainTitle = '📈 总变化率趋势';
@@ -2528,21 +2530,21 @@
         }
 
         function pickRandomDanmaku(n) {
-    const all = getAllDanmaku();
-    if (all.length === 0) return [];
-    // ★★★ 按弹幕文本去重，避免移动端显示重复内容 ★★★
-    const unique = [];
-    const seen = new Set();
-    all.forEach(item => {
-        if (!seen.has(item.text)) {
-            seen.add(item.text);
-            unique.push(item);
+            const all = getAllDanmaku();
+            if (all.length === 0) return [];
+            // ★★★ 按弹幕文本去重，避免移动端显示重复内容 ★★★
+            const unique = [];
+            const seen = new Set();
+            all.forEach(item => {
+                if (!seen.has(item.text)) {
+                    seen.add(item.text);
+                    unique.push(item);
+                }
+            });
+            if (unique.length === 0) return [];
+            const shuffled = unique.sort(() => Math.random() - 0.5);
+            return shuffled.slice(0, n);
         }
-    });
-    if (unique.length === 0) return [];
-    const shuffled = unique.sort(() => Math.random() - 0.5);
-    return shuffled.slice(0, n);
-}
 
         class Danmaku {
             constructor(text, avatarUrl, name, color, canvasWidth, canvasHeight) {
@@ -3049,33 +3051,33 @@
         }
 
         viewToggleGroup.addEventListener('click', function (e) {
-    const btn = e.target.closest('.view-btn');
-    if (!btn) return;
-    const v = btn.dataset.view;
-    if (v === viewMode) return;
-    viewMode = v;
-    if (viewMode === 'waterfall' && !waterfallSeriesName && seriesKeys.length > 0) {
-        waterfallSeriesName = seriesKeys[0];
-    }
-    if (viewMode === 'trend') {
-        trendLegendSelected = new Set();
-    }
-    // ★★★ 当切换到排行时，若尚未自动设置过，则自动设为今天 ★★★
-    if (viewMode === 'ranking' && !rankingAutoSetDone) {
-        const today = getTodayStr();
-        if (dates.includes(today)) {
-            rankingDate = today;
-            if (rankingDateInput) rankingDateInput.value = today;
-            rankingAutoSetDone = true;   // 标记已自动设置过
-        } else {
-            // 若今天不在数据中，则选最后一天，但不标记 done，以便日后有机会自动设今天
-            rankingDate = dates[dates.length - 1] || '';
-            if (rankingDateInput) rankingDateInput.value = rankingDate;
-        }
-    }
-    updateViewUI();
-    resetDanmaku();
-});
+            const btn = e.target.closest('.view-btn');
+            if (!btn) return;
+            const v = btn.dataset.view;
+            if (v === viewMode) return;
+            viewMode = v;
+            if (viewMode === 'waterfall' && !waterfallSeriesName && seriesKeys.length > 0) {
+                waterfallSeriesName = seriesKeys[0];
+            }
+            if (viewMode === 'trend') {
+                trendLegendSelected = new Set();
+            }
+            // ★★★ 当切换到排行时，若尚未自动设置过，则自动设为今天 ★★★
+            if (viewMode === 'ranking' && !rankingAutoSetDone) {
+                const today = getTodayStr();
+                if (dates.includes(today)) {
+                    rankingDate = today;
+                    if (rankingDateInput) rankingDateInput.value = today;
+                    rankingAutoSetDone = true;   // 标记已自动设置过
+                } else {
+                    // 若今天不在数据中，则选最后一天，但不标记 done，以便日后有机会自动设今天
+                    rankingDate = dates[dates.length - 1] || '';
+                    if (rankingDateInput) rankingDateInput.value = rankingDate;
+                }
+            }
+            updateViewUI();
+            resetDanmaku();
+        });
 
         waterfallSeriesSelect.addEventListener('change', function () {
             waterfallSeriesName = this.value;
@@ -3085,17 +3087,17 @@
 
         // 排行日期选择
         rankingDateInput.addEventListener('change', function () {
-    const val = this.value;
-    if (val && dates.includes(val)) {
-        rankingDate = val;
-        rankingAutoSetDone = true;   // 用户手动选择，今后不再自动覆盖
-        updateViewUI();
-        resetDanmaku();
-    } else {
-        alert('所选日期不在数据范围内，请选择有效日期');
-        this.value = rankingDate;
-    }
-});
+            const val = this.value;
+            if (val && dates.includes(val)) {
+                rankingDate = val;
+                rankingAutoSetDone = true;   // 用户手动选择，今后不再自动覆盖
+                updateViewUI();
+                resetDanmaku();
+            } else {
+                alert('所选日期不在数据范围内，请选择有效日期');
+                this.value = rankingDate;
+            }
+        });
 
         // ================================================================
         //  导入导出（与之前相同，略）
@@ -6157,8 +6159,39 @@
                 initResizeHandles();
                 initResizer();
                 setStatus('info', message || '就绪');
+
+                // ★★★ 趋势图图例点击事件：点击图例只显示该曲线，再次点击同一图例恢复全部显示 ★★★
+                myChart.off('legendselectchanged');
+                myChart.on('legendselectchanged', function (params) {
+                    if (legendChanging) return;
+                    if (viewMode !== 'trend') return;          // 仅在趋势图视图生效
+                    const name = params.name;
+                    if (!name) return;
+
+                    // 获取当前所有图例选中状态
+                    const currentSelected = params.selected;
+                    // 判断当前是否只有该图例被选中（其他全为false）
+                    const onlyThis = Object.keys(currentSelected).every(key =>
+                        key === name ? currentSelected[key] : !currentSelected[key]
+                    );
+
+                    if (onlyThis) {
+                        // 如果只有该曲线显示，则切换为全部显示
+                        trendLegendSelected.clear();
+                    } else {
+                        // 否则只显示该曲线，其他隐藏
+                        trendLegendSelected.clear();
+                        trendLegendSelected.add(name);
+                    }
+
+                    legendChanging = true;
+                    renderChart();          // 重新渲染图表应用新选中状态
+                    legendChanging = false;
+                    saveState();
+                });
+
                 updateViewUI();
-                saveState(); // 将最新数据存入 localStorage 作为缓存
+                saveState();
                 setTimeout(() => {refreshPrices();}, 2500);
                 console.log('✅ 初始化完成，数据来源：' + message);
             }
