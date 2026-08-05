@@ -4110,36 +4110,32 @@
         // ================================================================
         //  更新关联单元格
         // ================================================================
-        function updateLinkedCells(row, key) {
-            const dailyInputs = dailyBody.querySelectorAll(`input[data-row="${row}"][data-series="${key}"]`);
-            dailyInputs.forEach(inp => {
-                const s = getSeries(key);
-                if (!s) return;
-                let dailyChange = 0;
-                if (row === 0) dailyChange = 0;
-                else {
-                    const prev = s.data[row - 1];
-                    const curr = s.data[row];
-                    dailyChange = calcDailyChange(prev, curr);
-                }
-                inp.value = formatDisplay(dailyChange);
-            });
-            const totalInputs = totalBody.querySelectorAll(`input[data-row="${row}"][data-series="${key}"]`);
-            totalInputs.forEach(inp => {
-                const s = getSeries(key);
-                if (!s) return;
-                const base = s.data[0];
-                const curr = s.data[row];
-                const totalChange = calcTotalChange(base, curr);
-                inp.value = formatDisplay(totalChange);
-            });
-            const rawInputs = rawBody.querySelectorAll(`input[data-row="${row}"][data-series="${key}"]`);
-            rawInputs.forEach(inp => {
-                const s = getSeries(key);
-                if (s) {inp.value = formatDisplay(s.data[row]);}
-            });
-        }
+        function updateLinkedCells(seriesName, date) {
+            const s = getSeries(seriesName);
+            if (!s) return;
+            const idx = dates.indexOf(date);
+            if (idx === -1) return;
 
+            // 更新原始值（确保显示最新数值）
+            const rawInput = rawBody.querySelector(`input[data-row="${seriesName}"][data-col="${date}"]`);
+            if (rawInput) rawInput.value = formatDisplay(s.data[idx]);
+
+            // 更新当日变化率
+            let dailyChange = 0;
+            if (idx > 0) {
+                const prev = s.data[idx - 1];
+                const curr = s.data[idx];
+                dailyChange = calcDailyChange(prev, curr);
+            }
+            const dailyInput = dailyBody.querySelector(`input[data-row="${seriesName}"][data-col="${date}"]`);
+            if (dailyInput) dailyInput.value = formatDisplay(dailyChange);
+
+            // 更新总变化率
+            const base = s.data[0];
+            const totalChange = calcTotalChange(base, s.data[idx]);
+            const totalInput = totalBody.querySelector(`input[data-row="${seriesName}"][data-col="${date}"]`);
+            if (totalInput) totalInput.value = formatDisplay(totalChange);
+        }
         // ================================================================
         //  渲染表格
         // ================================================================
@@ -5037,7 +5033,7 @@
                 const {name, price, s} = result;
                 if (price > 0) {
                     s.data[targetIdx] = price;
-                    updateLinkedCells(targetIdx, name);
+                    updateLinkedCells(name, targetDate); 
                     updatedCount++;
                     s.updateStatus = 'success';
                 } else {
@@ -5186,7 +5182,7 @@
                             s.data[i] = priceMap[d];
                             matched++;
                             totalMatched++;
-                            updateLinkedCells(i, name);
+                            updateLinkedCells(name, dates[i]); 
                         }
                     }
 
