@@ -2332,7 +2332,7 @@
                 <span>系列</span>
             </button>
             <button class="tab" data-view="data" type="button">
-                <span class="tab-icon">📊</span>
+                <span class="tab-icon">📅</span>
                 <span>数据</span>
             </button>
         </nav>
@@ -2687,14 +2687,45 @@
                     img.src = this.avatarUrl;
                 }
             }
+
+            refreshContent() {
+                const all = getAllDanmaku();
+                if (all.length === 0) return;
+
+                // 先去重：随机选一条与当前不同的弹幕
+                let newItem;
+                let attempts = 0;
+                do {
+                    newItem = all[Math.floor(Math.random() * all.length)];
+                    attempts++;
+                } while (newItem.text === this.text && attempts < 10 && all.length > 1);
+
+                // 如果只有一条弹幕，直接使用
+                if (!newItem) newItem = all[0];
+
+                // 更新内容
+                this.text = newItem.text;
+                this.avatarUrl = newItem.avatarUrl;
+                this.color = newItem.color || '#3b82f6';
+
+                // 重新测量文本宽度
+                ctx.font = this.fontSize + 'px "Segoe UI", sans-serif';
+                this.textWidth = ctx.measureText(this.text).width;
+                this.totalWidth = this.avatarSize + this.padding + this.textWidth + this.padding * 2;
+
+                // 重新加载头像
+                this.loadAvatar();
+            }
             update(canvasWidth, canvasHeight) {
                 this.x += this.speed * this.direction;
                 if (this.direction === 1 && this.x > canvasWidth + 10) {
                     this.x = -this.totalWidth - 10;
                     this.y = Math.random() * (canvasHeight - this.avatarSize - 20) + 10;
+                    this.refreshContent();   // ← 新增
                 } else if (this.direction === -1 && this.x + this.totalWidth < -10) {
                     this.x = canvasWidth + 10;
                     this.y = Math.random() * (canvasHeight - this.avatarSize - 20) + 10;
+                    this.refreshContent();   // ← 新增
                 }
                 this.speed += (Math.random() - 0.5) * 0.2;
                 this.speed = Math.max(0.8, Math.min(3.5, this.speed));
