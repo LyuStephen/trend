@@ -143,7 +143,7 @@
             flex-wrap: wrap;
             gap: 8px;
             border-bottom: 1px solid var(--border-color);
-            background: var(--bg-panel);
+            background: var(--bg-app);
         }
 
         .chart-header h2 {
@@ -1770,7 +1770,8 @@
                 margin: 0 -10px 8px -10px;
                 padding: 6px 10px 8px 10px;
                 border-bottom: 1px solid var(--border-color);
-                background: var(--bg-panel);
+                background: var(--bg-app);
+                /* ← 改为 var(--bg-app) */
                 flex-wrap: wrap;
                 gap: 6px;
             }
@@ -5917,12 +5918,12 @@
             const graphic = [
                 {
                     type: 'group',
-                    left: 10,
-                    top: 10,
+                    left: 20,
+                    top: 50,
                     children: [
                         {
                             type: 'rect',
-                            shape: {width: 130, height: 72},
+                            shape: {width: 140, height: 78},
                             style: {
                                 fill: isDark ? 'rgba(30,41,59,0.85)' : 'rgba(255,255,255,0.85)',
                                 stroke: isDark ? '#334155' : '#eef2f6',
@@ -5936,7 +5937,7 @@
                             top: 12,
                             style: {
                                 text: `🏆 登顶 ${firstPlaceDays} 天`,
-                                fontSize: 10,
+                                fontSize: 12,
                                 fill: isDark ? '#e2e8f0' : '#1e293b',
                                 fontWeight: 'bold'
                             }
@@ -5944,20 +5945,20 @@
                         {
                             type: 'text',
                             left: 12,
-                            top: 30,
+                            top: 32,
                             style: {
                                 text: `📈 总变化率 ${latestChange.toFixed(2)}%`,
-                                fontSize: 10,
+                                fontSize: 12,
                                 fill: isDark ? '#e2e8f0' : '#1e293b'
                             }
                         },
                         {
                             type: 'text',
                             left: 12,
-                            top: 48,
+                            top: 52,
                             style: {
                                 text: `📊 跑赢上证 ${diffToSH}`,
-                                fontSize: 10,
+                                fontSize: 12,
                                 fill: isDark ? '#e2e8f0' : '#1e293b'
                             }
                         }
@@ -6297,6 +6298,10 @@
             this.textContent = isDark ? '☀️' : '🌙';
             saveState();
             renderChart();
+            const header = document.querySelector('.chart-header');
+            if (header) {
+                header.style.background = 'var(--bg-app)';
+            }
         });
 
         gridToggle.addEventListener('click', function () {
