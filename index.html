@@ -444,9 +444,9 @@
         /* 移动端调整按钮尺寸 */
         @media (max-width: 820px) {
             .chart-reset-buttons .toggle-reset-btn {
-                width: 22px;
-                height: 22px;
-                font-size: 11px;
+                width: 20px;
+                height: 20px;
+                font-size: 10px;
             }
 
             #viewToggleGroup .view-btn {
@@ -5677,7 +5677,7 @@
                     if (!coordLow || !coordHigh) return null;
                     const y = coordLow[1];
                     const barHeight = 10;
-                    const extra = 6;  // 左右各扩展 3px，使灰色条比柱宽 6px
+                    const extra = 8;  // 左右各扩展 ?px，使灰色条比柱宽 ?px
                     const x = Math.min(coordLow[0], coordHigh[0]) - extra / 2;
                     const width = Math.abs(coordLow[0] - coordHigh[0]) + extra;
                     // 统一浅灰色，半透明，无边框
