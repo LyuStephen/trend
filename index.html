@@ -4,7 +4,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🤣</text></svg>">
+    <link rel="icon"
+        href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🤣</text></svg>">
     <title>乐子人大赛</title>
     <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js">
     </script>
@@ -445,6 +446,27 @@
                 width: 28px;
                 height: 28px;
                 font-size: 12px;
+            }
+
+            #viewToggleGroup .view-btn {
+                font-size: 14px !important;
+                /* 缩小字体 */
+                padding: 4px 12px !important;
+                /* 适当缩小内边距 */
+            }
+
+            /* 新增：外层容器字体缩小 */
+            .chart-header>div:first-child {
+                font-size: 14px !important;
+            }
+
+            /* 新增：其他辅助按钮缩小 */
+            .header-actions .btn-outline,
+            .header-actions .theme-toggle,
+            .header-actions .grid-toggle,
+            .header-actions .danmaku-toggle {
+                font-size: 11px !important;
+                padding: 2px 6px !important;
             }
 
             .chart-reset-buttons .btn-reset,
