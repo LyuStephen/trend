@@ -5218,6 +5218,7 @@
                     `已更新 ${updatedCount} 只股票 (${usedApi}，采用前复权价格)，日期已对齐至 ${targetDate}`;
                 setStatus('success', statusMsg);
                 lastUpdateTime.textContent = '更新于 ' + new Date().toLocaleTimeString();
+                buildAndRenderPriceInfo();
 
             } catch (error) {
                 console.error('刷新过程异常:', error);
@@ -5674,8 +5675,9 @@
                     if (!coordLow || !coordHigh) return null;
                     const y = coordLow[1];
                     const barHeight = 10;
-                    const x = Math.min(coordLow[0], coordHigh[0]);
-                    const width = Math.abs(coordLow[0] - coordHigh[0]);
+                    const extra = 6;  // 左右各扩展 3px，使灰色条比柱宽 6px
+                    const x = Math.min(coordLow[0], coordHigh[0]) - extra / 2;
+                    const width = Math.abs(coordLow[0] - coordHigh[0]) + extra;
                     // 统一浅灰色，半透明，无边框
                     return {
                         type: 'rect',
@@ -6619,7 +6621,56 @@
             });
         });
 
+        // ---- 新增：自动刷新股价信息（打开网页后填充） ----
+        function buildAndRenderPriceInfo() {
+            let targetDate = rankingDate;
+            if (!targetDate || !dates.includes(targetDate)) {
+                targetDate = dates[dates.length - 1] || '';
+                rankingDate = targetDate;
+                if (rankingDateInput) rankingDateInput.value = targetDate;
+            }
+            if (!targetDate || !dates.includes(targetDate)) return;
 
+            const idx = dates.indexOf(targetDate);
+            const prevIdx = idx - 1;
+            const items = [];
+            seriesKeys.forEach(key => {
+                const s = getSeries(key);
+                if (!s) return;
+                let change = 0;
+                if (prevIdx >= 0) {
+                    const prevVal = s.data[prevIdx];
+                    const currVal = s.data[idx];
+                    change = calcDailyChange(prevVal, currVal);
+                }
+                let highChange = 0, lowChange = 0;
+                if (prevIdx >= 0) {
+                    const prevClose = s.data[prevIdx];
+                    const currHigh = (s.highData && s.highData[idx] !== undefined) ? s.highData[idx] : 0;
+                    const currLow = (s.lowData && s.lowData[idx] !== undefined) ? s.lowData[idx] : 0;
+                    highChange = (prevClose !== 0) ? ((currHigh - prevClose) / prevClose) * 100 : 0;
+                    lowChange = (prevClose !== 0) ? ((currLow - prevClose) / prevClose) * 100 : 0;
+                }
+                let price = s.data[idx] || 0;
+                let high = (s.highData && s.highData[idx] !== undefined) ? s.highData[idx] : 0;
+                let low = (s.lowData && s.lowData[idx] !== undefined) ? s.lowData[idx] : 0;
+                if (key === '飘小仙') {
+                    change = 0; highChange = 0; lowChange = 0; price = 1; high = 1; low = 1;
+                }
+                items.push({
+                    name: key,
+                    color: s.color,
+                    change: change,
+                    highChange: highChange,
+                    lowChange: lowChange,
+                    remark: s.remark || '',
+                    price: price,
+                    high: high,
+                    low: low
+                });
+            });
+            renderPriceTable(items, targetDate);
+        }
         // ================================================================
         //  初始化（远程 data.json 优先 + localStorage 后备 + 硬编码兜底）
         // ================================================================
@@ -6654,56 +6705,7 @@
                     });
                 }
 
-                // ---- 新增：自动刷新股价信息（打开网页后填充） ----
-                function buildAndRenderPriceInfo() {
-                    let targetDate = rankingDate;
-                    if (!targetDate || !dates.includes(targetDate)) {
-                        targetDate = dates[dates.length - 1] || '';
-                        rankingDate = targetDate;
-                        if (rankingDateInput) rankingDateInput.value = targetDate;
-                    }
-                    if (!targetDate || !dates.includes(targetDate)) return;
 
-                    const idx = dates.indexOf(targetDate);
-                    const prevIdx = idx - 1;
-                    const items = [];
-                    seriesKeys.forEach(key => {
-                        const s = getSeries(key);
-                        if (!s) return;
-                        let change = 0;
-                        if (prevIdx >= 0) {
-                            const prevVal = s.data[prevIdx];
-                            const currVal = s.data[idx];
-                            change = calcDailyChange(prevVal, currVal);
-                        }
-                        let highChange = 0, lowChange = 0;
-                        if (prevIdx >= 0) {
-                            const prevClose = s.data[prevIdx];
-                            const currHigh = (s.highData && s.highData[idx] !== undefined) ? s.highData[idx] : 0;
-                            const currLow = (s.lowData && s.lowData[idx] !== undefined) ? s.lowData[idx] : 0;
-                            highChange = (prevClose !== 0) ? ((currHigh - prevClose) / prevClose) * 100 : 0;
-                            lowChange = (prevClose !== 0) ? ((currLow - prevClose) / prevClose) * 100 : 0;
-                        }
-                        let price = s.data[idx] || 0;
-                        let high = (s.highData && s.highData[idx] !== undefined) ? s.highData[idx] : 0;
-                        let low = (s.lowData && s.lowData[idx] !== undefined) ? s.lowData[idx] : 0;
-                        if (key === '飘小仙') {
-                            change = 0; highChange = 0; lowChange = 0; price = 1; high = 1; low = 1;
-                        }
-                        items.push({
-                            name: key,
-                            color: s.color,
-                            change: change,
-                            highChange: highChange,
-                            lowChange: lowChange,
-                            remark: s.remark || '',
-                            price: price,
-                            high: high,
-                            low: low
-                        });
-                    });
-                    renderPriceTable(items, targetDate);
-                }
 
                 // 延迟执行，确保所有数据已初始化
                 setTimeout(buildAndRenderPriceInfo, 300);
