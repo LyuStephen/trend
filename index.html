@@ -3902,9 +3902,7 @@
                                     <button class="btn-icon" style="background:transparent;" data-reset-avatar="${s.name}">↩️</button>
                                 </div>
                                 
-                                <div class="series-stats" data-series="${s.name}" style="padding: 4px 8px; font-size: 13px; font-weight: 500; color: var(--text-secondary); border-top: 1px dashed var(--border-color); margin-top: 4px;">
-                                    🏆 登顶 ${firstPlaceDays[s.name] || 0} 天 &nbsp;·&nbsp; 跑赢上证 <span style="color:${diffColor};">${diffToSH}</span>
-                                </div>
+                                
                                 <div class="danmaku-section">
                                     <div class="danmaku-row">
                                         <input class="danmaku-input" placeholder="输入弹幕文字" data-series="${s.name}" />
@@ -5697,7 +5695,7 @@
                 };
             });
 
-            // ★★★ 修改点：renderItem 中的柱宽计算，增加 fallback 以适配移动端 ★★★
+            // renderItem 函数（柱状图绘制）
             function renderItem(params, api) {
                 const dataIndex = params.dataIndex;
                 const xValue = api.value(0);
@@ -5709,8 +5707,7 @@
 
                 if (!coordStart || !coordEnd) return null;
 
-                // --- 修改点：使用相邻分类的像素距离计算柱宽，并限制最大值 ---
-                let bandWidth = 20; // 默认宽度
+                let bandWidth = 20;
                 const curX = api.coord([dataIndex, 0])[0];
                 let nextX = curX;
                 if (dataIndex + 1 < dates.length) {
@@ -5719,13 +5716,12 @@
                     nextX = api.coord([dataIndex - 1, 0])[0];
                 }
                 if (nextX && curX) {
-                    bandWidth = Math.abs(nextX - curX) * 0.85;   // 85% 保证紧密且有微小间隙
-                    bandWidth = Math.min(bandWidth, 40);         // 最大不超过40px
-                    bandWidth = Math.max(bandWidth, 4);          // 最小不少于4px
+                    bandWidth = Math.abs(nextX - curX) * 0.85;
+                    bandWidth = Math.min(bandWidth, 40);
+                    bandWidth = Math.max(bandWidth, 4);
                 } else {
                     bandWidth = 20;
                 }
-                // --------------------------------------------------
 
                 const x = coordStart[0] - bandWidth / 2;
                 const y = Math.min(coordStart[1], coordEnd[1]);
@@ -5740,7 +5736,6 @@
                     style: {fill: color, stroke: color, lineWidth: 1}
                 };
 
-                // 如果显示标签（waterfallShowLabels 控制），添加文字
                 if (waterfallShowLabels) {
                     rect.children = [{
                         type: 'text',
@@ -5770,6 +5765,7 @@
                 }
                 return rect;
             }
+
             // 构建所有系列
             const allSeries = [];
             seriesKeys.forEach(key => {
@@ -5792,8 +5788,8 @@
                     data: data.totalChanges,
                     smooth: true,
                     symbol: 'circle',
-                    symbolSize: 8,          // 与趋势图一致
-                    lineStyle: {color, width: 2.5},  // 与趋势图一致
+                    symbolSize: 8,               // 与趋势图一致
+                    lineStyle: {color, width: 2.5}, // 与趋势图一致
                     itemStyle: {color},
                     z: 3,
                     label: {
@@ -5837,7 +5833,12 @@
                     left: 'center',
                     textStyle: {color: isDark ? '#94a3b8' : '#475569'}
                 },
-                grid: {left: 45, right: 25, top: 45, bottom: isMobileView() ? 55 : 35},
+                grid: {
+                    left: 45,
+                    right: 25,
+                    top: 45,
+                    bottom: isMobileView() ? 55 : 35
+                },
                 xAxis: {
                     type: 'category',
                     data: dates,
@@ -5883,7 +5884,90 @@
                 series: allSeries
             };
 
-            myChart.clear();
+            // ===== 新增：左上角信息标签 =====
+            // 计算统计信息
+            const shSeries = getSeries('上证');
+            const latestIdx = dates.length - 1;
+            const base = s.data[0];
+            const latestChange = calcTotalChange(base, s.data[latestIdx]);
+
+            // 计算登顶天数
+            let firstPlaceDays = 0;
+            for (let i = 0; i < dates.length; i++) {
+                const changes = seriesKeys.map(key => {
+                    const series = getSeries(key);
+                    if (!series) return {key, change: -Infinity};
+                    return {key, change: calcTotalChange(series.data[0], series.data[i])};
+                });
+                const maxChange = Math.max(...changes.map(c => c.change));
+                const topKeys = changes.filter(c => c.change === maxChange).map(c => c.key);
+                if (topKeys.includes(targetName)) firstPlaceDays++;
+            }
+
+            // 计算跑赢上证差值
+            let diffToSH = '--';
+            if (shSeries) {
+                const shBase = shSeries.data[0];
+                const shChange = calcTotalChange(shBase, shSeries.data[latestIdx]);
+                const diff = latestChange - shChange;
+                diffToSH = (diff >= 0 ? '+' : '') + diff.toFixed(2) + '%';
+            }
+
+            // 构造 graphic 文本块
+            const graphic = [
+                {
+                    type: 'group',
+                    left: 10,
+                    top: 10,
+                    children: [
+                        {
+                            type: 'rect',
+                            shape: {width: 130, height: 72},
+                            style: {
+                                fill: isDark ? 'rgba(30,41,59,0.85)' : 'rgba(255,255,255,0.85)',
+                                stroke: isDark ? '#334155' : '#eef2f6',
+                                lineWidth: 1,
+                                cornerRadius: 6
+                            }
+                        },
+                        {
+                            type: 'text',
+                            left: 12,
+                            top: 12,
+                            style: {
+                                text: `🏆 登顶 ${firstPlaceDays} 天`,
+                                fontSize: 10,
+                                fill: isDark ? '#e2e8f0' : '#1e293b',
+                                fontWeight: 'bold'
+                            }
+                        },
+                        {
+                            type: 'text',
+                            left: 12,
+                            top: 30,
+                            style: {
+                                text: `📈 总变化率 ${latestChange.toFixed(2)}%`,
+                                fontSize: 10,
+                                fill: isDark ? '#e2e8f0' : '#1e293b'
+                            }
+                        },
+                        {
+                            type: 'text',
+                            left: 12,
+                            top: 48,
+                            style: {
+                                text: `📊 跑赢上证 ${diffToSH}`,
+                                fontSize: 10,
+                                fill: isDark ? '#e2e8f0' : '#1e293b'
+                            }
+                        }
+                    ]
+                }
+            ];
+
+            option.graphic = graphic;
+            // ===== 标签添加结束 =====
+
             myChart.setOption(option, true);
             myChart.resize();
 
@@ -5914,8 +5998,7 @@
             });
 
             setTimeout(() => {resetDanmaku();}, 100);
-        }//  渲染图表（统一入口）
-        // ================================================================
+        }// ================================================================
         function renderChart() {
             const currentMode = viewMode;
             if (currentMode === 'waterfall') {
