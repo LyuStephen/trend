@@ -1537,7 +1537,7 @@
             .chart-reset-buttons {
                 top: 16px;
                 right: 8px;
-                gap: 2px; 
+                gap: 2px;
             }
 
             .chart-reset-buttons .btn-reset,
@@ -5536,7 +5536,7 @@
                     change = calcDailyChange(prevVal, currVal);
                 }
 
-                // 最高价和最低价变化率
+                // 最高价和最低价变化率（基准为前一日收盘价）
                 let highChange = 0, lowChange = 0;
                 if (prevIdx >= 0) {
                     const prevClose = s.data[prevIdx];
@@ -5549,7 +5549,7 @@
                 let price = s.data[idx] || 0;
                 let high = (s.highData && s.highData[idx] !== undefined) ? s.highData[idx] : 0;
                 let low = (s.lowData && s.lowData[idx] !== undefined) ? s.lowData[idx] : 0;
-                // ★★★ 新增：对“飘小仙”强制赋值 ★★★
+                // ★★★ 对“飘小仙”强制赋值 ★★★
                 if (key === '飘小仙') {
                     change = 0;
                     highChange = 0;
@@ -5604,50 +5604,52 @@
                 itemStyle: {
                     shadowBlur: 4,
                     shadowColor: 'rgba(0,0,0,0.1)'
-                }
+                },
+                z: 2
             };
 
-            // 构建散点数据（最高价变化率、最低价变化率）
-            const highScatterData = [];
-            const lowScatterData = [];
-            items.forEach((item, index) => {
-                // y 用索引，因为 yAxis 是 category
-                highScatterData.push([item.highChange, index]);
-                lowScatterData.push([item.lowChange, index]);
+            // 构建区间数据（最低变化率 → 最高变化率）
+            const rangeData = items.map(item => {
+                const low = Math.min(item.lowChange, item.highChange);
+                const high = Math.max(item.lowChange, item.highChange);
+                return [low, high];
             });
 
-            const highSeries = {
-                name: '最高价变化率',
-                type: 'scatter',
-                data: highScatterData,
-                symbol: 'circle',
-                symbolSize: 8,
-                itemStyle: {
-                    color: '#3b82f6', // 蓝色
-                    borderColor: '#fff',
-                    borderWidth: 1
+            // 自定义系列：绘制半透明区间条
+            const rangeSeries = {
+                type: 'custom',
+                data: rangeData,
+                renderItem: function (params, api) {
+                    const index = params.dataIndex;
+                    const low = api.value(0);
+                    const high = api.value(1);
+                    const coordLow = api.coord([low, index]);
+                    const coordHigh = api.coord([high, index]);
+                    if (!coordLow || !coordHigh) return null;
+                    const y = coordLow[1];
+                    const barHeight = 10; // 固定高度，与柱状图宽度协调
+                    const x = Math.min(coordLow[0], coordHigh[0]);
+                    const width = Math.abs(coordLow[0] - coordHigh[0]);
+                    // 颜色随正负变化（半透明）
+                    const color = low >= 0 ? 'rgba(230, 67, 64, 0.25)' : 'rgba(7, 193, 96, 0.25)';
+                    const strokeColor = low >= 0 ? 'rgba(230, 67, 64, 0.6)' : 'rgba(7, 193, 96, 0.6)';
+                    return {
+                        type: 'rect',
+                        shape: {
+                            x: x,
+                            y: y - barHeight / 2,
+                            width: width,
+                            height: barHeight
+                        },
+                        style: {
+                            fill: color,
+                            stroke: strokeColor,
+                            lineWidth: 1
+                        },
+                        z: 1 // 在柱状图下方
+                    };
                 },
-                label: {
-                    show: false // 不显示数值，避免拥挤
-                },
-                z: 10
-            };
-
-            const lowSeries = {
-                name: '最低价变化率',
-                type: 'scatter',
-                data: lowScatterData,
-                symbol: 'circle',
-                symbolSize: 8,
-                itemStyle: {
-                    color: '#f59e0b', // 橙色
-                    borderColor: '#fff',
-                    borderWidth: 1
-                },
-                label: {
-                    show: false
-                },
-                z: 10
+                z: 1
             };
 
             const option = {
@@ -5655,7 +5657,7 @@
                     trigger: 'axis',
                     axisPointer: {type: 'shadow'},
                     formatter: function (params) {
-                        // params 包含柱状图和散点的信息，我们按索引提取
+                        // 只取柱状图信息
                         const bar = params.find(p => p.seriesType === 'bar');
                         if (!bar) return '';
                         const idx = bar.dataIndex;
@@ -5710,7 +5712,7 @@
                     axisTick: {show: false},
                     splitLine: {show: false}
                 },
-                series: [barSeries, highSeries, lowSeries]
+                series: [barSeries, rangeSeries]
             };
 
             myChart.setOption(option, true);
@@ -5785,7 +5787,7 @@
 
             myChart.resize();
             setTimeout(() => {resetDanmaku();}, 100);
-        }
+        }        
         //  瀑布图（略，原有）
         // ================================================================
         function renderWaterfall() {
