@@ -5018,184 +5018,187 @@
             refreshPriceIconBtn.disabled = true;
             setStatus('loading', '获取实时行情...');
 
-            let quotes = null;
-            let usedApi = '';
-
             try {
-                quotes = await fetchTencentQuotes(codes);
-                usedApi = '腾讯';
-                const hasData = Object.values(quotes).some(q => q && q.price > 0);
-                if (!hasData) {
-                    console.warn('腾讯返回空数据，尝试新浪');
-                    quotes = await fetchSinaQuotes(codes);
-                    usedApi = '新浪';
-                }
-            } catch (err) {
-                console.warn('腾讯失败，尝试新浪:', err);
+                let quotes = null;
+                let usedApi = '';
+
                 try {
-                    quotes = await fetchSinaQuotes(codes);
-                    usedApi = '新浪';
-                } catch (err2) {
-                    console.error('所有接口失败:', err2);
-                    setStatus('error', '获取数据失败，请稍后重试');
-                    isRefreshing = false;
-                    refreshPriceIconBtn.disabled = false;
-                    return;
-                }
-            }
-
-            let latestDataDate = null;
-            for (const quote of Object.values(quotes)) {
-                if (quote && quote.updateTime) {
-                    const dateStr = quote.updateTime.split(' ')[0];
-                    if (dateStr && /^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
-                        if (!latestDataDate || dateStr > latestDataDate) {
-                            latestDataDate = dateStr;
-                        }
+                    quotes = await fetchTencentQuotes(codes);
+                    usedApi = '腾讯';
+                    const hasData = Object.values(quotes).some(q => q && q.price > 0);
+                    if (!hasData) {
+                        console.warn('腾讯返回空数据，尝试新浪');
+                        quotes = await fetchSinaQuotes(codes);
+                        usedApi = '新浪';
                     }
-                }
-            }
-
-            const today = getTodayStr();
-            const targetDate = latestDataDate || today;
-
-            if (!dates.includes(targetDate)) {
-                const oldLen = dates.length;
-                dates.push(targetDate);
-                seriesList.forEach(s => {
-                    const prevIdx = oldLen - 1;
-                    const prevVal = (prevIdx >= 0 && prevIdx < s.data.length) ? s.data[prevIdx] : (s.data[0] || 1);
-                    s.data.push(prevVal);
-                });
-                sortAllData();
-            }
-
-            const targetIdx = dates.indexOf(targetDate);
-            if (targetIdx === -1) {
-                setStatus('error', '日期处理异常');
-                isRefreshing = false;
-                refreshPriceIconBtn.disabled = false;
-                return;
-            }
-
-            let updatedCount = 0;
-            const todayStr = getTodayStr();
-            if (targetDate !== todayStr) {
-                setStatus('info', `非交易日，最新数据日期: ${targetDate}`);
-            } else {
-                setStatus('loading', '获取复权价格中...');
-            }
-
-            const entries = Object.entries(codeMap);
-            const total = entries.length;
-
-            const tasks = entries.map(async ([name, code], index) => {
-                const s = getSeries(name);
-                if (!s) return null;
-
-                const quote = findQuote(quotes, code);
-                let price = (quote && quote.price > 0) ? quote.price : 0;
-
-                const isUSStock = code.trim().toUpperCase().startsWith('US');
-
-                if (!isUSStock) {
-                    let formattedCode = formatStockCode(code);
-                    if (/^\d{5,6}$/.test(formattedCode)) {
-                        if (formattedCode.startsWith('6')) {
-                            formattedCode = 'sh' + formattedCode;
-                        } else {
-                            formattedCode = 'sz' + formattedCode;
-                        }
-                    }
-                    if (/^[A-Z]{1,5}$/.test(formattedCode) && !formattedCode.startsWith('us')) {
-                        formattedCode = 'us' + formattedCode;
-                    }
-                    if (/^\d{5}$/.test(formattedCode) && !formattedCode.startsWith('hk')) {
-                        formattedCode = 'hk' + formattedCode;
-                    }
-
-                    const qfqUrl =
-                        `https://web.ifzq.gtimg.cn/appstock/app/fqkline/get?param=${formattedCode},day,${targetDate},${targetDate},1,qfq`;
+                } catch (err) {
+                    console.warn('腾讯失败，尝试新浪:', err);
                     try {
-                        const resp = await fetch(qfqUrl, {
-                            mode: 'cors',
-                            headers: {'Referer': 'https://finance.sina.com.cn'}
-                        });
-                        if (resp.ok) {
-                            const json = await resp.json();
-                            const dataKey = formattedCode;
-                            let qfqData = json?.data?.[dataKey]?.qfqday || json?.data?.[dataKey]?.day;
-                            if (qfqData && Array.isArray(qfqData) && qfqData.length > 0) {
-                                const qfqPrice = parseFloat(qfqData[0][2]);
-                                if (!isNaN(qfqPrice) && qfqPrice > 0) {
-                                    if (price > 0) {
-                                        const diffPercent = Math.abs((qfqPrice - price) / price) * 100;
-                                        if (diffPercent < 20) {
-                                            price = qfqPrice;
-                                            console.log(`[${name}] 使用前复权价格: ${qfqPrice} (实时价: ${price})`);
+                        quotes = await fetchSinaQuotes(codes);
+                        usedApi = '新浪';
+                    } catch (err2) {
+                        console.error('所有接口失败:', err2);
+                        setStatus('error', '获取数据失败，请稍后重试');
+                        // 注意：此处不直接 return，而是抛出异常，让 finally 处理
+                        throw new Error('获取数据失败');
+                    }
+                }
+
+                let latestDataDate = null;
+                for (const quote of Object.values(quotes)) {
+                    if (quote && quote.updateTime) {
+                        const dateStr = quote.updateTime.split(' ')[0];
+                        if (dateStr && /^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+                            if (!latestDataDate || dateStr > latestDataDate) {
+                                latestDataDate = dateStr;
+                            }
+                        }
+                    }
+                }
+
+                const today = getTodayStr();
+                const targetDate = latestDataDate || today;
+
+                if (!dates.includes(targetDate)) {
+                    const oldLen = dates.length;
+                    dates.push(targetDate);
+                    seriesList.forEach(s => {
+                        const prevIdx = oldLen - 1;
+                        const prevVal = (prevIdx >= 0 && prevIdx < s.data.length) ? s.data[prevIdx] : (s.data[0] || 1);
+                        s.data.push(prevVal);
+                    });
+                    sortAllData();
+                }
+
+                const targetIdx = dates.indexOf(targetDate);
+                if (targetIdx === -1) {
+                    setStatus('error', '日期处理异常');
+                    throw new Error('日期索引错误');
+                }
+
+                let updatedCount = 0;
+                const todayStr = getTodayStr();
+                if (targetDate !== todayStr) {
+                    setStatus('info', `非交易日，最新数据日期: ${targetDate}`);
+                } else {
+                    setStatus('loading', '获取复权价格中...');
+                }
+
+                const entries = Object.entries(codeMap);
+                const total = entries.length;
+
+                const tasks = entries.map(async ([name, code], index) => {
+                    const s = getSeries(name);
+                    if (!s) return null;
+
+                    const quote = findQuote(quotes, code);
+                    let price = (quote && quote.price > 0) ? quote.price : 0;
+
+                    const isUSStock = code.trim().toUpperCase().startsWith('US');
+
+                    if (!isUSStock) {
+                        let formattedCode = formatStockCode(code);
+                        if (/^\d{5,6}$/.test(formattedCode)) {
+                            if (formattedCode.startsWith('6')) {
+                                formattedCode = 'sh' + formattedCode;
+                            } else {
+                                formattedCode = 'sz' + formattedCode;
+                            }
+                        }
+                        if (/^[A-Z]{1,5}$/.test(formattedCode) && !formattedCode.startsWith('us')) {
+                            formattedCode = 'us' + formattedCode;
+                        }
+                        if (/^\d{5}$/.test(formattedCode) && !formattedCode.startsWith('hk')) {
+                            formattedCode = 'hk' + formattedCode;
+                        }
+
+                        const qfqUrl =
+                            `https://web.ifzq.gtimg.cn/appstock/app/fqkline/get?param=${formattedCode},day,${targetDate},${targetDate},1,qfq`;
+                        try {
+                            const resp = await fetch(qfqUrl, {
+                                mode: 'cors',
+                                headers: {'Referer': 'https://finance.sina.com.cn'}
+                            });
+                            if (resp.ok) {
+                                const json = await resp.json();
+                                const dataKey = formattedCode;
+                                let qfqData = json?.data?.[dataKey]?.qfqday || json?.data?.[dataKey]?.day;
+                                if (qfqData && Array.isArray(qfqData) && qfqData.length > 0) {
+                                    const qfqPrice = parseFloat(qfqData[0][2]);
+                                    if (!isNaN(qfqPrice) && qfqPrice > 0) {
+                                        if (price > 0) {
+                                            const diffPercent = Math.abs((qfqPrice - price) / price) * 100;
+                                            if (diffPercent < 20) {
+                                                price = qfqPrice;
+                                                console.log(`[${name}] 使用前复权价格: ${qfqPrice} (实时价: ${price})`);
+                                            } else {
+                                                console.warn(`[${name}] 复权价与实时价差异过大 (${diffPercent.toFixed(2)}%)，使用实时价`);
+                                            }
                                         } else {
-                                            console.warn(`[${name}] 复权价与实时价差异过大 (${diffPercent.toFixed(2)}%)，使用实时价`);
+                                            price = qfqPrice;
+                                            console.log(`[${name}] 使用前复权价格: ${qfqPrice}`);
                                         }
-                                    } else {
-                                        price = qfqPrice;
-                                        console.log(`[${name}] 使用前复权价格: ${qfqPrice}`);
                                     }
                                 }
                             }
+                        } catch (e) {
+                            console.warn(`[${name}] 获取复权价失败，使用实时价`, e);
                         }
-                    } catch (e) {
-                        console.warn(`[${name}] 获取复权价失败，使用实时价`, e);
+                    } else {
+                        console.log(`[${name}] 美股跳过复权请求，使用实时价: ${price}`);
                     }
-                } else {
-                    console.log(`[${name}] 美股跳过复权请求，使用实时价: ${price}`);
+
+                    setStatus('loading', `获取价格中 (${index + 1}/${total})...`);
+
+                    return {name, price, s};
+                });
+
+                const results = await Promise.all(tasks);
+
+                for (const result of results) {
+                    if (!result) continue;
+                    const {name, price, s} = result;
+                    if (price > 0) {
+                        s.data[targetIdx] = price;
+                        // 存储最高最低价（安全访问）
+                        if (!s.highData) s.highData = new Array(dates.length).fill(0);
+                        if (!s.lowData) s.lowData = new Array(dates.length).fill(0);
+                        const q = quotes ? quotes[formatStockCode(s.code)] : null; // 再次尝试获取 quote
+                        s.highData[targetIdx] = (q && q.high) || price;
+                        s.lowData[targetIdx] = (q && q.low) || price;
+                        updateLinkedCells(name, targetDate);
+                        updatedCount++;
+                        s.updateStatus = 'success';
+                    } else {
+                        s.updateStatus = 'error';
+                    }
                 }
 
-                setStatus('loading', `获取价格中 (${index + 1}/${total})...`);
-
-                return {name, price, s};
-            });
-
-            const results = await Promise.all(tasks);
-
-            for (const result of results) {
-                if (!result) continue;
-                const {name, price, s} = result;
-                if (price > 0) {
-                    s.data[targetIdx] = price;
-                    // 存储最高最低价
-                    if (!s.highData) s.highData = new Array(dates.length).fill(0);
-                    if (!s.lowData) s.lowData = new Array(dates.length).fill(0);
-                    s.highData[targetIdx] = quote.high || price;
-                    s.lowData[targetIdx] = quote.low || price;
-                    updateLinkedCells(name, targetDate);
-                    updatedCount++;
-                    s.updateStatus = 'success';
-                } else {
-                    s.updateStatus = 'error';
+                const px = getSeries('飘小仙');
+                if (px) {
+                    px.data = px.data.map(() => 1);
                 }
+
+                sortAllData();
+                renderTables();
+                renderChart();
+                resetDanmaku();
+                saveState();
+
+                const statusMsg = targetDate !== todayStr ?
+                    `已更新 ${updatedCount} 只股票 (${usedApi}，采用前复权价格)，最新数据日期: ${targetDate}（非交易日）` :
+                    `已更新 ${updatedCount} 只股票 (${usedApi}，采用前复权价格)，日期已对齐至 ${targetDate}`;
+                setStatus('success', statusMsg);
+                lastUpdateTime.textContent = '更新于 ' + new Date().toLocaleTimeString();
+
+            } catch (error) {
+                console.error('刷新过程异常:', error);
+                setStatus('error', '刷新失败，请重试');
+            } finally {
+                isRefreshing = false;
+                refreshPriceIconBtn.disabled = false;
             }
-
-            const px = getSeries('飘小仙');
-            if (px) {
-                px.data = px.data.map(() => 1);
-            }
-
-            sortAllData();
-            renderTables();
-            renderChart();
-            resetDanmaku();
-            saveState();
-
-            const statusMsg = targetDate !== todayStr ?
-                `已更新 ${updatedCount} 只股票 (${usedApi}，采用前复权价格)，最新数据日期: ${targetDate}（非交易日）` :
-                `已更新 ${updatedCount} 只股票 (${usedApi}，采用前复权价格)，日期已对齐至 ${targetDate}`;
-            setStatus('success', statusMsg);
-            lastUpdateTime.textContent = '更新于 ' + new Date().toLocaleTimeString();
-
-            isRefreshing = false;
-            refreshPriceIconBtn.disabled = false;
         }
-
         // ================================================================
         //  历史数据校验
         // ================================================================
