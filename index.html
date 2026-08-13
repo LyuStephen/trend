@@ -2248,7 +2248,7 @@
                         </div>
                     </div>
                 </details>
-                
+
                 <!-- 表1：原始值 -->
                 <details id="rawDetails" open>
                     <summary>📊 原始值 <span
@@ -2268,7 +2268,7 @@
                     </div>
                 </details>
 
-                
+
 
                 <!-- 表2：当日变化率 -->
                 <details id="dailyDetails" open>
@@ -5677,10 +5677,18 @@
                     const coordHigh = api.coord([high, index]);
                     if (!coordLow || !coordHigh) return null;
                     const y = coordLow[1];
-                    const barHeight = 10;
-                    const extra = 8;  // 左右各扩展 ?px，使灰色条比柱宽 ?px
+                    // 红绿柱的 barWidth 为 16，将灰色条高度设为 24（比柱高 8px，视觉更突出）
+                    const barHeight = 24;
+                    const extra = 8; // 若希望水平方向也略宽，可保留，否则设为 0
+                    // 计算水平宽度（基于数据区间 + extra）
+                    let width = Math.abs(coordLow[0] - coordHigh[0]) + extra;
+                    // 可选项：设置最小宽度，避免过窄
+                    const minWidth = 20;
+                    width = Math.max(width, minWidth);
+                    // 计算 x 位置，使灰色条在水平方向上居中对齐（若 extra 为 0，则直接使用 min 坐标）
                     const x = Math.min(coordLow[0], coordHigh[0]) - extra / 2;
-                    const width = Math.abs(coordLow[0] - coordHigh[0]) + extra;
+                    // 垂直居中：y 为数据点的 y 坐标（即条形的中心），上移 barHeight/2
+                    const y = coordLow[1] - barHeight / 2;
                     // 统一浅灰色，半透明，无边框
                     return {
                         type: 'rect',
