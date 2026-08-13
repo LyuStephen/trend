@@ -5583,6 +5583,25 @@
             const leftMargin = isMobile ? 100 : 164;
             const rightMargin = isMobile ? 200 : 240;
 
+            // ---- 计算所有指标的全局最低和最高变化率（用于坐标轴范围） ----
+            let globalMin = Infinity;
+            let globalMax = -Infinity;
+            items.forEach(item => {
+                const low = Math.min(item.lowChange, item.highChange);
+                const high = Math.max(item.lowChange, item.highChange);
+                if (low < globalMin) globalMin = low;
+                if (high > globalMax) globalMax = high;
+            });
+            // 如果所有值都为 0（例如只有飘小仙），则设置默认范围
+            if (globalMin === Infinity || globalMax === -Infinity || globalMin === globalMax) {
+                globalMin = -10;
+                globalMax = 10;
+            }
+            // 添加边距（10%）
+            const padding = Math.max(5, (globalMax - globalMin) * 0.1);
+            const xMin = globalMin - padding;
+            const xMax = globalMax + padding;
+
             // 构建柱状图系列
             const barSeries = {
                 type: 'bar',
@@ -5615,7 +5634,7 @@
                 return [low, high];
             });
 
-            // 自定义系列：绘制半透明区间条
+            // 自定义系列：绘制半透明浅灰色区间条（无边框）
             const rangeSeries = {
                 type: 'custom',
                 data: rangeData,
@@ -5627,12 +5646,10 @@
                     const coordHigh = api.coord([high, index]);
                     if (!coordLow || !coordHigh) return null;
                     const y = coordLow[1];
-                    const barHeight = 10; // 固定高度，与柱状图宽度协调
+                    const barHeight = 10;
                     const x = Math.min(coordLow[0], coordHigh[0]);
                     const width = Math.abs(coordLow[0] - coordHigh[0]);
-                    // 颜色随正负变化（半透明）
-                    const color = low >= 0 ? 'rgba(230, 67, 64, 0.25)' : 'rgba(7, 193, 96, 0.25)';
-                    const strokeColor = low >= 0 ? 'rgba(230, 67, 64, 0.6)' : 'rgba(7, 193, 96, 0.6)';
+                    // 统一浅灰色，半透明，无边框
                     return {
                         type: 'rect',
                         shape: {
@@ -5642,11 +5659,10 @@
                             height: barHeight
                         },
                         style: {
-                            fill: color,
-                            stroke: strokeColor,
-                            lineWidth: 1
+                            fill: 'rgba(180, 180, 180, 0.35)',
+                            stroke: 'none'
                         },
-                        z: 1 // 在柱状图下方
+                        z: 1
                     };
                 },
                 z: 1
@@ -5657,7 +5673,6 @@
                     trigger: 'axis',
                     axisPointer: {type: 'shadow'},
                     formatter: function (params) {
-                        // 只取柱状图信息
                         const bar = params.find(p => p.seriesType === 'bar');
                         if (!bar) return '';
                         const idx = bar.dataIndex;
@@ -5679,6 +5694,8 @@
                 },
                 xAxis: {
                     type: 'value',
+                    min: xMin,
+                    max: xMax,
                     axisLabel: {
                         formatter: value => value.toFixed(1) + '%',
                         color: isDark ? '#94a3b8' : '#475569',
@@ -5737,7 +5754,7 @@
                     const avatar = getAvatarSrc(s);
                     const coord = myChart.convertToPixel('grid', [0, index]);
                     if (coord && !isNaN(coord[0]) && !isNaN(coord[1]) && avatar !== DEFAULT_AVATAR_SVG) {
-                        const avatarX = leftMargin + 4;   // 网格左边界内侧，紧挨指标名称右侧
+                        const avatarX = leftMargin + 4;
                         graphicElements.push({
                             type: 'image',
                             style: {
@@ -5787,7 +5804,7 @@
 
             myChart.resize();
             setTimeout(() => {resetDanmaku();}, 100);
-        }        
+        }
         //  瀑布图（略，原有）
         // ================================================================
         function renderWaterfall() {
