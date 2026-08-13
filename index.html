@@ -5521,52 +5521,141 @@
             const idx = dates.indexOf(targetDate);
             const prevIdx = idx - 1;
 
-            // 计算每个指标的当日变化率，并收集股价数据
+            // 计算每个指标的数据
             const items = [];
             seriesKeys.forEach(key => {
                 const s = getSeries(key);
                 if (!s) return;
+
+                // 收盘价变化率
                 let change = 0;
                 if (prevIdx >= 0) {
                     const prevVal = s.data[prevIdx];
                     const currVal = s.data[idx];
                     change = calcDailyChange(prevVal, currVal);
                 }
+
+                // 最高价和最低价变化率
+                let highChange = 0, lowChange = 0;
+                if (prevIdx >= 0) {
+                    const prevHigh = (s.highData && s.highData[prevIdx] !== undefined) ? s.highData[prevIdx] : 0;
+                    const currHigh = (s.highData && s.highData[idx] !== undefined) ? s.highData[idx] : 0;
+                    const prevLow = (s.lowData && s.lowData[prevIdx] !== undefined) ? s.lowData[prevIdx] : 0;
+                    const currLow = (s.lowData && s.lowData[idx] !== undefined) ? s.lowData[idx] : 0;
+                    highChange = (prevHigh !== 0) ? ((currHigh - prevHigh) / prevHigh) * 100 : 0;
+                    lowChange = (prevLow !== 0) ? ((currLow - prevLow) / prevLow) * 100 : 0;
+                }
+
+                const price = s.data[idx] || 0;
                 const high = (s.highData && s.highData[idx] !== undefined) ? s.highData[idx] : 0;
                 const low = (s.lowData && s.lowData[idx] !== undefined) ? s.lowData[idx] : 0;
-                const price = s.data[idx] || 0;
+
                 items.push({
                     name: key,
                     color: s.color,
                     change: change,
+                    highChange: highChange,
+                    lowChange: lowChange,
                     remark: s.remark || '',
+                    price: price,
                     high: high,
-                    low: low,
-                    price: price
+                    low: low
                 });
             });
 
-            // 按变化率从低到高排序（纵轴底部为最高）
+            // 按收盘价变化率从低到高排序（纵轴底部为最高）
             items.sort((a, b) => a.change - b.change);
 
             const isDark = document.body.classList.contains('dark');
             const names = items.map(item => item.name);
             const changes = items.map(item => item.change);
 
-            // 定义网格边距（左侧为指标名称，右侧为股价信息面板）
+            // 网格边距（左侧为指标名称，右侧为股价信息面板）
             const isMobile = isMobileView();
             const leftMargin = isMobile ? 100 : 164;
-            const rightMargin = isMobile ? 200 : 240; // 增大右留白
+            const rightMargin = isMobile ? 200 : 240;
+
+            // 构建柱状图系列
+            const barSeries = {
+                type: 'bar',
+                data: changes.map((val) => ({
+                    value: val,
+                    itemStyle: {
+                        color: val >= 0 ? '#e64340' : '#07c160',
+                        borderRadius: val >= 0 ? [4, 4, 0, 0] : [0, 0, 4, 4]
+                    }
+                })),
+                label: {
+                    show: true,
+                    position: 'right',
+                    formatter: p => p.value.toFixed(2) + '%',
+                    fontSize: isMobile ? 10 : 12,
+                    color: isDark ? '#cbd5e1' : '#1e293b'
+                },
+                barWidth: 16,
+                itemStyle: {
+                    shadowBlur: 4,
+                    shadowColor: 'rgba(0,0,0,0.1)'
+                }
+            };
+
+            // 构建散点数据（最高价变化率、最低价变化率）
+            const highScatterData = [];
+            const lowScatterData = [];
+            items.forEach((item, index) => {
+                // y 用索引，因为 yAxis 是 category
+                highScatterData.push([item.highChange, index]);
+                lowScatterData.push([item.lowChange, index]);
+            });
+
+            const highSeries = {
+                name: '最高价变化率',
+                type: 'scatter',
+                data: highScatterData,
+                symbol: 'circle',
+                symbolSize: 8,
+                itemStyle: {
+                    color: '#3b82f6', // 蓝色
+                    borderColor: '#fff',
+                    borderWidth: 1
+                },
+                label: {
+                    show: false // 不显示数值，避免拥挤
+                },
+                z: 10
+            };
+
+            const lowSeries = {
+                name: '最低价变化率',
+                type: 'scatter',
+                data: lowScatterData,
+                symbol: 'circle',
+                symbolSize: 8,
+                itemStyle: {
+                    color: '#f59e0b', // 橙色
+                    borderColor: '#fff',
+                    borderWidth: 1
+                },
+                label: {
+                    show: false
+                },
+                z: 10
+            };
 
             const option = {
                 tooltip: {
                     trigger: 'axis',
                     axisPointer: {type: 'shadow'},
                     formatter: function (params) {
-                        const p = params[0];
-                        if (!p) return '';
-                        const item = items[p.dataIndex];
-                        return `<strong>${item.name}</strong><br/>当日变化率: <strong>${item.change.toFixed(2)}%</strong>${item.remark ? '<br/>备注: ' + item.remark : ''}`;
+                        // params 包含柱状图和散点的信息，我们按索引提取
+                        const bar = params.find(p => p.seriesType === 'bar');
+                        if (!bar) return '';
+                        const idx = bar.dataIndex;
+                        const item = items[idx];
+                        return `<strong>${item.name}</strong><br/>
+                        收盘变化率: <strong>${item.change.toFixed(2)}%</strong><br/>
+                        最高变化率: <strong>${item.highChange.toFixed(2)}%</strong><br/>
+                        最低变化率: <strong>${item.lowChange.toFixed(2)}%</strong>${item.remark ? '<br/>备注: ' + item.remark : ''}`;
                     },
                     backgroundColor: isDark ? '#2d3748' : '#ffffff',
                     borderColor: isDark ? '#334155' : '#eef2f6',
@@ -5613,28 +5702,7 @@
                     axisTick: {show: false},
                     splitLine: {show: false}
                 },
-                series: [{
-                    type: 'bar',
-                    data: changes.map((val) => ({
-                        value: val,
-                        itemStyle: {
-                            color: val >= 0 ? '#e64340' : '#07c160',
-                            borderRadius: val >= 0 ? [4, 4, 0, 0] : [0, 0, 4, 4]
-                        }
-                    })),
-                    label: {
-                        show: true,
-                        position: 'right',
-                        formatter: p => p.value.toFixed(2) + '%',
-                        fontSize: isMobile ? 10 : 12,
-                        color: isDark ? '#cbd5e1' : '#1e293b'
-                    },
-                    barWidth: 16,
-                    itemStyle: {
-                        shadowBlur: 4,
-                        shadowColor: 'rgba(0,0,0,0.1)'
-                    }
-                }]
+                series: [barSeries, highSeries, lowSeries]
             };
 
             myChart.setOption(option, true);
@@ -5642,29 +5710,24 @@
             // 清除旧 graphic
             myChart.setOption({graphic: []});
 
-            // 渲染完成后再添加头像和右侧信息
+            // 渲染完成后添加头像和右侧信息
             myChart.on('finished', function onFinished() {
                 myChart.off('finished', onFinished);
 
                 const chartWidth = myChart.getWidth();
-                const chartHeight = myChart.getHeight();
                 const avatarSize = isMobile ? 22 : 28;
                 const padding = 6;
-
                 const graphicElements = [];
 
-                // 为每个指标生成头像（左侧）和股价信息（右侧）
                 items.forEach((item, index) => {
                     const s = getSeries(item.name);
                     if (!s) return;
 
                     // ---- 头像（左侧） ----
                     const avatar = getAvatarSrc(s);
-                    // 头像位置：在 yAxis 标签左侧，即网格左边界之外
-                    const avatarX = leftMargin - avatarSize - padding;
-                    // y坐标与 yAxis 标签对齐（居中）
                     const coord = myChart.convertToPixel('grid', [0, index]);
                     if (coord && !isNaN(coord[0]) && !isNaN(coord[1]) && avatar !== DEFAULT_AVATAR_SVG) {
+                        const avatarX = leftMargin - avatarSize - padding;
                         graphicElements.push({
                             type: 'image',
                             style: {
@@ -5714,7 +5777,7 @@
 
             myChart.resize();
             setTimeout(() => {resetDanmaku();}, 100);
-        }        // ================================================================
+        }
         //  瀑布图（略，原有）
         // ================================================================
         function renderWaterfall() {
