@@ -6297,6 +6297,10 @@
                 initResizer();
                 setStatus('info', message || '就绪');
 
+                // 强制关闭“数据导入导出”面板（默认收起）
+                importExportGroup.classList.remove('open');
+                toggleImportExportBtn.textContent = '📂 数据导入导出';
+
                 // ★★★ 趋势图图例点击事件 ★★★
                 // 普通点击：只显示该曲线，再次点击同一曲线恢复全部显示
                 // Ctrl+点击：切换该曲线的显示/隐藏（多选模式）
