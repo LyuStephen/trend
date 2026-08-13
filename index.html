@@ -5538,12 +5538,11 @@
                 // 最高价和最低价变化率
                 let highChange = 0, lowChange = 0;
                 if (prevIdx >= 0) {
-                    const prevHigh = (s.highData && s.highData[prevIdx] !== undefined) ? s.highData[prevIdx] : 0;
+                    const prevClose = s.data[prevIdx];
                     const currHigh = (s.highData && s.highData[idx] !== undefined) ? s.highData[idx] : 0;
-                    const prevLow = (s.lowData && s.lowData[prevIdx] !== undefined) ? s.lowData[prevIdx] : 0;
                     const currLow = (s.lowData && s.lowData[idx] !== undefined) ? s.lowData[idx] : 0;
-                    highChange = (prevHigh !== 0) ? ((currHigh - prevHigh) / prevHigh) * 100 : 0;
-                    lowChange = (prevLow !== 0) ? ((currLow - prevLow) / prevLow) * 100 : 0;
+                    highChange = (prevClose !== 0) ? ((currHigh - prevClose) / prevClose) * 100 : 0;
+                    lowChange = (prevClose !== 0) ? ((currLow - prevClose) / prevClose) * 100 : 0;
                 }
 
                 const price = s.data[idx] || 0;
@@ -5723,11 +5722,11 @@
                     const s = getSeries(item.name);
                     if (!s) return;
 
-                    // ---- 头像（左侧） ----
+                    // ---- 头像（左侧，在指标名称右侧） ----
                     const avatar = getAvatarSrc(s);
                     const coord = myChart.convertToPixel('grid', [0, index]);
                     if (coord && !isNaN(coord[0]) && !isNaN(coord[1]) && avatar !== DEFAULT_AVATAR_SVG) {
-                        const avatarX = leftMargin - avatarSize - padding;
+                        const avatarX = leftMargin + 4;   // 网格左边界内侧，紧挨指标名称右侧
                         graphicElements.push({
                             type: 'image',
                             style: {
