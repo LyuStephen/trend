@@ -5515,7 +5515,7 @@
                     textStyle: {color: isDark ? '#e2e8f0' : '#1e293b'}
                 },
                 grid: {
-                    left: isMobileView() ? 90 : 154,
+                    left: isMobileView() ? 100 : 164,
                     right: isMobileView() ? 60 : 40,
                     top: 20,
                     bottom: 30
@@ -5542,7 +5542,14 @@
                     axisLabel: {
                         color: isDark ? '#94a3b8' : '#475569',
                         fontSize: 13,
-                        fontWeight: 500
+                        fontWeight: 500,
+                        formatter: function (value, index) {
+                            let prefix = '';
+                            if (index === 0) prefix = '🥇 ';
+                            else if (index === 1) prefix = '🥈 ';
+                            else if (index === 2) prefix = '🥉 ';
+                            return prefix + value;
+                        }
                     },
                     axisLine: {lineStyle: {color: isDark ? '#334155' : '#eef2f6'}},
                     axisTick: {show: false},
