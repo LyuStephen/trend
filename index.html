@@ -142,7 +142,7 @@
             margin-bottom: 12px;
             flex-wrap: wrap;
             gap: 8px;
-            
+
             background: var(--bg-app);
         }
 
@@ -5833,10 +5833,10 @@
                     itemWidth: 10,
                     itemHeight: 10,
                     textStyle: {
-                        fontSize: 13,
+                        fontSize: isMobileView() ? 11 : 13,
                         color: 'var(--text-secondary)'
                     }
-                },
+                },,
                 grid: {
                     left: 45,
                     right: 25,
@@ -6106,8 +6106,11 @@
                     left: 'center',
                     itemWidth: 10,
                     itemHeight: 10,
-                    textStyle: {fontSize: 13, color: 'var(--text-secondary)'}
-                },
+                    textStyle: {
+                        fontSize: isMobileView() ? 11 : 13,
+                        color: 'var(--text-secondary)'
+                    }
+                },,
                 grid: {left: 45, right: 25, top: 45, bottom: isMobileView() ? 55 : 35},
                 xAxis: {
                     type: 'category',
