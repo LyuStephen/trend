@@ -2202,12 +2202,15 @@
                 <div class="series-manager" id="seriesManager"></div>
             </div>
 
-            <!-- 股价信息（排行图） -->
             <details id="priceInfoDetails" open>
                 <summary
                     style="display:flex; align-items:center; justify-content:space-between; cursor:pointer; font-weight:600; color:var(--text-secondary); font-size:13px; padding:4px 0; user-select:none;">
-                    <span>💰 股价信息 <span
-                            style="font-weight:400;text-transform:none;color:var(--text-muted);font-size:12px;">（排行图选定日期）</span></span>
+                    <span>
+                        <span id="priceInfoIcon"
+                            style="display:inline-block; width:1.2em; text-align:center; transition:transform 0.2s;">▼</span>
+                        💰 股价信息 <span
+                            style="font-weight:400;text-transform:none;color:var(--text-muted);font-size:12px;">（排行图选定日期）</span>
+                    </span>
                     <button class="btn btn-outline expand-table-btn" data-target="priceInfoScroll"
                         style="font-size:11px; padding:0 8px; margin-left:8px;">📏 显示全部</button>
                 </summary>
@@ -5620,7 +5623,7 @@
                 globalMax = 10;
             }
             // 添加边距（5%）
-            const padding = Math.max(2, (globalMax - globalMin) * 0.05);
+            const padding = Math.max(1.5, (globalMax - globalMin) * 0.05);
             const xMin = globalMin - padding;
             const xMax = globalMax + padding;
 
@@ -5811,11 +5814,7 @@
         function renderPriceTable(items, targetDate) {
             const tableBody = document.getElementById('priceInfoBody');
             const tableHead = document.getElementById('priceInfoHead');
-            const dateDisplay = document.querySelector('#priceInfoSection .panel-section-title span');
-
-            if (!tableBody || !tableHead) return;
-
-            // 更新标题中的日期
+            const dateDisplay = document.getElementById('priceInfoDateLabel');
             if (dateDisplay) {
                 dateDisplay.textContent = `（排行图选定日期: ${targetDate || '--'}）`;
             }
@@ -6644,6 +6643,69 @@
 
                 updateViewUI();
                 saveState();
+                // ---- 新增：图标切换 ----
+                const priceInfoDetails = document.getElementById('priceInfoDetails');
+                const priceInfoIcon = document.getElementById('priceInfoIcon');
+                if (priceInfoDetails && priceInfoIcon) {
+                    priceInfoDetails.addEventListener('toggle', function () {
+                        priceInfoIcon.textContent = this.open ? '▼' : '▶';
+                    });
+                }
+
+                // ---- 新增：自动刷新股价信息（打开网页后填充） ----
+                function buildAndRenderPriceInfo() {
+                    let targetDate = rankingDate;
+                    if (!targetDate || !dates.includes(targetDate)) {
+                        targetDate = dates[dates.length - 1] || '';
+                        rankingDate = targetDate;
+                        if (rankingDateInput) rankingDateInput.value = targetDate;
+                    }
+                    if (!targetDate || !dates.includes(targetDate)) return;
+
+                    const idx = dates.indexOf(targetDate);
+                    const prevIdx = idx - 1;
+                    const items = [];
+                    seriesKeys.forEach(key => {
+                        const s = getSeries(key);
+                        if (!s) return;
+                        let change = 0;
+                        if (prevIdx >= 0) {
+                            const prevVal = s.data[prevIdx];
+                            const currVal = s.data[idx];
+                            change = calcDailyChange(prevVal, currVal);
+                        }
+                        let highChange = 0, lowChange = 0;
+                        if (prevIdx >= 0) {
+                            const prevClose = s.data[prevIdx];
+                            const currHigh = (s.highData && s.highData[idx] !== undefined) ? s.highData[idx] : 0;
+                            const currLow = (s.lowData && s.lowData[idx] !== undefined) ? s.lowData[idx] : 0;
+                            highChange = (prevClose !== 0) ? ((currHigh - prevClose) / prevClose) * 100 : 0;
+                            lowChange = (prevClose !== 0) ? ((currLow - prevClose) / prevClose) * 100 : 0;
+                        }
+                        let price = s.data[idx] || 0;
+                        let high = (s.highData && s.highData[idx] !== undefined) ? s.highData[idx] : 0;
+                        let low = (s.lowData && s.lowData[idx] !== undefined) ? s.lowData[idx] : 0;
+                        if (key === '飘小仙') {
+                            change = 0; highChange = 0; lowChange = 0; price = 1; high = 1; low = 1;
+                        }
+                        items.push({
+                            name: key,
+                            color: s.color,
+                            change: change,
+                            highChange: highChange,
+                            lowChange: lowChange,
+                            remark: s.remark || '',
+                            price: price,
+                            high: high,
+                            low: low
+                        });
+                    });
+                    renderPriceTable(items, targetDate);
+                }
+
+                // 延迟执行，确保所有数据已初始化
+                setTimeout(buildAndRenderPriceInfo, 300);
+
                 setTimeout(() => {refreshPrices();}, 2500);
                 console.log('✅ 初始化完成，数据来源：' + message);
             }
