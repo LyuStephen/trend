@@ -387,14 +387,14 @@
 
         .chart-reset-buttons .btn-reset,
         .chart-reset-buttons .btn-refresh-icon {
-            width: 32px;
-            height: 32px;
+            width: 22px;
+            height: 22px;
             border-radius: 50%;
             border: none;
             background: rgba(255, 255, 255, 0.85);
             backdrop-filter: blur(4px);
             box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-            font-size: 16px;
+            font-size: 11px;
             cursor: pointer;
             transition: 0.2s;
             display: flex;
@@ -412,9 +412,9 @@
             backdrop-filter: blur(4px);
             border: 1px solid var(--border-color);
             border-radius: 50%;
-            width: 24px;
-            height: 24px;
-            font-size: 14px;
+            width: 22px;
+            height: 22px;
+            font-size: 11px;
             cursor: pointer;
             transition: transform 0.3s;
             display: flex;
@@ -2222,25 +2222,6 @@
                     <span style="font-size:11px; color:var(--text-muted);" id="lastUpdateTime"></span>
                 </div>
 
-                <!-- 表1：原始值 -->
-                <details id="rawDetails" open>
-                    <summary>📊 原始值 <span
-                            style="font-weight:400;color:var(--text-muted);font-size:12px;">（基准值默认1）</span>
-                        <button class="btn btn-outline expand-table-btn" data-target="rawScroll"
-                            style="font-size:11px; padding:0 8px; margin-left:8px;">📏 显示全部</button>
-                    </summary>
-                    <div class="table-scroll-wrapper">
-                        <div class="table-scroll" id="rawScroll"
-                            style="flex:0 0 auto; overflow:auto; margin-top:6px; max-height:200px;">
-                            <table class="data-table" id="rawTable">
-                                <thead id="rawHead"></thead>
-                                <tbody id="rawBody"></tbody>
-                            </table>
-                        </div>
-                        <div class="resize-handle" data-target="rawScroll"></div>
-                    </div>
-                </details>
-
                 <details id="priceInfoDetails" open>
                     <summary
                         style="display:flex; align-items:center; justify-content:space-between; cursor:pointer; font-weight:600; color:var(--text-secondary); font-size:13px; padding:4px 0; user-select:none;">
@@ -2266,6 +2247,27 @@
                         </div>
                     </div>
                 </details>
+                
+                <!-- 表1：原始值 -->
+                <details id="rawDetails" open>
+                    <summary>📊 原始值 <span
+                            style="font-weight:400;color:var(--text-muted);font-size:12px;">（基准值默认1）</span>
+                        <button class="btn btn-outline expand-table-btn" data-target="rawScroll"
+                            style="font-size:11px; padding:0 8px; margin-left:8px;">📏 显示全部</button>
+                    </summary>
+                    <div class="table-scroll-wrapper">
+                        <div class="table-scroll" id="rawScroll"
+                            style="flex:0 0 auto; overflow:auto; margin-top:6px; max-height:200px;">
+                            <table class="data-table" id="rawTable">
+                                <thead id="rawHead"></thead>
+                                <tbody id="rawBody"></tbody>
+                            </table>
+                        </div>
+                        <div class="resize-handle" data-target="rawScroll"></div>
+                    </div>
+                </details>
+
+                
 
                 <!-- 表2：当日变化率 -->
                 <details id="dailyDetails" open>
