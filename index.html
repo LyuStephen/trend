@@ -2202,6 +2202,24 @@
                 <div class="series-manager" id="seriesManager"></div>
             </div>
 
+            <!-- 股价信息（排行图） -->
+            <div class="panel-section" id="priceInfoSection">
+                <div class="panel-section-title">💰 股价信息 <span
+                        style="font-weight:400;text-transform:none;color:var(--text-muted);font-size:12px;">（排行图选定日期）</span>
+                </div>
+                <div id="priceInfoContainer">
+                    <div class="table-scroll-wrapper">
+                        <div class="table-scroll" id="priceInfoScroll"
+                            style="flex:0 0 auto; overflow:auto; margin-top:6px; max-height:200px;">
+                            <table class="data-table" id="priceInfoTable">
+                                <thead id="priceInfoHead"></thead>
+                                <tbody id="priceInfoBody"></tbody>
+                            </table>
+                        </div>
+                        <div class="resize-handle" data-target="priceInfoScroll"></div>
+                    </div>
+                </div>
+            </div>
             <!-- 数据编辑 -->
             <div class="panel-section data-edit-section" style="flex:0 0 auto;">
                 <div class="panel-section-title" style="margin-bottom:4px;">
@@ -5581,7 +5599,7 @@
             // 网格边距（左侧为指标名称，右侧为股价信息面板）
             const isMobile = isMobileView();
             const leftMargin = isMobile ? 100 : 164;
-            const rightMargin = isMobile ? 200 : 240;
+            const rightMargin = isMobile ? 60 : 80;
 
             // ---- 计算所有指标的全局最低和最高变化率（用于坐标轴范围） ----
             let globalMin = Infinity;
@@ -5598,7 +5616,7 @@
                 globalMax = 10;
             }
             // 添加边距（5%）
-            const padding = Math.max(1, (globalMax - globalMin) * 0.05);
+            const padding = Math.max(2, (globalMax - globalMin) * 0.05);
             const xMin = globalMin - padding;
             const xMax = globalMax + padding;
 
@@ -5770,31 +5788,7 @@
                         });
                     }
 
-                    // ---- 右侧股价信息 ----
-                    const price = item.price || 0;
-                    const high = item.high || 0;
-                    const low = item.low || 0;
-                    const priceStr = price > 0 ? price.toFixed(2) : '--';
-                    const highStr = high > 0 ? high.toFixed(2) : '--';
-                    const lowStr = low > 0 ? low.toFixed(2) : '--';
-                    const text = `P:${priceStr} H:${highStr} L:${lowStr}`;
-                    const textX = chartWidth - rightMargin + padding;
-                    const textY = coord ? coord[1] : 0;
 
-                    graphicElements.push({
-                        type: 'text',
-                        style: {
-                            text: text,
-                            x: textX,
-                            y: textY,
-                            fill: isDark ? '#cbd5e1' : '#1e293b',
-                            fontSize: isMobile ? 9 : 11,
-                            textBaseline: 'middle',
-                            textAlign: 'left'
-                        },
-                        z: 100,
-                        zlevel: 10
-                    });
                 });
 
                 if (graphicElements.length > 0) {
@@ -5804,6 +5798,67 @@
 
             myChart.resize();
             setTimeout(() => {resetDanmaku();}, 100);
+            // 渲染股价信息表格
+            renderPriceTable(items, targetDate);
+        }
+        // ================================================================
+        //  渲染股价信息表格（排行图专用）
+        // ================================================================
+        function renderPriceTable(items, targetDate) {
+            const tableBody = document.getElementById('priceInfoBody');
+            const tableHead = document.getElementById('priceInfoHead');
+            const dateDisplay = document.querySelector('#priceInfoSection .panel-section-title span');
+
+            if (!tableBody || !tableHead) return;
+
+            // 更新标题中的日期
+            if (dateDisplay) {
+                dateDisplay.textContent = `（排行图选定日期: ${targetDate || '--'}）`;
+            }
+
+            // 如果 items 为空或视图不是排行图
+            if (!items || items.length === 0) {
+                tableHead.innerHTML = '';
+                tableBody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--text-muted);padding:12px;">暂无数据</td></tr>';
+                return;
+            }
+
+            // 按收盘价变化率从高到低排序（与排行图一致）
+            const sorted = [...items].sort((a, b) => b.change - a.change);
+
+            // 渲染表头
+            tableHead.innerHTML = `
+        <tr>
+            <th style="text-align:left; padding-left:8px;">📊 指标</th>
+            <th style="text-align:center;">💰 当前价</th>
+            <th style="text-align:center;">📈 最高价</th>
+            <th style="text-align:center;">📉 最低价</th>
+        </tr>
+    `;
+
+            // 渲染表体
+            let html = '';
+            sorted.forEach(item => {
+                const color = item.color || '#3b82f6';
+                const priceStr = item.price > 0 ? item.price.toFixed(2) : '--';
+                const highStr = item.high > 0 ? item.high.toFixed(2) : '--';
+                const lowStr = item.low > 0 ? item.low.toFixed(2) : '--';
+                html += `
+            <tr>
+                <td style="text-align:left; padding-left:8px; font-weight:600;">
+                    <span class="color-dot" style="background:${color};"></span> ${item.name}
+                </td>
+                <td style="text-align:center; font-weight:500;">${priceStr}</td>
+                <td style="text-align:center; font-weight:500; color:#e64340;">${highStr}</td>
+                <td style="text-align:center; font-weight:500; color:#07c160;">${lowStr}</td>
+            </tr>
+        `;
+            });
+            tableBody.innerHTML = html;
+
+            // 触发表格滚动到顶部
+            const scroll = document.getElementById('priceInfoScroll');
+            if (scroll) scroll.scrollTop = 0;
         }
         //  瀑布图（略，原有）
         // ================================================================
