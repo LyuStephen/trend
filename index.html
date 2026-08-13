@@ -40,7 +40,7 @@
             --dropdown-hover: #f1f5f9;
             --tab-active-bg-start: #1e5bbf;
             --tab-active-bg-end: #3b82f6;
-            --tab-active-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.30), 0 1px 3px rgba(0, 0, 0, 0.12);
+            --tab-active-shadow: 0 2px 16px rgba(37, 99, 235, 0.30), 0 1px 4px rgba(0, 0, 0, 0.06);
             --tab-active-border: #1a4fa8;
             --tab-active-text-shadow: 0 1px 2px rgba(0, 0, 0, 0.20);
         }
@@ -209,17 +209,17 @@
             background: transparent;
             color: var(--text-muted);
             cursor: pointer;
-            transition: 0.2s;
+            transition: all 0.25s ease;      /* 与 active 保持一致 */
             font-weight: 500;
             white-space: nowrap;
+            position: relative;              /* 保证伪元素定位 */
         }
 
         .header-actions .view-toggle-group .view-btn.active {
             background: linear-gradient(145deg, var(--tab-active-bg-start), var(--tab-active-bg-end));
             color: #fff !important;
             box-shadow: var(--tab-active-shadow);
-            transform: translateY(1px) scale(0.98);
-            border-color: var(--tab-active-border);
+                  
             text-shadow: var(--tab-active-text-shadow);
             font-weight: 600;
             letter-spacing: 0.5px;
@@ -1665,14 +1665,18 @@
         }
 
         #viewToggleGroup .view-btn.active {
-            background: linear-gradient(145deg, var(--tab-active-bg-start), var(--tab-active-bg-end));
+            background: linear-gradient(135deg, var(--tab-active-bg-start), var(--tab-active-bg-end));
             color: #fff !important;
             box-shadow: var(--tab-active-shadow);
-            transform: translateY(1px) scale(0.98);
-            border-color: var(--tab-active-border);
-            text-shadow: var(--tab-active-text-shadow);
+            transform: scale(1.02);
+            /* 改为轻微放大，而不是下压 */
+            border-color: transparent;
+            /* 去掉边框颜色，让渐变完全展示 */
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
             font-weight: 600;
             letter-spacing: 0.6px;
+            transition: all 0.25s ease;
+            /* 平滑过渡 */
         }
 
         #viewToggleGroup .view-btn.active::after {
