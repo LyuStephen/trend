@@ -5519,9 +5519,9 @@
             }
 
             const idx = dates.indexOf(targetDate);
-            const prevIdx = idx - 1; // 前一日索引
+            const prevIdx = idx - 1;
 
-            // 计算每个指标的当日变化率（相对于前一日）
+            // 计算每个指标的当日变化率，并收集股价数据
             const items = [];
             seriesKeys.forEach(key => {
                 const s = getSeries(key);
@@ -5531,21 +5531,32 @@
                     const prevVal = s.data[prevIdx];
                     const currVal = s.data[idx];
                     change = calcDailyChange(prevVal, currVal);
-                } else {
-                    change = 0;
                 }
                 const high = (s.highData && s.highData[idx] !== undefined) ? s.highData[idx] : 0;
                 const low = (s.lowData && s.lowData[idx] !== undefined) ? s.lowData[idx] : 0;
-                items.push({name: key, color: s.color, change: change, remark: s.remark || '', high: high, low: low});
+                const price = s.data[idx] || 0;
+                items.push({
+                    name: key,
+                    color: s.color,
+                    change: change,
+                    remark: s.remark || '',
+                    high: high,
+                    low: low,
+                    price: price
+                });
             });
 
-            // 按当日变化率从高到低排序
+            // 按变化率从低到高排序（纵轴底部为最高）
             items.sort((a, b) => a.change - b.change);
 
             const isDark = document.body.classList.contains('dark');
             const names = items.map(item => item.name);
             const changes = items.map(item => item.change);
-            const colors = items.map(item => item.change >= 0 ? '#e64340' : '#07c160');
+
+            // 定义网格边距（左侧为指标名称，右侧为股价信息面板）
+            const isMobile = isMobileView();
+            const leftMargin = isMobile ? 100 : 164;
+            const rightMargin = isMobile ? 200 : 240; // 增大右留白
 
             const option = {
                 tooltip: {
@@ -5562,8 +5573,8 @@
                     textStyle: {color: isDark ? '#e2e8f0' : '#1e293b'}
                 },
                 grid: {
-                    left: isMobileView() ? 100 : 164,
-                    right: isMobileView() ? 140 : 160,
+                    left: leftMargin,
+                    right: rightMargin,
                     top: 20,
                     bottom: 30
                 },
@@ -5572,8 +5583,7 @@
                     axisLabel: {
                         formatter: value => value.toFixed(1) + '%',
                         color: isDark ? '#94a3b8' : '#475569',
-                        // ★★★ 移动端优化：旋转标签、缩小字号、自动间隔 ★★★
-                        ...(isMobileView() ? {
+                        ...(isMobile ? {
                             rotate: 45,
                             fontSize: 10,
                             margin: 8,
@@ -5593,9 +5603,9 @@
                         formatter: function (value, index) {
                             var len = names.length;
                             var prefix = '';
-                            if (len >= 3 && index === len - 1) prefix = '🥇 ';   // 倒数第一
-                            else if (len >= 2 && index === len - 2) prefix = '🥈 '; // 倒数第二
-                            else if (len >= 1 && index === len - 3) prefix = '🥉 '; // 倒数第三
+                            if (len >= 3 && index === len - 1) prefix = '🥇 ';
+                            else if (len >= 2 && index === len - 2) prefix = '🥈 ';
+                            else if (len >= 1 && index === len - 3) prefix = '🥉 ';
                             return prefix + value;
                         }
                     },
@@ -5605,7 +5615,7 @@
                 },
                 series: [{
                     type: 'bar',
-                    data: changes.map((val, idx) => ({
+                    data: changes.map((val) => ({
                         value: val,
                         itemStyle: {
                             color: val >= 0 ? '#e64340' : '#07c160',
@@ -5616,7 +5626,7 @@
                         show: true,
                         position: 'right',
                         formatter: p => p.value.toFixed(2) + '%',
-                        fontSize: isMobileView() ? 10 : 12,
+                        fontSize: isMobile ? 10 : 12,
                         color: isDark ? '#cbd5e1' : '#1e293b'
                     },
                     barWidth: 16,
@@ -5629,30 +5639,37 @@
 
             myChart.setOption(option, true);
 
-            // ★★★ 清除之前的 graphic ★★★
+            // 清除旧 graphic
             myChart.setOption({graphic: []});
 
-            // ★★★ 渲染完成后添加头像 graphic ★★★
+            // 渲染完成后再添加头像和右侧信息
             myChart.on('finished', function onFinished() {
                 myChart.off('finished', onFinished);
-                const graphicElements = [];
-                const isMobile = isMobileView();
-                const avatarSize = isMobile ? 22 : 28;
-                const leftOffset = isMobile ? 26 : 34;
 
+                const chartWidth = myChart.getWidth();
+                const chartHeight = myChart.getHeight();
+                const avatarSize = isMobile ? 22 : 28;
+                const padding = 6;
+
+                const graphicElements = [];
+
+                // 为每个指标生成头像（左侧）和股价信息（右侧）
                 items.forEach((item, index) => {
                     const s = getSeries(item.name);
                     if (!s) return;
+
+                    // ---- 头像（左侧） ----
                     const avatar = getAvatarSrc(s);
-                    // 如果是默认头像则跳过，避免显示灰色占位
-                    if (!avatar || avatar === DEFAULT_AVATAR_SVG) return;
+                    // 头像位置：在 yAxis 标签左侧，即网格左边界之外
+                    const avatarX = leftMargin - avatarSize - padding;
+                    // y坐标与 yAxis 标签对齐（居中）
                     const coord = myChart.convertToPixel('grid', [0, index]);
-                    if (coord && !isNaN(coord[0]) && !isNaN(coord[1])) {
+                    if (coord && !isNaN(coord[0]) && !isNaN(coord[1]) && avatar !== DEFAULT_AVATAR_SVG) {
                         graphicElements.push({
                             type: 'image',
                             style: {
                                 image: avatar,
-                                x: coord[0] - leftOffset,
+                                x: avatarX,
                                 y: coord[1] - avatarSize / 2,
                                 width: avatarSize,
                                 height: avatarSize,
@@ -5662,50 +5679,42 @@
                             zlevel: 10
                         });
                     }
-                });
-                if (graphicElements.length > 0) {
-                    myChart.setOption({graphic: graphicElements});
-                }
-            });
-            // ★★★ 添加最高最低价文本标注 ★★★
-            myChart.on('finished', function onFinished() {
-                myChart.off('finished', onFinished);
-                const graphicElements = [];
-                const isDark = document.body.classList.contains('dark');
-                const textColor = isDark ? '#94a3b8' : '#475569';
 
-                items.forEach((item, index) => {
-                    const coord = myChart.convertToPixel('grid', [item.change, index]);
-                    if (coord && !isNaN(coord[0]) && !isNaN(coord[1])) {
-                        const high = item.high || 0;
-                        const low = item.low || 0;
-                        const highStr = high > 0 ? high.toFixed(2) : '--';
-                        const lowStr = low > 0 ? low.toFixed(2) : '--';
-                        const label = `H:${highStr} L:${lowStr}`;
-                        graphicElements.push({
-                            type: 'text',
-                            style: {
-                                text: label,
-                                x: coord[0] + 12,
-                                y: coord[1],
-                                fill: textColor,
-                                fontSize: isMobileView() ? 9 : 11,
-                                textBaseline: 'middle',
-                                textAlign: 'left',
-                                fontWeight: 'normal'
-                            },
-                            z: 100
-                        });
-                    }
+                    // ---- 右侧股价信息 ----
+                    const price = item.price || 0;
+                    const high = item.high || 0;
+                    const low = item.low || 0;
+                    const priceStr = price > 0 ? price.toFixed(2) : '--';
+                    const highStr = high > 0 ? high.toFixed(2) : '--';
+                    const lowStr = low > 0 ? low.toFixed(2) : '--';
+                    const text = `P:${priceStr} H:${highStr} L:${lowStr}`;
+                    const textX = chartWidth - rightMargin + padding;
+                    const textY = coord ? coord[1] : 0;
+
+                    graphicElements.push({
+                        type: 'text',
+                        style: {
+                            text: text,
+                            x: textX,
+                            y: textY,
+                            fill: isDark ? '#cbd5e1' : '#1e293b',
+                            fontSize: isMobile ? 9 : 11,
+                            textBaseline: 'middle',
+                            textAlign: 'left'
+                        },
+                        z: 100,
+                        zlevel: 10
+                    });
                 });
+
                 if (graphicElements.length > 0) {
                     myChart.setOption({graphic: graphicElements});
                 }
             });
+
             myChart.resize();
             setTimeout(() => {resetDanmaku();}, 100);
-        }
-        // ================================================================
+        }        // ================================================================
         //  瀑布图（略，原有）
         // ================================================================
         function renderWaterfall() {
