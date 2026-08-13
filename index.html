@@ -5163,7 +5163,7 @@
                         // 存储最高最低价（安全访问）
                         if (!s.highData) s.highData = new Array(dates.length).fill(0);
                         if (!s.lowData) s.lowData = new Array(dates.length).fill(0);
-                        const q = quotes ? quotes[formatStockCode(s.code)] : null; // 再次尝试获取 quote
+                        const q = findQuote(quotes, s.code);
                         s.highData[targetIdx] = (q && q.high) || price;
                         s.lowData[targetIdx] = (q && q.low) || price;
                         updateLinkedCells(name, targetDate);
