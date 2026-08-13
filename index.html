@@ -5546,9 +5546,9 @@
                     lowChange = (prevClose !== 0) ? ((currLow - prevClose) / prevClose) * 100 : 0;
                 }
 
-                const price = s.data[idx] || 0;
-                const high = (s.highData && s.highData[idx] !== undefined) ? s.highData[idx] : 0;
-                const low = (s.lowData && s.lowData[idx] !== undefined) ? s.lowData[idx] : 0;
+                let price = s.data[idx] || 0;
+                let high = (s.highData && s.highData[idx] !== undefined) ? s.highData[idx] : 0;
+                let low = (s.lowData && s.lowData[idx] !== undefined) ? s.lowData[idx] : 0;
                 // ★★★ 新增：对“飘小仙”强制赋值 ★★★
                 if (key === '飘小仙') {
                     change = 0;
