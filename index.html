@@ -3030,11 +3030,13 @@
             dates = state.dates;
             seriesList = state.seriesList.map(s => ({
                 ...s,
-                avatarData: null, // 新字段，初始为 null，由后续 processAllAvatars 生成
+                avatarData: null,
                 avatarUrl: s.avatarUrl || '',
                 remark: s.remark || '',
                 code: s.code || '',
-                danmaku: s.danmaku || []
+                danmaku: s.danmaku || [],
+                highData: s.highData || new Array(s.data.length).fill(0),
+                lowData: s.lowData || new Array(s.data.length).fill(0)
             }));
             seriesKeys = seriesList.map(s => s.name);
             yMin = state.yMin !== undefined ? state.yMin : -50;
@@ -5160,6 +5162,11 @@
                 const {name, price, s} = result;
                 if (price > 0) {
                     s.data[targetIdx] = price;
+                    // 存储最高最低价
+                    if (!s.highData) s.highData = new Array(dates.length).fill(0);
+                    if (!s.lowData) s.lowData = new Array(dates.length).fill(0);
+                    s.highData[targetIdx] = quote.high || price;
+                    s.lowData[targetIdx] = quote.low || price;
                     updateLinkedCells(name, targetDate);
                     updatedCount++;
                     s.updateStatus = 'success';
@@ -5284,18 +5291,20 @@
 
                     console.log(`[${name}] 获取到 ${klineData.length} 条K线数据`);
 
-                    const priceMap = {};
+                    const dataMap = {};
                     klineData.forEach(row => {
-                        if (row && row.length >= 3) {
+                        if (row && row.length >= 5) {
                             const dateStr = row[0];
                             const close = parseFloat(row[2]);
-                            if (dateStr && !isNaN(close) && close > 0) {
-                                priceMap[dateStr] = close;
+                            const high = parseFloat(row[3]);
+                            const low = parseFloat(row[4]);
+                            if (dateStr && !isNaN(close) && !isNaN(high) && !isNaN(low) && close > 0) {
+                                dataMap[dateStr] = {close, high, low};
                             }
                         }
                     });
 
-                    const dateKeys = Object.keys(priceMap);
+                    const dateKeys = Object.keys(dataMap);   // ✅ 使用 dataMap
                     console.log(
                         `[${name}] 可匹配的日期范围: ${dateKeys[0] || '无'} ~ ${dateKeys[dateKeys.length - 1] || '无'}`
                     );
@@ -5305,8 +5314,12 @@
                     let matched = 0;
                     for (let i = 0; i < dates.length; i++) {
                         const d = dates[i];
-                        if (priceMap[d] !== undefined) {
-                            s.data[i] = priceMap[d];
+                        if (dataMap[d] !== undefined) {
+                            s.data[i] = dataMap[d].close;
+                            if (!s.highData) s.highData = new Array(dates.length).fill(0);
+                            if (!s.lowData) s.lowData = new Array(dates.length).fill(0);
+                            s.highData[i] = dataMap[d].high;
+                            s.lowData[i] = dataMap[d].low;
                             matched++;
                             totalMatched++;
                             updateLinkedCells(name, dates[i]);
@@ -5516,9 +5529,11 @@
                     const currVal = s.data[idx];
                     change = calcDailyChange(prevVal, currVal);
                 } else {
-                    change = 0; // 首日无变化
+                    change = 0;
                 }
-                items.push({name: key, color: s.color, change: change, remark: s.remark || ''});
+                const high = (s.highData && s.highData[idx] !== undefined) ? s.highData[idx] : 0;
+                const low = (s.lowData && s.lowData[idx] !== undefined) ? s.lowData[idx] : 0;
+                items.push({name: key, color: s.color, change: change, remark: s.remark || '', high: high, low: low});
             });
 
             // 按当日变化率从高到低排序
@@ -5545,7 +5560,7 @@
                 },
                 grid: {
                     left: isMobileView() ? 100 : 164,
-                    right: isMobileView() ? 60 : 40,
+                    right: isMobileView() ? 140 : 160,
                     top: 20,
                     bottom: 30
                 },
@@ -5649,7 +5664,41 @@
                     myChart.setOption({graphic: graphicElements});
                 }
             });
+            // ★★★ 添加最高最低价文本标注 ★★★
+            myChart.on('finished', function onFinished() {
+                myChart.off('finished', onFinished);
+                const graphicElements = [];
+                const isDark = document.body.classList.contains('dark');
+                const textColor = isDark ? '#94a3b8' : '#475569';
 
+                items.forEach((item, index) => {
+                    const coord = myChart.convertToPixel('grid', [item.change, index]);
+                    if (coord && !isNaN(coord[0]) && !isNaN(coord[1])) {
+                        const high = item.high || 0;
+                        const low = item.low || 0;
+                        const highStr = high > 0 ? high.toFixed(2) : '--';
+                        const lowStr = low > 0 ? low.toFixed(2) : '--';
+                        const label = `H:${highStr} L:${lowStr}`;
+                        graphicElements.push({
+                            type: 'text',
+                            style: {
+                                text: label,
+                                x: coord[0] + 12,
+                                y: coord[1],
+                                fill: textColor,
+                                fontSize: isMobileView() ? 9 : 11,
+                                textBaseline: 'middle',
+                                textAlign: 'left',
+                                fontWeight: 'normal'
+                            },
+                            z: 100
+                        });
+                    }
+                });
+                if (graphicElements.length > 0) {
+                    myChart.setOption({graphic: graphicElements});
+                }
+            });
             myChart.resize();
             setTimeout(() => {resetDanmaku();}, 100);
         }
@@ -6547,6 +6596,8 @@
                 name: name,
                 color: defaultColors[name] || '#3b82f6',
                 data: [...defaultSeriesData[name]],
+                highData: new Array(defaultSeriesData[name].length).fill(0),
+                lowData: new Array(defaultSeriesData[name].length).fill(0),
                 avatarUrl: '',
                 avatarData: null,
                 remark: defaultRemarks[name] || '',
