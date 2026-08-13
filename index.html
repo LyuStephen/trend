@@ -2107,7 +2107,7 @@
                             瀑布图</button>
                         <button class="view-btn" data-view="ranking"
                             style="padding:4px 20px; font-size:16px; border:none; cursor:pointer; transition:0.2s; font-weight:500;">🌫️
-                            排行</button>
+                            排行图</button>
                     </span>
                 </div>
                 <div class="header-actions">
@@ -5792,8 +5792,8 @@
                     data: data.totalChanges,
                     smooth: true,
                     symbol: 'circle',
-                    symbolSize: 6,
-                    lineStyle: {color, width: 2},
+                    symbolSize: 8,          // 与趋势图一致
+                    lineStyle: {color, width: 2.5},  // 与趋势图一致
                     itemStyle: {color},
                     z: 3,
                     label: {
