@@ -5544,10 +5544,11 @@
                         fontSize: 13,
                         fontWeight: 500,
                         formatter: function (value, index) {
-                            let prefix = '';
-                            if (index === 0) prefix = '🥇 ';
-                            else if (index === 1) prefix = '🥈 ';
-                            else if (index === 2) prefix = '🥉 ';
+                            var len = names.length;
+                            var prefix = '';
+                            if (len >= 3 && index === len - 1) prefix = '🥇 ';   // 倒数第一
+                            else if (len >= 2 && index === len - 2) prefix = '🥈 '; // 倒数第二
+                            else if (len >= 1 && index === len - 3) prefix = '🥉 '; // 倒数第三
                             return prefix + value;
                         }
                     },
