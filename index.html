@@ -2203,10 +2203,14 @@
             </div>
 
             <!-- 股价信息（排行图） -->
-            <div class="panel-section" id="priceInfoSection">
-                <div class="panel-section-title">💰 股价信息 <span
-                        style="font-weight:400;text-transform:none;color:var(--text-muted);font-size:12px;">（排行图选定日期）</span>
-                </div>
+            <details id="priceInfoDetails" open>
+                <summary
+                    style="display:flex; align-items:center; justify-content:space-between; cursor:pointer; font-weight:600; color:var(--text-secondary); font-size:13px; padding:4px 0; user-select:none;">
+                    <span>💰 股价信息 <span
+                            style="font-weight:400;text-transform:none;color:var(--text-muted);font-size:12px;">（排行图选定日期）</span></span>
+                    <button class="btn btn-outline expand-table-btn" data-target="priceInfoScroll"
+                        style="font-size:11px; padding:0 8px; margin-left:8px;">📏 显示全部</button>
+                </summary>
                 <div id="priceInfoContainer">
                     <div class="table-scroll-wrapper">
                         <div class="table-scroll" id="priceInfoScroll"
@@ -2219,7 +2223,7 @@
                         <div class="resize-handle" data-target="priceInfoScroll"></div>
                     </div>
                 </div>
-            </div>
+            </details>
             <!-- 数据编辑 -->
             <div class="panel-section data-edit-section" style="flex:0 0 auto;">
                 <div class="panel-section-title" style="margin-bottom:4px;">
