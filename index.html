@@ -2588,7 +2588,7 @@
 
 
         // 右侧面板标签切换
-        const panelTabs = document.querySelectorAll('.panel-tab-btn');
+        const panelTabs = document.querySelectorAll('.panel-tab-btn[data-panel]');
         const panelSeries = document.getElementById('panelSeriesContainer');
         const panelData = document.getElementById('panelDataContainer');
 
@@ -2604,7 +2604,6 @@
                     panelSeries.style.display = 'none';
                     panelData.style.display = 'block';
                 }
-                // 可选：保存状态到 localStorage
             });
         });
         // ================================================================
