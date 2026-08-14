@@ -428,19 +428,21 @@
             transition: all 0.25s ease;
         }
 
-
-
         .header-actions .view-toggle-group .view-btn:hover:not(.active) {
             background: var(--hover-bg);
             color: var(--text-primary);
         }
 
-
-
-        .header-actions .view-toggle-group .view-btn:not(.active):hover {
-            background: var(--hover-bg);
-            color: var(--text-primary);
+        .header-actions .view-toggle-group .view-btn.active {
+            background: linear-gradient(145deg, var(--tab-active-bg-start), var(--tab-active-bg-end));
+            color: #fff !important;
+            box-shadow: var(--tab-active-shadow);
+            text-shadow: var(--tab-active-text-shadow);
+            font-weight: 600;
+            border-color: transparent;
         }
+
+              
 
         .header-actions .waterfall-selector {
             display: none;
