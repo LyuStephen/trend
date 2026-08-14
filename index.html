@@ -447,16 +447,14 @@
             border-color: #3b82f6;
         }
 
+
+
         .ranking-date-picker {
-            display: none;
+            display: inline-flex;
             align-items: center;
             gap: 4px;
             font-size: 12px;
             color: var(--text-secondary);
-        }
-
-        .ranking-date-picker.show {
-            display: inline-flex;
         }
 
         .ranking-date-picker input[type="date"] {
@@ -2241,6 +2239,14 @@
                         <button class="panel-tab-btn" data-view="ranking">🌫️ 排行图</button>
                     </span>
                 </div>
+                <!-- 新增：全局日期选择行（始终显示） -->
+                <div
+                    style="width:100%; text-align:center; margin:4px 0 8px 0; font-size:13px; color:var(--text-secondary);">
+                    <span class="ranking-date-picker" id="rankingDatePicker">
+                        <span>📅 排行日期</span>
+                        <input type="date" id="rankingDateInput">
+                    </span>
+                </div>
                 <div class="header-actions">
 
                     <!-- 瀑布图系列选择 -->
@@ -2248,11 +2254,7 @@
                         <span>系列</span>
                         <select id="waterfallSeriesSelect"></select>
                     </span>
-                    <!-- 排行图日期选择 -->
-                    <span class="ranking-date-picker" id="rankingDatePicker">
-                        <span>日期</span>
-                        <input type="date" id="rankingDateInput">
-                    </span>
+
                     <button class="grid-toggle" id="gridToggle">📏</button>
                     <button class="theme-toggle" id="themeToggle">🌙</button>
                     <button class="danmaku-toggle" id="danmakuToggle" title="弹幕开关">💬</button>
@@ -3391,7 +3393,7 @@
                 btn.classList.toggle('active', v === viewMode);
             });
             waterfallSelector.classList.toggle('show', viewMode === 'waterfall');
-            rankingDatePicker.classList.toggle('show', viewMode === 'ranking');
+
             updateWaterfallSelect();
             if (viewMode === 'trend') {
                 mainTitleInput.value = mainTitle.replace(/🪨.*$/, '').trim() || '🌈 总变化率趋势';
