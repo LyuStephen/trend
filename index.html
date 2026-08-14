@@ -3288,6 +3288,12 @@
                 document.body.classList.remove('dark');
                 themeToggle.textContent = '🌙';
             }
+            // ⭐ 新增：恢复用户手动切换标记
+            if (state.userThemeOverride !== undefined) {
+                userThemeOverride = state.userThemeOverride;
+            } else {
+                userThemeOverride = false;   // 兼容旧数据
+            }
             if (state.showGrid !== undefined) showGrid = state.showGrid;
             gridToggle.textContent = showGrid ? '📏' : '📏';
             viewMode = state.viewMode || 'trend';
