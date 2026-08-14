@@ -2309,12 +2309,12 @@
 
             <!-- 2. 切换标签（系列管理 / 数据编辑） -->
             <div class="panel-tab-switch" style="display:flex; justify-content:center; gap:8px; margin-bottom:6px;">
-                <button class="panel-tab-btn active" data-panel="series">👤 系列管理</button>
-                <button class="panel-tab-btn" data-panel="data">📋 数据编辑</button>
+                <button class="panel-tab-btn" data-panel="series">👤 系列管理</button>
+                <button class="panel-tab-btn active" data-panel="data">📋 数据编辑</button>
             </div>
 
             <!-- 3. 系列管理容器（独立，默认显示） -->
-            <div id="panelSeriesContainer" style="display:block;">
+            <div id="panelSeriesContainer" style="display:none;">
                 <div class="panel-section series-manager-wrapper">
                     <div class="panel-section-title">
                         <span>👤 系列管理 <span
@@ -2332,7 +2332,7 @@
             </div>
 
             <!-- 4. 数据编辑容器（独立，默认隐藏） -->
-            <div id="panelDataContainer" style="display:none;">
+            <div id="panelDataContainer" style="display:block;">
                 <div class="panel-section data-edit-section" style="flex:0 0 auto;">
                     <div class="panel-section-title" style="margin-bottom:4px;">
                         <span>📋 数据编辑 <span
