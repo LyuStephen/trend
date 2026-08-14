@@ -2276,7 +2276,7 @@
             </div>
             <div class="chart-container" id="chartContainer">
                 <div id="trendChart"></div>
-
+                
                 <!-- 轴调整按钮（左上：Y+ / Y-，右下：X+ / X-） -->
                 <div class="axis-corner-buttons" id="axisCornerButtons">
                     <div class="axis-btn-group-vertical top-left">
@@ -6525,29 +6525,47 @@
             const option = {
                 tooltip: {
                     trigger: 'axis',
-                    backgroundColor: isDark ? '#2d3748' : '#ffffff',
-                    borderColor: isDark ? '#334155' : '#eef2f6',
+                    backgroundColor: 'var(--tooltip-bg)',
+                    borderColor: 'var(--border-color)',
                     borderWidth: 1,
                     textStyle: {
-                        color: isDark ? '#e2e8f0' : '#1e293b',
+                        color: 'var(--text-primary)',
                         fontSize: isMobileView() ? 11 : 13
                     },
-                    formatter: function (params) { /* 保持不变 */}
-                },
-                legend: {
-                    // 保持不变（图例文字颜色通过 textStyle.color 控制，但 textStyle 可加）
-                    textStyle: {
-                        fontSize: isMobileView() ? 11 : 13,
-                        color: isDark ? '#94a3b8' : '#475569'
+                    formatter: function (params) {
+                        if (!params || params.length === 0) return '';
+                        const sorted = params.slice().sort((a, b) => b.value - a.value);
+                        let s = `<strong>${sorted[0].axisValue}</strong><br/>`;
+                        sorted.forEach(p => {
+                            if (p.seriesName) {
+                                const val = p.value;
+                                s += `${p.marker} ${p.seriesName}: <strong>${val.toFixed(2)}%</strong><br/>`;
+                            }
+                        });
+                        return s;
                     }
                 },
+                legend: {
+                    data: seriesKeys,
+                    selected: legendSelected,
+                    icon: 'circle',
+                    top: 0,
+                    left: 'center',
+                    itemWidth: 10,
+                    itemHeight: 10,
+                    textStyle: {
+                        fontSize: isMobileView() ? 11 : 13,
+                        color: 'var(--text-secondary)'
+                    }
+                },
+                grid: {left: 70, right: 30, top: 45, bottom: isMobileView() ? 55 : 50},
                 xAxis: {
                     type: 'category',
                     data: dates,
                     boundaryGap: false,
-                    axisLine: {lineStyle: {color: isDark ? '#334155' : '#eef2f6'}},
+                    axisLine: {lineStyle: {color: 'var(--border-color)'}},
                     axisLabel: {
-                        color: isDark ? '#94a3b8' : '#475569',
+                        color: 'var(--text-muted)',
                         fontSize: 12,
                         formatter: function (val) {const p = val.split('-'); return p[1] + '-' + p[2];}
                     },
@@ -6559,13 +6577,13 @@
                     min: yMin,
                     max: yMax,
                     axisLabel: {
-                        color: isDark ? '#94a3b8' : '#475569',
+                        color: 'var(--text-muted)',
                         fontSize: 12,
                         formatter: function (value) {return value.toFixed(1) + '%';}
                     },
                     splitLine: {
                         show: showGrid,
-                        lineStyle: {color: isDark ? '#334155' : '#eef2f6', type: 'solid', opacity: 0.6}
+                        lineStyle: {color: 'var(--border-color)', type: 'solid', opacity: 0.6}
                     },
                     axisLine: {show: false},
                     axisTick: {show: false}
@@ -6576,15 +6594,15 @@
                     end: 100,
                     height: isMobileView() ? 16 : 14,
                     bottom: isMobileView() ? 20 : 4,
-                    borderColor: isDark ? '#334155' : '#eef2f6',
-                    backgroundColor: isDark ? '#1e293b' : '#f8fafc',
+                    borderColor: 'var(--border-color)',
+                    backgroundColor: 'var(--bg-panel)',
                     fillerColor: 'rgba(59,130,246,0.12)',
                     handleStyle: {color: '#3b82f6', borderColor: '#3b82f6'},
-                    textStyle: {color: isDark ? '#94a3b8' : '#475569', fontSize: 11},
+                    textStyle: {color: 'var(--text-muted)', fontSize: 11},
                     minSpan: 10,
                     maxSpan: 100
                 }],
-                series: series   // series 中的颜色来自各指标的 s.color，已存在，无需修改
+                series: series
             };
             myChart.setOption(option, true);
             myChart.resize();
