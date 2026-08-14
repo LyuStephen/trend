@@ -2309,8 +2309,8 @@
 
             <!-- 2. 切换标签（系列管理 / 数据编辑） -->
             <div class="panel-tab-switch" style="display:flex; justify-content:center; gap:8px; margin-bottom:6px;">
-                <button class="panel-tab-btn" data-panel="series">👤 系列管理</button>
-                <button class="panel-tab-btn active" data-panel="data">📋 数据编辑</button>
+                <button class="panel-tab-btn" data-panel="series">👤 系列</button>
+                <button class="panel-tab-btn active" data-panel="data">📋 数据</button>
             </div>
 
             <!-- 3. 系列管理容器（独立，默认显示） -->
@@ -2318,7 +2318,7 @@
                 <div class="panel-section series-manager-wrapper">
                     <div class="panel-section-title">
                         <span>👤 系列管理 <span
-                                style="font-weight:400;text-transform:none;color:var(--text-muted);font-size:12px;">点击行选中
+                                style="font-weight:400;text-transform:none;color:var(--text-muted);font-size:12px;">点击选中
                                 · 拖拽排序</span></span>
                         <button class="btn btn-success" id="addColBtn" style="font-size:12px; padding:2px 10px;">➕
                             添加指标</button>
@@ -2336,7 +2336,7 @@
                 <div class="panel-section data-edit-section" style="flex:0 0 auto;">
                     <div class="panel-section-title" style="margin-bottom:4px;">
                         <span>📋 数据编辑 <span
-                                style="font-weight:400;text-transform:none;color:var(--text-muted);font-size:12px;">双向联动
+                                style="font-weight:400;text-transform:none;color:var(--text-muted);font-size:12px;"> 
                             </span></span>
                         <button class="btn btn-outline" id="expandEditBtn" style="font-size:12px; padding:2px 10px;">🔍
                             缩小还原</button>
@@ -2357,7 +2357,7 @@
                             <span>
                                 <span id="priceInfoIcon"
                                     style="display:inline-block; width:1.2em; text-align:center; transition:transform 0.2s;">▼</span>
-                                💰 股价信息 <span id="priceInfoDateLabel"
+                                💰 最新股价 <span id="priceInfoDateLabel"
                                     style="font-weight:400;text-transform:none;color:var(--text-muted);font-size:12px;">
                                 </span>
                                 <button class="btn btn-outline expand-table-btn" data-target="priceInfoScroll"
