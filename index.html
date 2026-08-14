@@ -5941,7 +5941,7 @@
                         const idx = bar.dataIndex;
                         const item = items[idx];
                         return `<strong>${item.name}</strong><br/>
-                        收盘变化率: <strong>${item.change.toFixed(2)}%</strong><br/>
+                        当前变化率: <strong>${item.change.toFixed(2)}%</strong><br/>
                         最高变化率: <strong>${item.highChange.toFixed(2)}%</strong><br/>
                         最低变化率: <strong>${item.lowChange.toFixed(2)}%</strong>${item.remark ? '<br/>备注: ' + item.remark : ''}`;
                     },
@@ -6352,10 +6352,11 @@
 
             // 计算跑赢上证差值
             let diffToSH = '--';
+            let diff = 0;   // 新增：提升作用域
             if (shSeries) {
                 const shBase = shSeries.data[0];
                 const shChange = calcTotalChange(shBase, shSeries.data[latestIdx]);
-                const diff = latestChange - shChange;
+                diff = latestChange - shChange;
                 diffToSH = (diff >= 0 ? '+' : '') + diff.toFixed(2) + '%';
             }
 
@@ -6394,7 +6395,7 @@
                             style: {
                                 text: `📈 总变化率 ${latestChange.toFixed(2)}%`,
                                 fontSize: 12,
-                                fill: isDark ? '#e2e8f0' : '#1e293b'
+                                fill: latestChange >= 0 ? '#e64340' : '#07c160'   // 红色/绿色
                             }
                         },
                         {
@@ -6404,7 +6405,7 @@
                             style: {
                                 text: `📊 跑赢上证 ${diffToSH}`,
                                 fontSize: 12,
-                                fill: isDark ? '#e2e8f0' : '#1e293b'
+                                fill: diff >= 0 ? '#e64340' : '#07c160'           // 红色/绿色
                             }
                         }
                     ]
