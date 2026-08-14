@@ -97,7 +97,7 @@
 
         /* 左上组 */
         .axis-btn-group-vertical.top-left {
-            top: 4px;
+            top: 10px;
             left: 4px;
         }
 
@@ -683,7 +683,7 @@
 
         #fullscreenBtn {
             position: absolute;
-            bottom: 12px;
+            bottom: 8px;
             left: 12px;
             z-index: 50;
             width: 36px;
@@ -2276,7 +2276,7 @@
             </div>
             <div class="chart-container" id="chartContainer">
                 <div id="trendChart"></div>
-                <!-- 轴调整按钮（放置于四角） -->
+                
                 <!-- 轴调整按钮（左上：Y+ / Y-，右下：X+ / X-） -->
                 <div class="axis-corner-buttons" id="axisCornerButtons">
                     <div class="axis-btn-group-vertical top-left">
@@ -6289,7 +6289,7 @@
                         color: 'var(--text-secondary)'
                     }
                 },
-                grid: {left: 70, right: 50, top: 45, bottom: isMobileView() ? 55 : 50},
+                grid: {left: 70, right: 30, top: 45, bottom: isMobileView() ? 55 : 50},
                 xAxis: {
                     type: 'category',
                     data: dates,
@@ -6558,7 +6558,7 @@
                         color: 'var(--text-secondary)'
                     }
                 },
-                grid: {left: 70, right: 50, top: 45, bottom: isMobileView() ? 55 : 50},
+                grid: {left: 70, right: 30, top: 45, bottom: isMobileView() ? 55 : 50},
                 xAxis: {
                     type: 'category',
                     data: dates,
