@@ -1836,7 +1836,30 @@
                 font-size: 10px;
             }
 
+            /* 统一所有表格的文本行高（含无输入框的排名表） */
+            #dailyTable td,
+            #rawTable td,
+            #totalTable td,
+            #rankTable td {
+                line-height: 1.2 !important;
+            }
 
+            /* 针对含输入框的表格，将输入框高度压缩至与“最新股价”行高匹配 */
+            #dailyTable input[type="number"],
+            #dailyTable input[type="text"],
+            #rawTable input[type="number"],
+            #rawTable input[type="text"],
+            #totalTable input[type="number"],
+            #totalTable input[type="text"] {
+                height: 24px !important;
+                /* 由原来的 36px 降至 24px */
+                padding: 1px 2px !important;
+                /* 上下内边距进一步压缩 */
+                font-size: 10px !important;
+                /* 与表格字体一致 */
+                line-height: normal !important;
+                /* 避免额外行高 */
+            }
 
             /* 新增：外层容器字体缩小 */
             .chart-header>div:first-child {
