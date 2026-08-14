@@ -117,7 +117,7 @@
             right: 4px;
         }
 
-        
+
 
         .axis-corner-buttons .axis-btn:hover {
             background: #ffffff;
@@ -592,7 +592,7 @@
             display: none;
         }
 
-        
+
 
         /* 系列管理头像缩小 */
         .series-item .avatar-sm {
@@ -1829,6 +1829,7 @@
                 justify-content: initial;
                 overflow: hidden;
             }
+
             .chart-reset-buttons .toggle-reset-btn {
                 width: 20px;
                 height: 20px;
@@ -1850,7 +1851,7 @@
                 font-size: 11px !important;
                 padding: 2px 6px !important;
             }
-            
+
             .panel-tab-switch {
                 display: none !important;
             }
@@ -1864,7 +1865,7 @@
                 bottom: 8px;
                 right: 8px;
             }
-        
+
             .app-container {
                 position: fixed;
                 inset: 0;
@@ -2219,19 +2220,36 @@
                 padding: 2px 1px;
             }
 
-            /* 针对“最新股价”“排名”“统计”等特殊表格进一步压缩 */
+            /* 针对所有数据表格进一步压缩（与“最新股价”统一） */
             #priceInfoTable td,
             #rankTable td,
-            #statsTable td {
+            #statsTable td,
+            #dailyTable td,
+            #rawTable td,
+            #totalTable td {
                 padding: 2px 1px !important;
                 font-size: 10px;
             }
 
             #priceInfoTable .row-label,
             #rankTable .row-label,
-            #statsTable .row-label {
+            #statsTable .row-label,
+            #dailyTable .row-label,
+            #rawTable .row-label,
+            #totalTable .row-label {
                 font-size: 10px;
                 padding: 2px 4px !important;
+            }
+
+            /* 压缩所有表格的表头（th）使其与表体统一 */
+            #priceInfoTable th,
+            #rankTable th,
+            #statsTable th,
+            #dailyTable th,
+            #rawTable th,
+            #totalTable th {
+                font-size: 10px !important;
+                padding: 2px 2px !important;
             }
 
             /* 让股价信息表（价格、最高、最低）的数值列更紧凑 */
