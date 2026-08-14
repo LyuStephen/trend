@@ -2366,11 +2366,10 @@
                             <span>
                                 <span id="priceInfoIcon"
                                     style="display:inline-block; width:1.2em; text-align:center; transition:transform 0.2s;">▼</span>
-                                💰 股价信息 <span
+                                💰 股价信息 <span id="priceInfoDateLabel"
                                     style="font-weight:400;text-transform:none;color:var(--text-muted);font-size:12px;">（排行图选定日期）</span>
-                            </span>
-                            <button class="btn btn-outline expand-table-btn" data-target="priceInfoScroll"
-                                style="font-size:11px; padding:0 8px; margin-left:8px;">📏 显示全部</button>
+                                <button class="btn btn-outline expand-table-btn" data-target="priceInfoScroll"
+                                    style="font-size:11px; padding:0 8px; margin-left:8px;">📏 显示全部</button>
                         </summary>
                         <div id="priceInfoContainer">
                             <div class="table-scroll-wrapper">
@@ -3387,7 +3386,7 @@
         //  视图切换
         // ================================================================
         function updateViewUI() {
-            document.querySelectorAll('.view-btn').forEach(btn => {
+            document.querySelectorAll('.panel-tab-btn[data-view]').forEach(btn => {
                 const v = btn.dataset.view;
                 btn.classList.toggle('active', v === viewMode);
             });
@@ -3412,14 +3411,7 @@
                     axisButtons.style.display = 'none';
                 }
             }
-            const axisButtons = document.getElementById('axisCornerButtons');
-            if (axisButtons) {
-                if (viewMode === 'trend' || viewMode === 'waterfall') {
-                    axisButtons.style.display = 'block';
-                } else {
-                    axisButtons.style.display = 'none';
-                }
-            }
+
             saveState();
         }
 
