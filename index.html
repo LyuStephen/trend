@@ -4971,6 +4971,45 @@
         // ================================================================
         //  删除 / 添加 行/列
         // ================================================================
+        function deleteSelectedSeries() {
+            const selectedItems = document.querySelectorAll('.series-item.selected');
+            if (selectedItems.length === 0) {
+                alert('请先在系列管理列表中点击选中要删除的指标');
+                return;
+            }
+            const names = Array.from(selectedItems).map(item => item.dataset.series);
+            // 至少保留一个指标
+            if (seriesKeys.length - names.length < 1) {
+                alert('至少保留一个指标');
+                return;
+            }
+            if (!confirm(`确定要删除选中的 ${names.length} 个指标吗？`)) return;
+
+            // 从 seriesList 和 seriesKeys 中移除
+            names.forEach(name => {
+                const idx = seriesKeys.indexOf(name);
+                if (idx !== -1) seriesKeys.splice(idx, 1);
+                const sIdx = seriesList.findIndex(s => s.name === name);
+                if (sIdx !== -1) seriesList.splice(sIdx, 1);
+                trendLegendSelected.delete(name);
+            });
+
+            // 如果瀑布图选中的系列被删除，重置
+            if (!seriesKeys.includes(waterfallSeriesName) && seriesKeys.length > 0) {
+                waterfallSeriesName = seriesKeys[0];
+            }
+
+            // 清空选中状态
+            document.querySelectorAll('.series-item.selected').forEach(el => el.classList.remove('selected'));
+
+            // 重新渲染
+            renderSeriesManager();
+            renderTables();
+            renderChart();
+            resetDanmaku();
+            updateWaterfallSelect();
+            saveState();
+        }
         function deleteDateColumn() {
             if (selectedCols.size === 0) {
                 alert('请先选择要删除的日期列（Ctrl+点击列表头多选）');
@@ -6759,6 +6798,7 @@
             saveState();
         });
         document.getElementById('verifyHistoryBtn').addEventListener('click', verifyHistoricalData);
+        document.getElementById('deleteSelectedSeriesBtn').addEventListener('click', deleteSelectedSeries);
 
         // ================================================================
         //  窗口自适应
