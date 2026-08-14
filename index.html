@@ -120,153 +120,7 @@
         /* 移动端适配 */
         @media (max-width: 820px) {
 
-            /* 滚动阴影指示器（移动端） */
-            .table-scroll-wrapper {
-                position: relative;
-            }
-
-            .table-scroll-wrapper::after {
-                content: '';
-                position: absolute;
-                bottom: 0;
-                left: 0;
-                right: 0;
-                height: 20px;
-                background: linear-gradient(transparent, var(--bg-section));
-                pointer-events: none;
-                opacity: 0;
-                transition: opacity 0.3s;
-            }
-
-            .table-scroll-wrapper.scrollable::after {
-                opacity: 1;
-            }
-
-            /* 数据表格移动端专属适配 */
-            .table-scroll {
-                -webkit-overflow-scrolling: touch;
-                overflow-x: auto;
-                overflow-y: auto;
-                max-height: 260px !important;
-                border-radius: 8px;
-                margin: 4px 0 2px 0;
-                scroll-behavior: smooth;
-            }
-
-            /* 固定首列（指标名称）在移动端保持 sticky */
-            .data-table th:first-child,
-            .data-table td:first-child {
-                position: sticky;
-                left: 0;
-                z-index: 10;
-                background: var(--bg-section);
-                border-right: 2px solid var(--border-color);
-                min-width: 80px;
-                max-width: 100px;
-                white-space: nowrap;
-                overflow: hidden;
-                text-overflow: ellipsis;
-            }
-
-            .data-table thead th:first-child {
-                z-index: 15;
-                background: var(--bg-panel);
-            }
-
-            /* 表格单元格触摸优化 */
-            .data-table td {
-                padding: 6px 2px;
-                min-height: 44px;
-                vertical-align: middle;
-            }
-
-            .data-table th {
-                padding: 8px 2px;
-                font-size: 11px;
-                min-height: 40px;
-            }
-
-            /* 移动端输入框 */
-            .data-table input[type="number"],
-            .data-table input[type="text"] {
-                width: 60px;
-                height: 44px;
-                font-size: 15px;
-                padding: 4px 2px;
-                border-radius: 8px;
-                border: 1px solid var(--input-border);
-                background: var(--input-bg);
-                color: var(--text-primary);
-                text-align: center;
-                font-weight: 500;
-                -webkit-appearance: none;
-                appearance: none;
-            }
-
-            .data-table input[type="text"] {
-                width: 80px;
-                text-align: left;
-                padding-left: 6px;
-            }
-
-            /* 表格行高 */
-            .data-table tr {
-                min-height: 48px;
-            }
-
-            .data-table .row-label {
-                font-size: 12px;
-                padding: 4px 6px;
-                display: flex;
-                align-items: center;
-                gap: 4px;
-            }
-
-            /* 表头紧凑 */
-            .data-table thead {
-                position: sticky;
-                top: 0;
-                z-index: 5;
-            }
-
-            .data-table thead th {
-                background: var(--bg-panel);
-                font-size: 10px;
-                padding: 4px 2px;
-                border-bottom: 2px solid var(--border-color);
-            }
-
-            /* 小屏手机进一步压缩 */
-            @media (max-width: 480px) {
-                .data-table input[type="number"] {
-                    width: 48px;
-                    height: 38px;
-                    font-size: 13px;
-                }
-
-                .data-table input[type="text"] {
-                    width: 64px;
-                    height: 38px;
-                    font-size: 13px;
-                }
-
-                .data-table th:first-child,
-                .data-table td:first-child {
-                    min-width: 60px;
-                    max-width: 80px;
-                    font-size: 11px;
-                }
-
-                .table-scroll {
-                    max-height: 200px !important;
-                }
-
-                .data-table td {
-                    padding: 4px 1px;
-                    min-height: 38px;
-                }
-            }
-
+            
             .panel-tab-switch {
                 display: none !important;
             }
@@ -2211,198 +2065,146 @@
                 flex: 1 1 auto !important;
                 border-left: none;
                 border-top: none;
-                padding: 8px 6px;
+                padding: 10px;
                 overflow-y: auto;
-                gap: 8px;
+                gap: 12px;
                 -webkit-overflow-scrolling: touch;
             }
 
             .panel-section {
-                padding: 10px 8px;
-                border-radius: 12px;
+                padding: 12px;
             }
 
-            .panel-section-title {
+            body.m-view-chart .chart-wrapper {
+                display: flex;
+            }
+
+            body.m-view-chart .control-panel {
+                display: none !important;
+            }
+
+            body.m-view-chart .mobile-fab-theme {
+                display: none;
+            }
+
+            body.m-view-series .chart-wrapper,
+            body.m-view-series .resizer {
+                display: none !important;
+            }
+
+            body.m-view-series .control-panel {
+                display: flex !important;
+            }
+
+            body.m-view-series .y-axis-panel,
+            body.m-view-series .data-edit-section {
+                display: none !important;
+            }
+
+            body.m-view-data .chart-wrapper,
+            body.m-view-data .resizer {
+                display: none !important;
+            }
+
+            body.m-view-data .control-panel {
+                display: flex !important;
+            }
+
+            body.m-view-data .y-axis-panel,
+            body.m-view-data .series-manager-wrapper {
+                display: none !important;
+            }
+
+            .mobile-fab-theme {
+                display: flex;
+                position: fixed;
+                right: 16px;
+                bottom: calc(72px + env(safe-area-inset-bottom, 0px));
+                width: 44px;
+                height: 44px;
+                border-radius: 50%;
+                background: var(--btn-bg);
+                border: 1px solid var(--border-color);
+                align-items: center;
+                justify-content: center;
+                font-size: 20px;
+                z-index: 200;
+                box-shadow: 0 2px 8px var(--shadow-color);
+                cursor: pointer;
+            }
+
+            .mobile-tabbar {
+                display: flex;
+                flex-shrink: 0;
+                height: calc(56px + env(safe-area-inset-bottom, 0px));
+                padding-bottom: env(safe-area-inset-bottom, 0px);
+                background: var(--bg-app);
+                border-top: 1px solid var(--border-color);
+            }
+
+            .mobile-tabbar .tab {
+                flex: 1;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                gap: 2px;
                 font-size: 12px;
-                margin-bottom: 6px;
+                color: var(--text-muted);
+                background: transparent;
+                border: none;
+                cursor: pointer;
+                -webkit-tap-highlight-color: transparent;
             }
 
-            .table-toolbar {
-                gap: 4px;
-                flex-wrap: wrap;
+            .mobile-tabbar .tab .tab-icon {
+                font-size: 20px;
+                line-height: 1;
             }
 
-            .table-toolbar .btn {
-                font-size: 11px;
-                padding: 6px 10px;
-                border-radius: 6px;
-                min-height: 36px;
+            .mobile-tabbar .tab.active {
+                color: var(--selected-text);
             }
 
             .table-scroll {
-                max-height: 200px !important;
-                min-height: 80px;
-                border-radius: 6px;
+                max-height: none;
             }
 
-            details summary {
-                font-size: 12px;
-                padding: 6px 0;
-                display: flex;
-                flex-wrap: wrap;
-                align-items: center;
-                gap: 4px;
+            .data-table input[type="number"] {
+                width: 64px;
+                height: 36px;
             }
 
-            details summary .btn-outline {
-                font-size: 10px;
-                padding: 2px 8px;
-                min-height: 28px;
+            .data-table input[type="text"] {
+                width: 84px;
+                height: 36px;
             }
 
-            /* 统计表在移动端更紧凑 */
-            #statsTable td,
-            #statsTable th {
-                font-size: 11px;
-                padding: 4px 2px;
+            .series-item .series-name-input {
+                width: 64px;
             }
 
-            #statsTable .color-dot {
-                width: 8px;
-                height: 8px;
+            .series-item .code-input {
+                width: 84px;
             }
-        }
 
-        body.m-view-chart .chart-wrapper {
-            display: flex;
-        }
+            .series-item .remark-input {
+                max-width: 100px;
+            }
 
-        body.m-view-chart .control-panel {
-            display: none !important;
-        }
+            .series-item .drag-handle {
+                display: none;
+            }
 
-        body.m-view-chart .mobile-fab-theme {
-            display: none;
-        }
-
-        body.m-view-series .chart-wrapper,
-        body.m-view-series .resizer {
-            display: none !important;
-        }
-
-        body.m-view-series .control-panel {
-            display: flex !important;
-        }
-
-        body.m-view-series .y-axis-panel,
-        body.m-view-series .data-edit-section {
-            display: none !important;
-        }
-
-        body.m-view-data .chart-wrapper,
-        body.m-view-data .resizer {
-            display: none !important;
-        }
-
-        body.m-view-data .control-panel {
-            display: flex !important;
-        }
-
-        body.m-view-data .y-axis-panel,
-        body.m-view-data .series-manager-wrapper {
-            display: none !important;
-        }
-
-        .mobile-fab-theme {
-            display: flex;
-            position: fixed;
-            right: 16px;
-            bottom: calc(72px + env(safe-area-inset-bottom, 0px));
-            width: 44px;
-            height: 44px;
-            border-radius: 50%;
-            background: var(--btn-bg);
-            border: 1px solid var(--border-color);
-            align-items: center;
-            justify-content: center;
-            font-size: 20px;
-            z-index: 200;
-            box-shadow: 0 2px 8px var(--shadow-color);
-            cursor: pointer;
-        }
-
-        .mobile-tabbar {
-            display: flex;
-            flex-shrink: 0;
-            height: calc(56px + env(safe-area-inset-bottom, 0px));
-            padding-bottom: env(safe-area-inset-bottom, 0px);
-            background: var(--bg-app);
-            border-top: 1px solid var(--border-color);
-        }
-
-        .mobile-tabbar .tab {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            gap: 2px;
-            font-size: 12px;
-            color: var(--text-muted);
-            background: transparent;
-            border: none;
-            cursor: pointer;
-            -webkit-tap-highlight-color: transparent;
-        }
-
-        .mobile-tabbar .tab .tab-icon {
-            font-size: 20px;
-            line-height: 1;
-        }
-
-        .mobile-tabbar .tab.active {
-            color: var(--selected-text);
-        }
-
-        .table-scroll {
-            max-height: none;
-        }
-
-        .data-table input[type="number"] {
-            width: 64px;
-            height: 36px;
-        }
-
-        .data-table input[type="text"] {
-            width: 84px;
-            height: 36px;
-        }
-
-        .series-item .series-name-input {
-            width: 64px;
-        }
-
-        .series-item .code-input {
-            width: 84px;
-        }
-
-        .series-item .remark-input {
-            max-width: 100px;
-        }
-
-        .series-item .drag-handle {
-            display: none;
-        }
-
-        .series-item .row-main {
-            gap: 6px;
-        }
+            .series-item .row-main {
+                gap: 6px;
+            }
 
 
 
-        #fullscreenBtn {
-            display: none;
-        }
+            #fullscreenBtn {
+                display: none;
+            }
         }
     </style>
 </head>
@@ -2534,7 +2336,7 @@
                 <div class="panel-section data-edit-section" style="flex:0 0 auto;">
                     <div class="panel-section-title" style="margin-bottom:4px;">
                         <span>📋 数据编辑 <span
-                                style="font-weight:400;text-transform:none;color:var(--text-muted);font-size:12px;">
+                                style="font-weight:400;text-transform:none;color:var(--text-muted);font-size:12px;"> 
                             </span></span>
                         <button class="btn btn-outline" id="expandEditBtn" style="font-size:12px; padding:2px 10px;">🔍
                             缩小还原</button>
@@ -4976,20 +4778,6 @@
                 }
             });
             if (typeof renderRanking === 'function') renderRanking();
-            // 检测表格是否可滚动
-            document.querySelectorAll('.table-scroll').forEach(scroll => {
-                const wrapper = scroll.closest('.table-scroll-wrapper');
-                if (!wrapper) return;
-                const checkScroll = () => {
-                    const hasScroll = scroll.scrollHeight > scroll.clientHeight ||
-                        scroll.scrollWidth > scroll.clientWidth;
-                    wrapper.classList.toggle('scrollable', hasScroll);
-                };
-                checkScroll();
-                // 窗口变化时重新检测
-                const resizeObserver = new ResizeObserver(checkScroll);
-                resizeObserver.observe(scroll);
-            });
         }
 
         // ================================================================
