@@ -374,28 +374,29 @@
         }
 
         .header-actions .view-toggle-group .view-btn {
-            padding: 2px 12px;
-            font-size: 12px;
-            border: none;
             background: transparent;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 4px 16px;
+            font-size: 13px;
+            font-weight: 500;
             color: var(--text-muted);
             cursor: pointer;
             transition: all 0.25s ease;
-            /* 与 active 保持一致 */
-            font-weight: 500;
-            white-space: nowrap;
-            position: relative;
-            /* 保证伪元素定位 */
         }
 
         .header-actions .view-toggle-group .view-btn.active {
             background: linear-gradient(145deg, var(--tab-active-bg-start), var(--tab-active-bg-end));
             color: #fff !important;
             box-shadow: var(--tab-active-shadow);
-
             text-shadow: var(--tab-active-text-shadow);
             font-weight: 600;
-            letter-spacing: 0.5px;
+            border-color: transparent;
+        }
+
+        .header-actions .view-toggle-group .view-btn:hover:not(.active) {
+            background: var(--hover-bg);
+            color: var(--text-primary);
         }
 
         /* 同时添加顶部高光线 */
@@ -617,10 +618,8 @@
             }
 
             #viewToggleGroup .view-btn {
-                font-size: 14px !important;
-                /* 缩小字体 */
-                padding: 4px 12px !important;
-                /* 适当缩小内边距 */
+                font-size: 13px !important;
+                padding: 4px 14px !important;
             }
 
             /* 新增：外层容器字体缩小 */
@@ -2265,16 +2264,10 @@
                 <!-- 视图切换按钮单独成行，字号20px（与图表标题相同） -->
                 <div style="width:100%; text-align:center; font-size:16px; font-weight:400; margin-bottom:8px;">
                     <span class="view-toggle-group" id="viewToggleGroup"
-                        style="display:inline-flex; border-radius:6px; overflow:visible; border:1px solid var(--border-color);">
-                        <button class="view-btn active" data-view="trend"
-                            style="padding:4px 20px; font-size:16px; border:none; cursor:pointer; transition:0.2s; font-weight:500;">🌈
-                            趋势图</button>
-                        <button class="view-btn" data-view="waterfall"
-                            style="padding:4px 20px; font-size:16px; border:none; cursor:pointer; transition:0.2s; font-weight:500;">🪨
-                            瀑布图</button>
-                        <button class="view-btn" data-view="ranking"
-                            style="padding:4px 20px; font-size:16px; border:none; cursor:pointer; transition:0.2s; font-weight:500;">🌫️
-                            排行图</button>
+                        style="display:inline-flex; gap:8px; border-radius:6px;">
+                        <button class="view-btn active" data-view="trend">🌈 趋势图</button>
+                        <button class="view-btn" data-view="waterfall">🪨 瀑布图</button>
+                        <button class="view-btn" data-view="ranking">🌫️ 排行图</button>
                     </span>
                 </div>
                 <div class="header-actions">
