@@ -60,16 +60,15 @@
         }
 
         .axis-corner-buttons .axis-btn {
-            position: absolute;
+            position: relative;
             pointer-events: auto;
-            /* 按钮自身可点击 */
-            width: 28px;
-            height: 28px;
+            width: 24px;
+            height: 24px;
             border-radius: 50%;
             border: none;
             background: rgba(255, 255, 255, 0.85);
             backdrop-filter: blur(4px);
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
             font-size: 12px;
             font-weight: 600;
             cursor: pointer;
@@ -79,6 +78,52 @@
             color: #1e293b;
             border: 1px solid var(--border-color);
             transition: all 0.2s;
+            flex-shrink: 0;
+            font-family: inherit;
+        }
+
+        /* 垂直按钮组 */
+        .axis-btn-group-vertical {
+            position: absolute;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            pointer-events: none;
+        }
+
+        .axis-btn-group-vertical .axis-btn {
+            pointer-events: auto;
+        }
+
+        /* 左上组 */
+        .axis-btn-group-vertical.top-left {
+            top: 10px;
+            left: 10px;
+        }
+
+        /* 右下组 */
+        .axis-btn-group-vertical.bottom-right {
+            bottom: 10px;
+            right: 10px;
+        }
+
+        /* 移动端适配 */
+        @media (max-width: 820px) {
+            .axis-corner-buttons .axis-btn {
+                width: 30px;
+                height: 30px;
+                font-size: 14px;
+            }
+
+            .axis-btn-group-vertical.top-left {
+                top: 8px;
+                left: 8px;
+            }
+
+            .axis-btn-group-vertical.bottom-right {
+                bottom: 8px;
+                right: 8px;
+            }
         }
 
         .axis-corner-buttons .axis-btn:hover {
@@ -383,7 +428,7 @@
             transition: all 0.25s ease;
         }
 
-        
+
 
         .header-actions .view-toggle-group .view-btn:hover:not(.active) {
             background: var(--hover-bg);
@@ -2248,15 +2293,16 @@
             <div class="chart-container" id="chartContainer">
                 <div id="trendChart"></div>
                 <!-- 轴调整按钮（放置于四角） -->
-                <div class="axis-corner-buttons">
-                    <button class="axis-btn axis-corner" id="yPlusBtn" title="Y轴放大"
-                        style="top:10px; left:10px;">Y+</button>
-                    <button class="axis-btn axis-corner" id="yMinusBtn" title="Y轴缩小"
-                        style="bottom:10px; left:10px;">Y-</button>
-                    <button class="axis-btn axis-corner" id="xPlusBtn" title="X轴放大（展开）"
-                        style="bottom:10px; right:10px;">X+</button>
-                    <button class="axis-btn axis-corner" id="xMinusBtn" title="X轴缩小（聚焦）"
-                        style="top:10px; right:10px;">X-</button>
+                <!-- 轴调整按钮（左上：Y+ / Y-，右下：X+ / X-） -->
+                <div class="axis-corner-buttons" id="axisCornerButtons">
+                    <div class="axis-btn-group-vertical top-left">
+                        <button class="axis-btn" id="yPlusBtn" title="Y轴放大">Y+</button>
+                        <button class="axis-btn" id="yMinusBtn" title="Y轴缩小">Y-</button>
+                    </div>
+                    <div class="axis-btn-group-vertical bottom-right">
+                        <button class="axis-btn" id="xPlusBtn" title="X轴放大（展开）">X+</button>
+                        <button class="axis-btn" id="xMinusBtn" title="X轴缩小（聚焦）">X-</button>
+                    </div>
                 </div>
                 <canvas id="danmakuCanvas"></canvas>
                 <div class="chart-reset-buttons" id="resetButtonsGroup">
@@ -3379,6 +3425,15 @@
                 mainTitleInput.value = `🌫️ 日涨跌排行 · ${rankingDate || '请选择日期'}`;
             }
             renderChart();
+            // 控制轴按钮显示：仅在趋势图和瀑布图时显示
+            const axisButtons = document.getElementById('axisCornerButtons');
+            if (axisButtons) {
+                if (viewMode === 'trend' || viewMode === 'waterfall') {
+                    axisButtons.style.display = 'block';
+                } else {
+                    axisButtons.style.display = 'none';
+                }
+            }
             saveState();
         }
 
