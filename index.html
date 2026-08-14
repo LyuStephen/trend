@@ -6427,24 +6427,52 @@
                                 fontWeight: 'bold'
                             }
                         },
+                        // ===== 总变化率：标签 + 数字 =====
                         {
                             type: 'text',
                             left: 12,
                             top: 32,
                             style: {
-                                text: `📈 总变化率 ${latestChange.toFixed(2)}%`,
+                                text: '📈 总变化率 ',
                                 fontSize: 12,
-                                fill: latestChange >= 0 ? '#e64340' : '#07c160'   // 红色/绿色
+                                fill: isDark ? '#e2e8f0' : '#1e293b',
+                                textBaseline: 'top'
                             }
                         },
+                        {
+                            type: 'text',
+                            left: 84,
+                            top: 32,
+                            style: {
+                                text: `${latestChange >= 0 ? '+' : ''}${latestChange.toFixed(2)}%`,
+                                fontSize: 12,
+                                fill: latestChange >= 0 ? '#e64340' : '#07c160',
+                                fontWeight: 'bold',
+                                textBaseline: 'top'
+                            }
+                        },
+                        // ===== 跑赢上证：标签 + 数字 =====
                         {
                             type: 'text',
                             left: 12,
                             top: 52,
                             style: {
-                                text: `📊 跑赢上证 ${diffToSH}`,
+                                text: '📊 跑赢上证 ',
                                 fontSize: 12,
-                                fill: diff >= 0 ? '#e64340' : '#07c160'           // 红色/绿色
+                                fill: isDark ? '#e2e8f0' : '#1e293b',
+                                textBaseline: 'top'
+                            }
+                        },
+                        {
+                            type: 'text',
+                            left: 84,
+                            top: 52,
+                            style: {
+                                text: diffToSH,
+                                fontSize: 12,
+                                fill: diff >= 0 ? '#e64340' : '#07c160',
+                                fontWeight: 'bold',
+                                textBaseline: 'top'
                             }
                         }
                     ]
