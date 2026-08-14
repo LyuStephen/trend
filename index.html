@@ -47,6 +47,66 @@
             --tab-active-text-shadow: 0 1px 2px rgba(0, 0, 0, 0.20);
         }
 
+        .panel-tab-btn {
+            background: transparent;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 4px 16px;
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--text-muted);
+            cursor: pointer;
+            transition: all 0.25s ease;
+        }
+
+        .panel-tab-btn.active {
+            background: linear-gradient(145deg, var(--tab-active-bg-start), var(--tab-active-bg-end));
+            color: #fff !important;
+            box-shadow: var(--tab-active-shadow);
+            text-shadow: var(--tab-active-text-shadow);
+            font-weight: 600;
+            border-color: transparent;
+        }
+
+        .panel-tab-btn:hover:not(.active) {
+            background: var(--hover-bg);
+            color: var(--text-primary);
+        }
+
+        .y-axis-control {
+            transition: max-height 0.3s ease, opacity 0.3s ease, margin 0.3s ease;
+            max-height: 300px;
+            opacity: 1;
+            overflow: hidden;
+            margin-top: 0;
+        }
+
+        .y-axis-control.collapsed {
+            max-height: 0 !important;
+            opacity: 0;
+            margin-top: 0 !important;
+            pointer-events: none;
+        }
+
+        .y-axis-toggle-btn {
+            background: transparent;
+            border: none;
+            color: var(--text-muted);
+            cursor: pointer;
+            font-size: 14px;
+            padding: 0 4px;
+            transition: transform 0.2s;
+            line-height: 1;
+        }
+
+        .y-axis-toggle-btn:hover {
+            color: var(--text-primary);
+        }
+
+        .y-axis-toggle-btn.collapsed {
+            transform: rotate(-90deg);
+        }
+
         body.dark {
             --bg-body: #0f172a;
             --bg-app: #1e293b;
@@ -2167,12 +2227,15 @@
         <!-- 分隔条 -->
         <div class="resizer" id="resizer"></div>
 
-        <!-- 控制面板 -->
+        <!-- ========== 控制面板（修正后） ========== -->
         <div class="control-panel" id="controlPanel">
-            <!-- Y轴 -->
+            <!-- 1. Y轴面板（已默认折叠） -->
             <div class="panel-section y-axis-panel">
-                <div class="panel-section-title">📊 Y轴范围 <span>支持负值 · 滚轮缩放</span></div>
-                <div class="y-axis-control">
+                <div class="panel-section-title">
+                    📊 Y轴范围 <span>支持负值 · 滚轮缩放</span>
+                    <button class="y-axis-toggle-btn collapsed" id="yAxisToggleBtn">▶</button>
+                </div>
+                <div class="y-axis-control collapsed" id="yAxisControl">
                     <div class="slider-group">
                         <label>最小</label>
                         <input type="range" id="yMinSlider" min="-200" max="100" value="-50" step="1">
@@ -2186,170 +2249,173 @@
                 </div>
             </div>
 
-            <!-- 系列管理 -->
-            <div class="panel-section series-manager-wrapper">
-                <div class="panel-section-title">
-                    <span>👤 系列管理 <span
-                            style="font-weight:400;text-transform:none;color:var(--text-muted);font-size:12px;">点击行选中 ·
-                            拖拽排序</span></span>
-                    <button class="btn btn-success" id="addColBtn" style="font-size:12px; padding:2px 10px;">➕
-                        添加指标</button>
-                    <button class="btn btn-danger" id="deleteSelectedSeriesBtn"
-                        style="font-size:12px; padding:2px 10px;">🗑️ 删除选中指标</button>
-                    <button class="btn btn-outline collapse-btn" id="collapseSeriesBtn"
-                        style="font-size:12px; padding:2px 8px;">▼</button>
-                </div>
-                <div class="series-manager" id="seriesManager"></div>
+            <!-- 2. 切换标签（系列管理 / 数据编辑） -->
+            <div style="display:flex; justify-content:center; gap:8px; margin-bottom:6px;">
+                <button class="panel-tab-btn active" data-panel="series">👤 系列管理</button>
+                <button class="panel-tab-btn" data-panel="data">📋 数据编辑</button>
             </div>
 
-
-            <!-- 数据编辑 -->
-            <div class="panel-section data-edit-section" style="flex:0 0 auto;">
-                <div class="panel-section-title" style="margin-bottom:4px;">
-                    <span>📋 数据编辑 <span
-                            style="font-weight:400;text-transform:none;color:var(--text-muted);font-size:12px;">双向联动 ·
-                            日期排序</span></span>
-                    <button class="btn btn-outline" id="expandEditBtn" style="font-size:12px; padding:2px 10px;">🔍
-                        缩小还原</button>
+            <!-- 3. 系列管理容器（独立，默认显示） -->
+            <div id="panelSeriesContainer" style="display:block;">
+                <div class="panel-section series-manager-wrapper">
+                    <div class="panel-section-title">
+                        <span>👤 系列管理 <span
+                                style="font-weight:400;text-transform:none;color:var(--text-muted);font-size:12px;">点击行选中
+                                · 拖拽排序</span></span>
+                        <button class="btn btn-success" id="addColBtn" style="font-size:12px; padding:2px 10px;">➕
+                            添加指标</button>
+                        <button class="btn btn-danger" id="deleteSelectedSeriesBtn"
+                            style="font-size:12px; padding:2px 10px;">🗑️ 删除选中指标</button>
+                        <button class="btn btn-outline collapse-btn" id="collapseSeriesBtn"
+                            style="font-size:12px; padding:2px 8px;">▼</button>
+                    </div>
+                    <div class="series-manager" id="seriesManager"></div>
                 </div>
-                <div class="table-toolbar">
-                    <button class="btn btn-success" id="addDateBtn">➕ 插入日期列</button>
-                    <button class="btn btn-danger" id="delDateBtn">🗑️ 删除日期列</button>
-                    <span class="status-badge" id="refreshStatus">
-                        <span class="dot idle" id="statusDot"></span>
-                        <span id="statusText">就绪</span>
-                    </span>
-                    <span style="font-size:11px; color:var(--text-muted);" id="lastUpdateTime"></span>
-                </div>
+            </div>
 
-                <details id="priceInfoDetails" open>
-                    <summary
-                        style="display:flex; align-items:center; justify-content:space-between; cursor:pointer; font-weight:600; color:var(--text-secondary); font-size:13px; padding:4px 0; user-select:none;">
-                        <span>
-                            <span id="priceInfoIcon"
-                                style="display:inline-block; width:1.2em; text-align:center; transition:transform 0.2s;">▼</span>
-                            💰 股价信息 <span
-                                style="font-weight:400;text-transform:none;color:var(--text-muted);font-size:12px;">（排行图选定日期）</span>
+            <!-- 4. 数据编辑容器（独立，默认隐藏） -->
+            <div id="panelDataContainer" style="display:none;">
+                <div class="panel-section data-edit-section" style="flex:0 0 auto;">
+                    <div class="panel-section-title" style="margin-bottom:4px;">
+                        <span>📋 数据编辑 <span
+                                style="font-weight:400;text-transform:none;color:var(--text-muted);font-size:12px;">双向联动
+                                · 日期排序</span></span>
+                        <button class="btn btn-outline" id="expandEditBtn" style="font-size:12px; padding:2px 10px;">🔍
+                            缩小还原</button>
+                    </div>
+                    <div class="table-toolbar">
+                        <button class="btn btn-success" id="addDateBtn">➕ 插入日期列</button>
+                        <button class="btn btn-danger" id="delDateBtn">🗑️ 删除日期列</button>
+                        <span class="status-badge" id="refreshStatus">
+                            <span class="dot idle" id="statusDot"></span>
+                            <span id="statusText">就绪</span>
                         </span>
-                        <button class="btn btn-outline expand-table-btn" data-target="priceInfoScroll"
-                            style="font-size:11px; padding:0 8px; margin-left:8px;">📏 显示全部</button>
-                    </summary>
-                    <div id="priceInfoContainer">
+                        <span style="font-size:11px; color:var(--text-muted);" id="lastUpdateTime"></span>
+                    </div>
+
+                    <details id="priceInfoDetails" open>
+                        <summary
+                            style="display:flex; align-items:center; justify-content:space-between; cursor:pointer; font-weight:600; color:var(--text-secondary); font-size:13px; padding:4px 0; user-select:none;">
+                            <span>
+                                <span id="priceInfoIcon"
+                                    style="display:inline-block; width:1.2em; text-align:center; transition:transform 0.2s;">▼</span>
+                                💰 股价信息 <span
+                                    style="font-weight:400;text-transform:none;color:var(--text-muted);font-size:12px;">（排行图选定日期）</span>
+                            </span>
+                            <button class="btn btn-outline expand-table-btn" data-target="priceInfoScroll"
+                                style="font-size:11px; padding:0 8px; margin-left:8px;">📏 显示全部</button>
+                        </summary>
+                        <div id="priceInfoContainer">
+                            <div class="table-scroll-wrapper">
+                                <div class="table-scroll" id="priceInfoScroll"
+                                    style="flex:0 0 auto; overflow:auto; margin-top:6px; max-height:200px;">
+                                    <table class="data-table" id="priceInfoTable">
+                                        <thead id="priceInfoHead"></thead>
+                                        <tbody id="priceInfoBody"></tbody>
+                                    </table>
+                                </div>
+                                <div class="resize-handle" data-target="priceInfoScroll"></div>
+                            </div>
+                        </div>
+                    </details>
+
+                    <details id="rawDetails" open>
+                        <summary>📊 原始值 <span
+                                style="font-weight:400;color:var(--text-muted);font-size:12px;">（基准值默认1）</span>
+                            <button class="btn btn-outline expand-table-btn" data-target="rawScroll"
+                                style="font-size:11px; padding:0 8px; margin-left:8px;">📏 显示全部</button>
+                        </summary>
                         <div class="table-scroll-wrapper">
-                            <div class="table-scroll" id="priceInfoScroll"
+                            <div class="table-scroll" id="rawScroll"
                                 style="flex:0 0 auto; overflow:auto; margin-top:6px; max-height:200px;">
-                                <table class="data-table" id="priceInfoTable">
-                                    <thead id="priceInfoHead"></thead>
-                                    <tbody id="priceInfoBody"></tbody>
+                                <table class="data-table" id="rawTable">
+                                    <thead id="rawHead"></thead>
+                                    <tbody id="rawBody"></tbody>
                                 </table>
                             </div>
-                            <div class="resize-handle" data-target="priceInfoScroll"></div>
+                            <div class="resize-handle" data-target="rawScroll"></div>
                         </div>
-                    </div>
-                </details>
+                    </details>
 
-                <!-- 表1：原始值 -->
-                <details id="rawDetails" open>
-                    <summary>📊 原始值 <span
-                            style="font-weight:400;color:var(--text-muted);font-size:12px;">（基准值默认1）</span>
-                        <button class="btn btn-outline expand-table-btn" data-target="rawScroll"
-                            style="font-size:11px; padding:0 8px; margin-left:8px;">📏 显示全部</button>
-                    </summary>
-                    <div class="table-scroll-wrapper">
-                        <div class="table-scroll" id="rawScroll"
-                            style="flex:0 0 auto; overflow:auto; margin-top:6px; max-height:200px;">
-                            <table class="data-table" id="rawTable">
-                                <thead id="rawHead"></thead>
-                                <tbody id="rawBody"></tbody>
-                            </table>
+                    <details id="dailyDetails" open>
+                        <summary>📈 当日变化率 (%) <span
+                                style="font-weight:400;color:var(--text-muted);font-size:12px;">（环比昨日）</span>
+                            <button class="btn btn-outline expand-table-btn" data-target="dailyScroll"
+                                style="font-size:11px; padding:0 8px; margin-left:8px;">📏 显示全部</button>
+                        </summary>
+                        <div class="table-scroll-wrapper">
+                            <div class="table-scroll" id="dailyScroll"
+                                style="flex:0 0 auto; overflow:auto; margin-top:6px; max-height:120px;">
+                                <table class="data-table" id="dailyTable">
+                                    <thead id="dailyHead"></thead>
+                                    <tbody id="dailyBody"></tbody>
+                                </table>
+                            </div>
+                            <div class="resize-handle" data-target="dailyScroll"></div>
                         </div>
-                        <div class="resize-handle" data-target="rawScroll"></div>
-                    </div>
-                </details>
+                    </details>
 
-
-
-                <!-- 表2：当日变化率 -->
-                <details id="dailyDetails" open>
-                    <summary>📈 当日变化率 (%) <span
-                            style="font-weight:400;color:var(--text-muted);font-size:12px;">（环比昨日）</span>
-                        <button class="btn btn-outline expand-table-btn" data-target="dailyScroll"
-                            style="font-size:11px; padding:0 8px; margin-left:8px;">📏 显示全部</button>
-                    </summary>
-                    <div class="table-scroll-wrapper">
-                        <div class="table-scroll" id="dailyScroll"
-                            style="flex:0 0 auto; overflow:auto; margin-top:6px; max-height:120px;">
-                            <table class="data-table" id="dailyTable">
-                                <thead id="dailyHead"></thead>
-                                <tbody id="dailyBody"></tbody>
-                            </table>
+                    <details id="totalDetails" open>
+                        <summary>📈 总变化率 (%) <span
+                                style="font-weight:400;color:var(--text-muted);font-size:12px;">（相对首日）</span>
+                            <button class="btn btn-outline expand-table-btn" data-target="totalScroll"
+                                style="font-size:11px; padding:0 8px; margin-left:8px;">📏 显示全部</button>
+                        </summary>
+                        <div class="table-scroll-wrapper">
+                            <div class="table-scroll" id="totalScroll"
+                                style="flex:1; min-height:0; overflow:auto; margin-top:6px;">
+                                <table class="data-table" id="totalTable">
+                                    <thead id="totalHead"></thead>
+                                    <tbody id="totalBody"></tbody>
+                                </table>
+                            </div>
+                            <div class="resize-handle" data-target="totalScroll"></div>
                         </div>
-                        <div class="resize-handle" data-target="dailyScroll"></div>
-                    </div>
-                </details>
+                    </details>
 
-                <!-- 表3：总变化率 -->
-                <details id="totalDetails" open>
-                    <summary>📈 总变化率 (%) <span
-                            style="font-weight:400;color:var(--text-muted);font-size:12px;">（相对首日）</span>
-                        <button class="btn btn-outline expand-table-btn" data-target="totalScroll"
-                            style="font-size:11px; padding:0 8px; margin-left:8px;">📏 显示全部</button>
-                    </summary>
-                    <div class="table-scroll-wrapper">
-                        <div class="table-scroll" id="totalScroll"
-                            style="flex:1; min-height:0; overflow:auto; margin-top:6px;">
-                            <table class="data-table" id="totalTable">
-                                <thead id="totalHead"></thead>
-                                <tbody id="totalBody"></tbody>
-                            </table>
+                    <details id="rankDetails" open>
+                        <summary>🏆 各指标当天排名 <span
+                                style="font-weight:400;color:var(--text-muted);font-size:12px;">（总变化率从高到低）</span>
+                            <button class="btn btn-outline expand-table-btn" data-target="rankScroll"
+                                style="font-size:11px; padding:0 8px; margin-left:8px;">📏 显示全部</button>
+                        </summary>
+                        <div class="table-scroll-wrapper">
+                            <div class="table-scroll" id="rankScroll"
+                                style="flex:0 0 auto; overflow:auto; margin-top:6px; max-height:150px;">
+                                <table class="data-table" id="rankTable">
+                                    <thead id="rankHead"></thead>
+                                    <tbody id="rankBody"></tbody>
+                                </table>
+                            </div>
+                            <div class="resize-handle" data-target="rankScroll"></div>
                         </div>
-                        <div class="resize-handle" data-target="totalScroll"></div>
-                    </div>
-                </details>
+                    </details>
 
-                <!-- 表4：各指标当天排名 -->
-                <details id="rankDetails" open>
-                    <summary>🏆 各指标当天排名 <span
-                            style="font-weight:400;color:var(--text-muted);font-size:12px;">（总变化率从高到低）</span>
-                        <button class="btn btn-outline expand-table-btn" data-target="rankScroll"
-                            style="font-size:11px; padding:0 8px; margin-left:8px;">📏 显示全部</button>
-                    </summary>
-                    <div class="table-scroll-wrapper">
-                        <div class="table-scroll" id="rankScroll"
-                            style="flex:0 0 auto; overflow:auto; margin-top:6px; max-height:150px;">
-                            <table class="data-table" id="rankTable">
-                                <thead id="rankHead"></thead>
-                                <tbody id="rankBody"></tbody>
-                            </table>
+                    <details id="statsDetails" open>
+                        <summary>📊 各指标统计 <span style="font-weight:400;color:var(--text-muted);font-size:12px;">（获第一天数 ·
+                                正负天数）</span>
+                            <button class="btn btn-outline" id="statsToggleBtn"
+                                style="font-size:11px; padding:0 8px; margin-left:8px;">📊 显示百分比</button>
+                            <button class="btn btn-outline expand-table-btn" data-target="statsScroll"
+                                style="font-size:11px; padding:0 8px; margin-left:8px;">📏 显示全部</button>
+                        </summary>
+                        <div class="table-scroll-wrapper">
+                            <div class="table-scroll" id="statsScroll"
+                                style="flex:0 0 auto; overflow:auto; margin-top:6px; max-height:150px;">
+                                <table class="data-table" id="statsTable">
+                                    <thead id="statsHead"></thead>
+                                    <tbody id="statsBody"></tbody>
+                                </table>
+                            </div>
+                            <div class="resize-handle" data-target="statsScroll"></div>
                         </div>
-                        <div class="resize-handle" data-target="rankScroll"></div>
-                    </div>
-                </details>
+                    </details>
 
-                <!-- 表5：各指标统计 -->
-                <details id="statsDetails" open>
-                    <summary>📊 各指标统计 <span style="font-weight:400;color:var(--text-muted);font-size:12px;">（获第一天数 ·
-                            正负天数）</span>
-                        <button class="btn btn-outline" id="statsToggleBtn"
-                            style="font-size:11px; padding:0 8px; margin-left:8px;">📊 显示百分比</button>
-                        <button class="btn btn-outline expand-table-btn" data-target="statsScroll"
-                            style="font-size:11px; padding:0 8px; margin-left:8px;">📏 显示全部</button>
-                    </summary>
-                    <div class="table-scroll-wrapper">
-                        <div class="table-scroll" id="statsScroll"
-                            style="flex:0 0 auto; overflow:auto; margin-top:6px; max-height:150px;">
-                            <table class="data-table" id="statsTable">
-                                <thead id="statsHead"></thead>
-                                <tbody id="statsBody"></tbody>
-                            </table>
-                        </div>
-                        <div class="resize-handle" data-target="statsScroll"></div>
-                    </div>
-                </details>
-
-                <div class="hint-text">Ctrl+点击多选行/列，Shift+点击范围选择。编辑任一表自动联动其他表。拖动表格下边缘可调整高度。</div>
+                    <div class="hint-text">Ctrl+点击多选行/列，Shift+点击范围选择。编辑任一表自动联动其他表。拖动表格下边缘可调整高度。</div>
+                </div>
             </div>
         </div>
+        <!-- ========== 控制面板结束 ========== -->
 
         <!-- 移动端底部标签栏 -->
         <nav class="mobile-tabbar" id="mobileTabbar">
@@ -2396,6 +2462,37 @@
             '<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32"><circle cx="16" cy="16" r="15" fill="white" stroke="#cccccc" stroke-width="1"/></svg>'
         );
 
+        // Y轴折叠切换
+        const yAxisToggleBtn = document.getElementById('yAxisToggleBtn');
+        const yAxisControl = document.getElementById('yAxisControl');
+        if (yAxisToggleBtn && yAxisControl) {
+            yAxisToggleBtn.addEventListener('click', function () {
+                const isCollapsed = yAxisControl.classList.toggle('collapsed');
+                this.classList.toggle('collapsed', isCollapsed);
+                this.textContent = isCollapsed ? '▶' : '▼';
+                // 可选：保存状态到 localStorage
+            });
+        }
+        // 右侧面板标签切换
+        const panelTabs = document.querySelectorAll('.panel-tab-btn');
+        const panelSeries = document.getElementById('panelSeriesContainer');
+        const panelData = document.getElementById('panelDataContainer');
+
+        panelTabs.forEach(tab => {
+            tab.addEventListener('click', function () {
+                panelTabs.forEach(t => t.classList.remove('active'));
+                this.classList.add('active');
+                const target = this.dataset.panel;
+                if (target === 'series') {
+                    panelSeries.style.display = 'block';
+                    panelData.style.display = 'none';
+                } else {
+                    panelSeries.style.display = 'none';
+                    panelData.style.display = 'block';
+                }
+                // 可选：保存状态到 localStorage
+            });
+        });
         // ================================================================
         //  工具函数
         // ================================================================
