@@ -2734,6 +2734,7 @@
             yMax = 150;
         let mainTitle = '📈 总变化率趋势';
         let showGrid = true;
+        let userThemeOverride = false;   // 新增：用户是否手动切换过主题
         let isRefreshing = false;
         let waterfallShowLabels = false;
 
@@ -3259,7 +3260,8 @@
                     chart: chartWrapper.style.flex || '',
                     panel: controlPanel.style.flex || ''
                 },
-                importExportOpen: importExportGroup.classList.contains('open')
+                importExportOpen: importExportGroup.classList.contains('open'),
+                userThemeOverride: userThemeOverride
             };
         }
 
@@ -6691,6 +6693,7 @@
         mainTitleInput.addEventListener('keydown', function (e) {if (e.key === 'Enter') this.blur();});
 
         themeToggle.addEventListener('click', function () {
+            userThemeOverride = true;   // 用户主动点击，禁止自动切换
             document.body.classList.toggle('dark');
             const isDark = document.body.classList.contains('dark');
             this.textContent = isDark ? '☀️' : '🌙';
@@ -6849,6 +6852,24 @@
                 });
             });
             renderPriceTable(items, targetDate);
+        }
+        // 自动根据时间切换深色/浅色（18:00-8:00 深色）
+        function autoThemeByTime() {
+            if (userThemeOverride) return; // 用户手动切换过，不再自动干预
+            const now = new Date();
+            const hours = now.getHours();
+            const isDarkTime = hours >= 18 || hours < 8; // 18:00 ~ 次日 8:00
+            const currentlyDark = document.body.classList.contains('dark');
+            if (isDarkTime !== currentlyDark) {
+                // 模拟点击主题切换按钮，保持与其他逻辑一致
+                if (themeToggle) {
+                    themeToggle.click();
+                } else {
+                    document.body.classList.toggle('dark', isDarkTime);
+                    if (themeToggle) themeToggle.textContent = isDarkTime ? '☀️' : '🌙';
+                    saveState();
+                }
+            }
         }
         // ================================================================
         //  初始化（远程 data.json 优先 + localStorage 后备 + 硬编码兜底）
@@ -7031,6 +7052,7 @@
             trendLegendSelected = new Set();
             // 清除可能存在的 localStorage 错误状态
             try {localStorage.removeItem('trendState');} catch (e) { }
+            userThemeOverride = false;
         }
         // 布局稳定后再次 resize
         setTimeout(function () {
@@ -7251,6 +7273,14 @@
         setTimeout(() => {resetDanmaku();}, 500);
         init();
         initMobileView();
+        // ---- 新增：自动主题切换（优化版） ----
+        // 从已加载的状态中恢复 userThemeOverride（已在 loadStateFromObject 中处理）
+        // 如果没有加载到任何状态（全新用户），userThemeOverride 保持 false
+        if (!userThemeOverride) {
+            autoThemeByTime(); // 首次加载根据时间设置
+        }
+        // 每分钟检查一次，但仅在未手动覆盖时生效
+        setInterval(autoThemeByTime, 60000);
     </script>
 </body>
 
