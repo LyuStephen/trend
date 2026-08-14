@@ -115,6 +115,10 @@
                 font-size: 14px;
             }
 
+            .panel-tab-switch {
+                display: none !important;
+            }
+
             .axis-btn-group-vertical.top-left {
                 top: 8px;
                 left: 8px;
@@ -2319,7 +2323,7 @@
 
 
             <!-- 2. 切换标签（系列管理 / 数据编辑） -->
-            <div style="display:flex; justify-content:center; gap:8px; margin-bottom:6px;">
+            <div class="panel-tab-switch" style="display:flex; justify-content:center; gap:8px; margin-bottom:6px;">
                 <button class="panel-tab-btn active" data-panel="series">👤 系列管理</button>
                 <button class="panel-tab-btn" data-panel="data">📋 数据编辑</button>
             </div>
@@ -6278,12 +6282,7 @@
                         color: 'var(--text-secondary)'
                     }
                 },
-                grid: {
-                    left: 45,
-                    right: 25,
-                    top: 45,
-                    bottom: isMobileView() ? 55 : 35
-                },
+                grid: {left: 70, right: 50, top: 45, bottom: isMobileView() ? 55 : 50},
                 xAxis: {
                     type: 'category',
                     data: dates,
@@ -7067,6 +7066,17 @@
                 mobileTabbarEl.querySelectorAll('.tab').forEach(function (t) {
                     t.classList.toggle('active', t.getAttribute('data-view') === view);
                 });
+            }
+            // 移动端显式控制系列/数据容器的显示（覆盖 PC 端内联样式）
+            if (isMobileView()) {
+                if (view === 'series') {
+                    document.getElementById('panelSeriesContainer').style.display = 'block';
+                    document.getElementById('panelDataContainer').style.display = 'none';
+                } else if (view === 'data') {
+                    document.getElementById('panelSeriesContainer').style.display = 'none';
+                    document.getElementById('panelDataContainer').style.display = 'block';
+                }
+                // 若 view === 'chart'，控制面板整体隐藏，无需设置容器
             }
             if (view === 'chart') {
                 setTimeout(function () {try {myChart.resize();} catch (e) { } }, 30);
