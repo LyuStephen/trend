@@ -47,6 +47,55 @@
             --tab-active-text-shadow: 0 1px 2px rgba(0, 0, 0, 0.20);
         }
 
+        .chart-reset-buttons .axis-btn {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            border: none;
+            background: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(4px);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+            font-size: 12px;
+            cursor: pointer;
+            transition: 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #1e293b;
+            border: 1px solid var(--border-color);
+            font-weight: 600;
+        }
+
+        .axis-btn-group {
+            display: flex;
+            gap: 2px;
+            margin: 0 2px;
+            padding: 0 2px;
+            border-left: 1px solid var(--border-color);
+            border-right: 1px solid var(--border-color);
+        }
+
+        .axis-btn-group .axis-btn {
+            width: 22px;
+            height: 22px;
+            font-size: 11px;
+        }
+
+        body.dark .chart-reset-buttons .axis-btn {
+            background: rgba(30, 41, 59, 0.85);
+            color: #e2e8f0;
+        }
+
+        .chart-reset-buttons .axis-btn:hover {
+            background: #ffffff;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+            transform: scale(1.05);
+        }
+
+        body.dark .chart-reset-buttons .axis-btn:hover {
+            background: #334155;
+        }
+
         .panel-tab-btn {
             background: transparent;
             border: 1px solid var(--border-color);
@@ -2204,9 +2253,19 @@
                     <button class="btn-reset toggle-reset-btn" id="toggleResetBtns" title="收起/展开快捷按钮">◀</button>
                     <button class="btn-refresh-icon" id="refreshPriceIconBtn" title="刷新股价">🔄</button>
                     <button class="btn-refresh-icon" id="verifyHistoryBtn" title="校验历史数据">📜</button>
+                    <!-- 新增 Y/X 轴调整按钮组 -->
+                    <span class="axis-btn-group">
+                        <button class="axis-btn" id="yPlusBtn" title="Y轴放大">Y+</button>
+                        <button class="axis-btn" id="yMinusBtn" title="Y轴缩小">Y-</button>
+                    </span>
+                    <span class="axis-btn-group">
+                        <button class="axis-btn" id="xPlusBtn" title="X轴放大（展开）">X+</button>
+                        <button class="axis-btn" id="xMinusBtn" title="X轴缩小（聚焦）">X-</button>
+                    </span>
                     <button class="btn-reset" id="resetYBtnChart" title="重置Y轴">↕</button>
                     <button class="btn-reset" id="resetZoomBtnChart" title="重置X轴缩放">⟲</button>
                 </div>
+
                 <button id="fullscreenBtn" title="全屏图表">⛶</button>
             </div>
             <div class="custom-tooltip" id="customTooltip"></div>
@@ -2229,25 +2288,7 @@
 
         <!-- ========== 控制面板（修正后） ========== -->
         <div class="control-panel" id="controlPanel">
-            <!-- 1. Y轴面板（已默认折叠） -->
-            <div class="panel-section y-axis-panel">
-                <div class="panel-section-title">
-                    📊 Y轴范围 <span>支持负值 · 滚轮缩放</span>
-                    <button class="y-axis-toggle-btn collapsed" id="yAxisToggleBtn">▶</button>
-                </div>
-                <div class="y-axis-control collapsed" id="yAxisControl">
-                    <div class="slider-group">
-                        <label>最小</label>
-                        <input type="range" id="yMinSlider" min="-200" max="100" value="-50" step="1">
-                        <span class="slider-value" id="yMinValue">-5</span>
-                    </div>
-                    <div class="slider-group">
-                        <label>最大</label>
-                        <input type="range" id="yMaxSlider" min="0" max="300" value="150" step="1">
-                        <span class="slider-value" id="yMaxValue">3</span>
-                    </div>
-                </div>
-            </div>
+
 
             <!-- 2. 切换标签（系列管理 / 数据编辑） -->
             <div style="display:flex; justify-content:center; gap:8px; margin-bottom:6px;">
@@ -2455,6 +2496,70 @@
             }
         })();
 
+
+        // Y轴调整按钮
+        document.getElementById('yPlusBtn').addEventListener('click', function () {adjustYAxis(1);});
+        document.getElementById('yMinusBtn').addEventListener('click', function () {adjustYAxis(-1);});
+
+        // X轴调整按钮
+        document.getElementById('xPlusBtn').addEventListener('click', function () {adjustXZoom(1);});
+        document.getElementById('xMinusBtn').addEventListener('click', function () {adjustXZoom(-1);});
+
+
+        // 调整 Y 轴范围（delta 为正表示扩大，负表示缩小）
+        function adjustYAxis(delta) {
+            const range = yMax - yMin;
+            const step = range * 0.1; // 每次调整 10%
+            let newMin = yMin - delta * step;
+            let newMax = yMax + delta * step;
+            // 限制范围
+            newMin = Math.max(-200, Math.min(100, newMin));
+            newMax = Math.max(0, Math.min(300, newMax));
+            if (newMin < newMax) {
+                yMin = newMin;
+                yMax = newMax;
+                renderChart();
+                saveState();
+            }
+        }
+
+        // 调整 X 轴缩放（delta 为正表示放大查看（缩小范围），负表示缩小查看（扩大范围））
+        function adjustXZoom(delta) {
+            // 获取当前 dataZoom 状态（默认只有一个 dataZoom 组件）
+            const option = myChart.getOption();
+            const dataZoom = option.dataZoom && option.dataZoom[0];
+            if (!dataZoom) return;
+            let start = dataZoom.start !== undefined ? dataZoom.start : 0;
+            let end = dataZoom.end !== undefined ? dataZoom.end : 100;
+            // 每次调整 10 个百分点
+            const step = 10;
+            let newStart = start + delta * step;
+            let newEnd = end - delta * step;
+            // 确保范围有效
+            if (newStart < 0) newStart = 0;
+            if (newEnd > 100) newEnd = 100;
+            if (newStart >= newEnd) {
+                // 不能交叉
+                if (delta > 0) {
+                    // 放大时，如果已接近，则居中调整
+                    const mid = (start + end) / 2;
+                    newStart = Math.max(0, mid - step);
+                    newEnd = Math.min(100, mid + step);
+                    if (newStart >= newEnd) return;
+                } else {
+                    return;
+                }
+            }
+            myChart.dispatchAction({
+                type: 'dataZoom',
+                start: newStart,
+                end: newEnd,
+                dataZoomIndex: 0
+            });
+            // 由于 dataZoom 是交互式的，图表会自动更新，但我们需要同步保存状态（可选）
+            // 可以读取最新值并保存，但暂时不强制
+        }
+
         // ================================================================
         //  默认头像
         // ================================================================
@@ -2462,17 +2567,7 @@
             '<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32"><circle cx="16" cy="16" r="15" fill="white" stroke="#cccccc" stroke-width="1"/></svg>'
         );
 
-        // Y轴折叠切换
-        const yAxisToggleBtn = document.getElementById('yAxisToggleBtn');
-        const yAxisControl = document.getElementById('yAxisControl');
-        if (yAxisToggleBtn && yAxisControl) {
-            yAxisToggleBtn.addEventListener('click', function () {
-                const isCollapsed = yAxisControl.classList.toggle('collapsed');
-                this.classList.toggle('collapsed', isCollapsed);
-                this.textContent = isCollapsed ? '▶' : '▼';
-                // 可选：保存状态到 localStorage
-            });
-        }
+
         // 右侧面板标签切换
         const panelTabs = document.querySelectorAll('.panel-tab-btn');
         const panelSeries = document.getElementById('panelSeriesContainer');
@@ -2651,10 +2746,7 @@
         const danmakuCanvas = document.getElementById('danmakuCanvas');
         const ctx = danmakuCanvas.getContext('2d');
 
-        const yMinSlider = document.getElementById('yMinSlider');
-        const yMaxSlider = document.getElementById('yMaxSlider');
-        const yMinValue = document.getElementById('yMinValue');
-        const yMaxValue = document.getElementById('yMaxValue');
+
         const seriesManager = document.getElementById('seriesManager');
         const rawHead = document.getElementById('rawHead');
         const rawBody = document.getElementById('rawBody');
@@ -3192,10 +3284,7 @@
             } else {
                 trendLegendSelected = new Set();
             }
-            yMinSlider.value = yMin;
-            yMaxSlider.value = yMax;
-            yMinValue.textContent = yMin;
-            yMaxValue.textContent = yMax;
+
             mainTitleInput.value = mainTitle;
             statsDisplayMode = state.statsDisplayMode || 'count';
 
@@ -6519,52 +6608,7 @@
         }
 
 
-
-        // ================================================================
-        //  Y轴控制 & 重置 & 滚轮缩放
-        // ================================================================
-        function updateYAxis() {
-            let minVal = parseFloat(yMinSlider.value);
-            let maxVal = parseFloat(yMaxSlider.value);
-            if (minVal >= maxVal) {
-                if (minVal >= 200) minVal = maxVal - 20;
-                if (maxVal <= -100) maxVal = minVal + 20;
-                if (minVal >= maxVal) minVal = maxVal - 50;
-                yMinSlider.value = minVal;
-                yMaxSlider.value = maxVal;
-            }
-            yMin = minVal;
-            yMax = maxVal;
-            yMinValue.textContent = minVal;
-            yMaxValue.textContent = maxVal;
-            renderChart();
-            saveState();
-        }
-        yMinSlider.addEventListener('input', updateYAxis);
-        yMaxSlider.addEventListener('input', updateYAxis);
-
         function resetYAxis() {
-            if (viewMode === 'waterfall') {
-                const targetName = waterfallSeriesName || (seriesKeys[0] || '');
-                const s = getSeries(targetName);
-                if (!s || s.data.length < 2) return;
-                const base = s.data[0];
-                const totalChanges = s.data.map(v => calcTotalChange(base, v));
-                const dayChanges = totalChanges.map((v, i) => i === 0 ? v : v - totalChanges[i - 1]);
-                const allValues = [...dayChanges, ...totalChanges];
-                let min = Math.min(...allValues);
-                let max = Math.max(...allValues);
-                const padding = (max - min) * 0.15 || 10;
-                min = Math.floor(min - padding);
-                max = Math.ceil(max + padding);
-                min = Math.max(-200, min);
-                max = Math.min(300, max);
-                yMinSlider.value = min;
-                yMaxSlider.value = max;
-                updateYAxis();
-                return;
-            }
-
             let allChanges = [];
             seriesList.forEach(s => {
                 const base = s.data[0];
@@ -6578,10 +6622,12 @@
             max = Math.ceil(max + padding);
             min = Math.max(-200, min);
             max = Math.min(300, max);
-            yMinSlider.value = min;
-            yMaxSlider.value = max;
-            updateYAxis();
+            yMin = min;
+            yMax = max;
+            renderChart();
+            saveState();
         }
+
         resetYBtnChart.addEventListener('click', resetYAxis);
         chartDom.addEventListener('dblclick', resetYAxis);
 
@@ -6598,9 +6644,10 @@
             newMin = Math.max(-200, Math.min(100, newMin));
             newMax = Math.max(0, Math.min(300, newMax));
             if (newMin < newMax) {
-                yMinSlider.value = newMin;
-                yMaxSlider.value = newMax;
-                updateYAxis();
+                yMin = newMin;
+                yMax = newMax;
+                renderChart();
+                saveState();
             }
         }, {passive: false});
 
@@ -6936,10 +6983,7 @@
             seriesKeys = seriesList.map(s => s.name);
             yMin = -50;
             yMax = 150;
-            yMinSlider.value = -50;
-            yMaxSlider.value = 150;
-            yMinValue.textContent = '-50';
-            yMaxValue.textContent = '150';
+
             mainTitle = '🌈 总变化率趋势';
             mainTitleInput.value = mainTitle;
             showGrid = true;
