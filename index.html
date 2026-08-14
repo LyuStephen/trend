@@ -5437,6 +5437,13 @@
                 }
 
                 sortAllData();
+                // 更新排行日期为最新日期
+                if (dates.length > 0) {
+                    const latestDate = dates[dates.length - 1];
+                    rankingDate = latestDate;
+                    if (rankingDateInput) rankingDateInput.value = latestDate;
+                    rankingAutoSetDone = true; // 标记已自动设置过
+                }
                 renderTables();
                 renderChart();
                 resetDanmaku();
@@ -6897,6 +6904,10 @@
 
                 setTimeout(() => {refreshPrices();}, 2500);
                 console.log('✅ 初始化完成，数据来源：' + message);
+                const expandBtn = document.querySelector('#priceInfoDetails .expand-table-btn');
+                if (expandBtn) {
+                    expandBtn.click();  // 触发“显示全部”，将 max-height 设为 none
+                }
             }
 
             // ---------- 1. 优先从远程 data.json 加载 ----------
