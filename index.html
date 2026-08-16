@@ -6245,7 +6245,15 @@
         // ================================================================
         function renderWaterfall() {
             myChart.clear();
+            const isMobile = isMobileView();   // 已存在，可直接使用
 
+            // 根据移动端调整尺寸
+            const cardWidth = isMobile ? 130 : 180;
+            const cardHeight = isMobile ? 68 : 78;
+            const avatarSize = isMobile ? 16 : 22;
+            const fontSize = isMobile ? 10 : 12;
+            const leftOffset = isMobile ? 28 : 36;   // 文字起始位置（头像右侧）
+            const valueLeft = isMobile ? 78 : 108;   // 数值起始位置
             const targetName = waterfallSeriesName || (seriesKeys[0] || '');
             const s = getSeries(targetName);
             if (!s || s.data.length < 2) {
@@ -6428,12 +6436,13 @@
             const graphic = [
                 {
                     type: 'group',
-                    left: 75,
+                    left: isMobile ? 10 : 75,   // 整个卡片左侧边距，移动端靠左一些
                     top: 50,
                     children: [
+                        // 背景矩形
                         {
                             type: 'rect',
-                            shape: {width: 140, height: 78},
+                            shape: {width: cardWidth, height: cardHeight},
                             style: {
                                 fill: isDark ? 'rgba(30,41,59,0.85)' : 'rgba(255,255,255,0.85)',
                                 stroke: isDark ? '#334155' : '#eef2f6',
@@ -6441,27 +6450,27 @@
                                 cornerRadius: 6
                             }
                         },
-                        // 头像（新增）
+                        // 头像
                         {
                             type: 'image',
                             style: {
                                 image: avatarSrc,
                                 x: 8,
                                 y: 8,
-                                width: 22,
-                                height: 22,
-                                borderRadius: 11
+                                width: avatarSize,
+                                height: avatarSize,
+                                borderRadius: avatarSize / 2
                             },
                             z: 10
                         },
-                        // 登顶天数（左移以让出头像空间）
+                        // 登顶天数
                         {
                             type: 'text',
-                            left: 36,
-                            top: 12,
+                            left: leftOffset,
+                            top: isMobile ? 10 : 12,
                             style: {
                                 text: `🏆 登顶 ${firstPlaceDays} 天`,
-                                fontSize: 12,
+                                fontSize: fontSize,
                                 fill: isDark ? '#e2e8f0' : '#1e293b',
                                 fontWeight: 'bold'
                             }
@@ -6469,11 +6478,11 @@
                         // 总变化率标签
                         {
                             type: 'text',
-                            left: 36,
-                            top: 32,
+                            left: leftOffset,
+                            top: isMobile ? 28 : 32,
                             style: {
                                 text: '📈 总变化率 ',
-                                fontSize: 12,
+                                fontSize: fontSize,
                                 fill: isDark ? '#e2e8f0' : '#1e293b',
                                 textBaseline: 'top'
                             }
@@ -6481,11 +6490,11 @@
                         // 总变化率数值
                         {
                             type: 'text',
-                            left: 100,
-                            top: 32,
+                            left: valueLeft,
+                            top: isMobile ? 28 : 32,
                             style: {
                                 text: `${latestChange >= 0 ? '+' : ''}${latestChange.toFixed(2)}%`,
-                                fontSize: 12,
+                                fontSize: fontSize,
                                 fill: latestChange >= 0 ? '#e64340' : '#07c160',
                                 fontWeight: 'bold',
                                 textBaseline: 'top'
@@ -6494,11 +6503,11 @@
                         // 跑赢上证标签
                         {
                             type: 'text',
-                            left: 36,
-                            top: 52,
+                            left: leftOffset,
+                            top: isMobile ? 46 : 52,
                             style: {
                                 text: '📊 跑赢上证 ',
-                                fontSize: 12,
+                                fontSize: fontSize,
                                 fill: isDark ? '#e2e8f0' : '#1e293b',
                                 textBaseline: 'top'
                             }
@@ -6506,11 +6515,11 @@
                         // 跑赢上证数值
                         {
                             type: 'text',
-                            left: 100,
-                            top: 52,
+                            left: valueLeft,
+                            top: isMobile ? 46 : 52,
                             style: {
                                 text: diffToSH,
-                                fontSize: 12,
+                                fontSize: fontSize,
                                 fill: diff >= 0 ? '#e64340' : '#07c160',
                                 fontWeight: 'bold',
                                 textBaseline: 'top'
@@ -6519,7 +6528,6 @@
                     ]
                 }
             ];
-
             const option = {
                 tooltip: {
                     trigger: 'axis',
