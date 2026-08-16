@@ -6251,7 +6251,7 @@
             const cardWidth = isMobile ? 160 : 180;
             const cardHeight = isMobile ? 68 : 78;
             const avatarSize = isMobile ? 16 : 22;
-            const fontSize = isMobile ? 8 : 12;
+            const fontSize = isMobile ? 9 : 12;
             const leftOffset = isMobile ? 28 : 36;   // 文字起始位置（头像右侧）
             const valueLeft = isMobile ? 78 : 108;   // 数值起始位置
             const targetName = waterfallSeriesName || (seriesKeys[0] || '');
@@ -6678,14 +6678,14 @@
 
                     markPoint: {
                         symbol: 'image://' + getAvatarSrcForChart(s),
-                        symbolSize: isMobileView() ? 12 : 32,
+                        symbolSize: isMobileView() ? 20 : 32,
                         label: {show: false},
                         tooltip: {show: false},
                         data: [{
                             name: s.name + '_latest',
                             coord: [latestDate, latestChange],
                             symbol: 'image://' + getAvatarSrcForChart(s),
-                            symbolSize: 42
+                            symbolSize: isMobileView() ? 20 : 32
                         }],
                         itemStyle: {
                             borderColor: '#fff',
