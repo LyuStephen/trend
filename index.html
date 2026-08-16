@@ -5239,9 +5239,9 @@
                         formatter: function(value, index) {
                             var len = names.length;
                             var prefix = '';
-                            if (len >= 3 && index === len - 1) prefix = '🥇 ';
-                            else if (len >= 2 && index === len - 2) prefix = '🥈 ';
-                            else if (len >= 1 && index === len - 3) prefix = '🥉 ';
+                            if (len >= 3 && index === len - 1) prefix = '#1 ';
+                            else if (len >= 2 && index === len - 2) prefix = '#2 ';
+                            else if (len >= 1 && index === len - 3) prefix = '#3 ';
                             return prefix + value;
                         }
                     },
