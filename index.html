@@ -2454,7 +2454,8 @@
                         </summary>
                         <div id="priceInfoContainer">
                             <div class="table-scroll-wrapper">
-                                <div class="table-scroll" id="priceInfoScroll" style="flex:0 0 auto; overflow:auto; margin-top:6px; max-height:200px;">
+                                <div class="table-scroll" id="priceInfoScroll"
+                                    style="flex:0 0 auto; overflow:auto; margin-top:6px; max-height:200px;">
                                     <table class="data-table" id="priceInfoTable">
                                         <thead id="priceInfoHead"></thead>
                                         <tbody id="priceInfoBody"></tbody>
@@ -2474,7 +2475,8 @@
                                 style="font-size:11px; padding:0 8px; margin-left:8px;">📏 显示全部</button>
                         </summary>
                         <div class="table-scroll-wrapper">
-                            <div class="table-scroll" id="dailyScroll" style="flex:0 0 auto; overflow:auto; margin-top:6px; max-height:none;">
+                            <div class="table-scroll" id="dailyScroll"
+                                style="flex:0 0 auto; overflow:auto; margin-top:6px; max-height:none;">
                                 <table class="data-table" id="dailyTable">
                                     <thead id="dailyHead"></thead>
                                     <tbody id="dailyBody"></tbody>
@@ -2491,7 +2493,8 @@
                                 style="font-size:11px; padding:0 8px; margin-left:8px;">📏 显示全部</button>
                         </summary>
                         <div class="table-scroll-wrapper">
-                            <div class="table-scroll" id="rawScroll" style="flex:0 0 auto; overflow:auto; margin-top:6px; max-height:none;">
+                            <div class="table-scroll" id="rawScroll"
+                                style="flex:0 0 auto; overflow:auto; margin-top:6px; max-height:none;">
                                 <table class="data-table" id="rawTable">
                                     <thead id="rawHead"></thead>
                                     <tbody id="rawBody"></tbody>
@@ -2526,7 +2529,8 @@
                                 style="font-size:11px; padding:0 8px; margin-left:8px;">📏 显示全部</button>
                         </summary>
                         <div class="table-scroll-wrapper">
-                            <div class="table-scroll" id="rankScroll" style="flex:0 0 auto; overflow:auto; margin-top:6px; max-height:none;">
+                            <div class="table-scroll" id="rankScroll"
+                                style="flex:0 0 auto; overflow:auto; margin-top:6px; max-height:none;">
                                 <table class="data-table" id="rankTable">
                                     <thead id="rankHead"></thead>
                                     <tbody id="rankBody"></tbody>
@@ -2537,14 +2541,16 @@
                     </details>
 
                     <details id="statsDetails" open>
-                        <summary>📊 历史统计 <span style="font-weight:400;color:var(--text-muted);font-size:12px;">（点击切换天数/百分比）</span>
+                        <summary>📊 历史统计 <span
+                                style="font-weight:400;color:var(--text-muted);font-size:12px;">（点击切换天数/百分比）</span>
                             <button class="btn btn-outline" id="statsToggleBtn"
                                 style="font-size:11px; padding:0 8px; margin-left:8px;">📊 百分比</button>
                             <button class="btn btn-outline expand-table-btn" data-target="statsScroll"
                                 style="font-size:11px; padding:0 8px; margin-left:8px;">📏 显示全部</button>
                         </summary>
                         <div class="table-scroll-wrapper">
-                            <div class="table-scroll" id="statsScroll" style="flex:0 0 auto; overflow:auto; margin-top:6px; max-height:none;">
+                            <div class="table-scroll" id="statsScroll"
+                                style="flex:0 0 auto; overflow:auto; margin-top:6px; max-height:none;">
                                 <table class="data-table" id="statsTable">
                                     <thead id="statsHead"></thead>
                                     <tbody id="statsBody"></tbody>
@@ -4149,6 +4155,16 @@
         //  渲染系列管理
         // ================================================================
         function renderSeriesManager() {
+            // ----- 按最新总变化率降序排序（自动排序，移除拖拽） -----
+            const latestIdx = dates.length - 1;
+            seriesList.sort((a, b) => {
+                const aChange = calcTotalChange(a.data[0], a.data[latestIdx]);
+                const bChange = calcTotalChange(b.data[0], b.data[latestIdx]);
+                return bChange - aChange; // 从高到低
+            });
+            seriesKeys = seriesList.map(s => s.name);
+            // -------------------------------------------------------
+
             const firstPlaceDays = {};
             seriesKeys.forEach(key => {firstPlaceDays[key] = 0;});
             for (let i = 0; i < dates.length; i++) {
@@ -4208,12 +4224,12 @@
                 let diffToSH = '--';
                 let diffColor = 'var(--text-muted)';
                 if (shSeries && dates.length > 0) {
-                    const latestIdx = dates.length - 1;
+                    const latestIdx2 = dates.length - 1;
                     const baseSH = shSeries.data[0];
-                    const currSH = shSeries.data[latestIdx];
+                    const currSH = shSeries.data[latestIdx2];
                     const changeSH = calcTotalChange(baseSH, currSH);
                     const baseS = s.data[0];
-                    const currS = s.data[latestIdx];
+                    const currS = s.data[latestIdx2];
                     const changeS = calcTotalChange(baseS, currS);
                     const diffValue = changeS - changeSH;
                     diffToSH = (diffValue >= 0 ? '+' : '') + diffValue.toFixed(2) + '%';
@@ -4222,32 +4238,32 @@
                 // 头像显示：优先avatarData，其次avatarUrl
                 const avatar = getAvatarSrc(s);
                 html += `
-                            <div class="series-item" data-series="${s.name}" data-index="${idx}">
-                                <div class="row-main">
-                                    <span class="drag-handle">⠿</span>
-                                    <div class="avatar-sm"><img src="${avatar}" alt="${s.name}" /></div>
-                                    <input class="series-name-input" type="text" value="${s.name}" data-oldname="${s.name}" />
-                                    <input class="color-picker" type="color" value="${s.color}" />
-                                    
-                                    <span class="code-wrapper">
-                                        <input class="code-input" type="text" placeholder="股票代码/名称" value="${s.code || ''}" data-series="${s.name}" autocomplete="off" />
-                                        <div class="code-dropdown" data-series="${s.name}"></div>
-                                        <button class="${btnClass}" ${btnDisabled} data-link="${link}" title="查看雪球行情">${btnText}</button>
-                                    </span>
-                                    <span class="upload-btn"><button class="btn-icon">📤</button><input type="file" accept="image/*" data-series="${s.name}" /></span>
-                                    <button class="btn-icon" style="background:transparent;" data-reset-avatar="${s.name}">↩️</button>
-                                </div>
-                                
-                                
-                                <div class="danmaku-section">
-                                    <div class="danmaku-row">
-                                        <input class="danmaku-input" placeholder="输入弹幕文字" data-series="${s.name}" />
-                                        <button class="danmaku-add-btn" data-series="${s.name}">添加</button>
-                                    </div>
-                                    <div class="danmaku-list">${danmakuTags}</div>
-                                </div>
+                    <div class="series-item" data-series="${s.name}" data-index="${idx}">
+                        <div class="row-main">
+                            <span class="drag-handle">⠿</span>
+                            <div class="avatar-sm"><img src="${avatar}" alt="${s.name}" /></div>
+                            <input class="series-name-input" type="text" value="${s.name}" data-oldname="${s.name}" />
+                            <input class="color-picker" type="color" value="${s.color}" />
+                            
+                            <span class="code-wrapper">
+                                <input class="code-input" type="text" placeholder="股票代码/名称" value="${s.code || ''}" data-series="${s.name}" autocomplete="off" />
+                                <div class="code-dropdown" data-series="${s.name}"></div>
+                                <button class="${btnClass}" ${btnDisabled} data-link="${link}" title="查看雪球行情">${btnText}</button>
+                            </span>
+                            <span class="upload-btn"><button class="btn-icon">📤</button><input type="file" accept="image/*" data-series="${s.name}" /></span>
+                            <button class="btn-icon" style="background:transparent;" data-reset-avatar="${s.name}">↩️</button>
+                        </div>
+                        
+                        
+                        <div class="danmaku-section">
+                            <div class="danmaku-row">
+                                <input class="danmaku-input" placeholder="输入弹幕文字" data-series="${s.name}" />
+                                <button class="danmaku-add-btn" data-series="${s.name}">添加</button>
                             </div>
-                        `;
+                            <div class="danmaku-list">${danmakuTags}</div>
+                        </div>
+                    </div>
+                `;
             });
             seriesManager.innerHTML = html;
 
@@ -4301,8 +4317,10 @@
             });
 
             bindSeriesManagerEvents();
-        }
 
+            // 重要：移除原有的 Sortable 初始化，因为已改为自动排序
+            // 如果原代码中有 new Sortable(...)，请注释掉或删除。
+        }
         function bindSeriesManagerEvents() {
             seriesManager.querySelectorAll('.market-btn').forEach(btn => {
                 btn.addEventListener('click', function (e) {
@@ -6356,8 +6374,8 @@
                     data: data.totalChanges,
                     smooth: true,
                     symbol: 'circle',
-                    symbolSize: 8,               // 与趋势图一致
-                    lineStyle: {color, width: 2.5}, // 与趋势图一致
+                    symbolSize: 8,
+                    lineStyle: {color, width: 2.5},
                     itemStyle: {color},
                     z: 3,
                     label: {
@@ -6376,6 +6394,131 @@
             seriesKeys.forEach(key => {
                 legendSelected[key] = (key === targetName);
             });
+
+            // ===== 计算统计信息（用于左上角卡片） =====
+            const latestIdx = dates.length - 1;
+            const latestChange = calcTotalChange(s.data[0], s.data[latestIdx]);
+
+            let firstPlaceDays = 0;
+            for (let i = 0; i < dates.length; i++) {
+                const changes = seriesKeys.map(key => {
+                    const series = getSeries(key);
+                    if (!series) return {key, change: -Infinity};
+                    return {key, change: calcTotalChange(series.data[0], series.data[i])};
+                });
+                const maxChange = Math.max(...changes.map(c => c.change));
+                const topKeys = changes.filter(c => c.change === maxChange).map(c => c.key);
+                if (topKeys.includes(targetName)) firstPlaceDays++;
+            }
+
+            const shSeries = getSeries('上证');
+            let diffToSH = '--';
+            let diff = 0;
+            if (shSeries) {
+                const shBase = shSeries.data[0];
+                const shChange = calcTotalChange(shBase, shSeries.data[latestIdx]);
+                diff = latestChange - shChange;
+                diffToSH = (diff >= 0 ? '+' : '') + diff.toFixed(2) + '%';
+            }
+
+            // 获取当前系列的头像
+            const avatarSrc = getAvatarSrc(s);
+
+            // ===== 构建 graphic 配置（带头像） =====
+            const graphic = [
+                {
+                    type: 'group',
+                    left: 75,
+                    top: 50,
+                    children: [
+                        {
+                            type: 'rect',
+                            shape: {width: 140, height: 78},
+                            style: {
+                                fill: isDark ? 'rgba(30,41,59,0.85)' : 'rgba(255,255,255,0.85)',
+                                stroke: isDark ? '#334155' : '#eef2f6',
+                                lineWidth: 1,
+                                cornerRadius: 6
+                            }
+                        },
+                        // 头像（新增）
+                        {
+                            type: 'image',
+                            style: {
+                                image: avatarSrc,
+                                x: 8,
+                                y: 8,
+                                width: 22,
+                                height: 22,
+                                borderRadius: 11
+                            },
+                            z: 10
+                        },
+                        // 登顶天数（左移以让出头像空间）
+                        {
+                            type: 'text',
+                            left: 36,
+                            top: 12,
+                            style: {
+                                text: `🏆 登顶 ${firstPlaceDays} 天`,
+                                fontSize: 12,
+                                fill: isDark ? '#e2e8f0' : '#1e293b',
+                                fontWeight: 'bold'
+                            }
+                        },
+                        // 总变化率标签
+                        {
+                            type: 'text',
+                            left: 36,
+                            top: 32,
+                            style: {
+                                text: '📈 总变化率 ',
+                                fontSize: 12,
+                                fill: isDark ? '#e2e8f0' : '#1e293b',
+                                textBaseline: 'top'
+                            }
+                        },
+                        // 总变化率数值
+                        {
+                            type: 'text',
+                            left: 100,
+                            top: 32,
+                            style: {
+                                text: `${latestChange >= 0 ? '+' : ''}${latestChange.toFixed(2)}%`,
+                                fontSize: 12,
+                                fill: latestChange >= 0 ? '#e64340' : '#07c160',
+                                fontWeight: 'bold',
+                                textBaseline: 'top'
+                            }
+                        },
+                        // 跑赢上证标签
+                        {
+                            type: 'text',
+                            left: 36,
+                            top: 52,
+                            style: {
+                                text: '📊 跑赢上证 ',
+                                fontSize: 12,
+                                fill: isDark ? '#e2e8f0' : '#1e293b',
+                                textBaseline: 'top'
+                            }
+                        },
+                        // 跑赢上证数值
+                        {
+                            type: 'text',
+                            left: 100,
+                            top: 52,
+                            style: {
+                                text: diffToSH,
+                                fontSize: 12,
+                                fill: diff >= 0 ? '#e64340' : '#07c160',
+                                fontWeight: 'bold',
+                                textBaseline: 'top'
+                            }
+                        }
+                    ]
+                }
+            ];
 
             const option = {
                 tooltip: {
@@ -6449,121 +6592,9 @@
                     minSpan: 10,
                     maxSpan: 100
                 }],
-                series: allSeries
+                series: allSeries,
+                graphic: graphic
             };
-
-            // ===== 新增：左上角信息标签 =====
-            // 计算统计信息
-            const shSeries = getSeries('上证');
-            const latestIdx = dates.length - 1;
-            const base = s.data[0];
-            const latestChange = calcTotalChange(base, s.data[latestIdx]);
-
-            // 计算登顶天数
-            let firstPlaceDays = 0;
-            for (let i = 0; i < dates.length; i++) {
-                const changes = seriesKeys.map(key => {
-                    const series = getSeries(key);
-                    if (!series) return {key, change: -Infinity};
-                    return {key, change: calcTotalChange(series.data[0], series.data[i])};
-                });
-                const maxChange = Math.max(...changes.map(c => c.change));
-                const topKeys = changes.filter(c => c.change === maxChange).map(c => c.key);
-                if (topKeys.includes(targetName)) firstPlaceDays++;
-            }
-
-            // 计算跑赢上证差值
-            let diffToSH = '--';
-            let diff = 0;   // 新增：提升作用域
-            if (shSeries) {
-                const shBase = shSeries.data[0];
-                const shChange = calcTotalChange(shBase, shSeries.data[latestIdx]);
-                diff = latestChange - shChange;
-                diffToSH = (diff >= 0 ? '+' : '') + diff.toFixed(2) + '%';
-            }
-
-            // 构造 graphic 文本块
-            const graphic = [
-                {
-                    type: 'group',
-                    left: 75,
-                    top: 50,
-                    children: [
-                        {
-                            type: 'rect',
-                            shape: {width: 140, height: 78},
-                            style: {
-                                fill: isDark ? 'rgba(30,41,59,0.85)' : 'rgba(255,255,255,0.85)',
-                                stroke: isDark ? '#334155' : '#eef2f6',
-                                lineWidth: 1,
-                                cornerRadius: 6
-                            }
-                        },
-                        {
-                            type: 'text',
-                            left: 12,
-                            top: 12,
-                            style: {
-                                text: `🏆 登顶 ${firstPlaceDays} 天`,
-                                fontSize: 12,
-                                fill: isDark ? '#e2e8f0' : '#1e293b',
-                                fontWeight: 'bold'
-                            }
-                        },
-                        // ===== 总变化率：标签 + 数字 =====
-                        {
-                            type: 'text',
-                            left: 12,
-                            top: 32,
-                            style: {
-                                text: '📈 总变化率 ',
-                                fontSize: 12,
-                                fill: isDark ? '#e2e8f0' : '#1e293b',
-                                textBaseline: 'top'
-                            }
-                        },
-                        {
-                            type: 'text',
-                            left: 84,
-                            top: 32,
-                            style: {
-                                text: `${latestChange >= 0 ? '+' : ''}${latestChange.toFixed(2)}%`,
-                                fontSize: 12,
-                                fill: latestChange >= 0 ? '#e64340' : '#07c160',
-                                fontWeight: 'bold',
-                                textBaseline: 'top'
-                            }
-                        },
-                        // ===== 跑赢上证：标签 + 数字 =====
-                        {
-                            type: 'text',
-                            left: 12,
-                            top: 52,
-                            style: {
-                                text: '📊 跑赢上证 ',
-                                fontSize: 12,
-                                fill: isDark ? '#e2e8f0' : '#1e293b',
-                                textBaseline: 'top'
-                            }
-                        },
-                        {
-                            type: 'text',
-                            left: 84,
-                            top: 52,
-                            style: {
-                                text: diffToSH,
-                                fontSize: 12,
-                                fill: diff >= 0 ? '#e64340' : '#07c160',
-                                fontWeight: 'bold',
-                                textBaseline: 'top'
-                            }
-                        }
-                    ]
-                }
-            ];
-
-            option.graphic = graphic;
-            // ===== 标签添加结束 =====
 
             myChart.setOption(option, true);
             myChart.resize();
@@ -6595,8 +6626,7 @@
             });
 
             setTimeout(() => {resetDanmaku();}, 100);
-        }// ================================================================
-        function renderChart() {
+        } function renderChart() {
             const currentMode = viewMode;
             if (currentMode === 'waterfall') {
                 renderWaterfall();
