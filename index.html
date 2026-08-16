@@ -6248,10 +6248,10 @@
             const isMobile = isMobileView();   // 已存在，可直接使用
 
             // 根据移动端调整尺寸
-            const cardWidth = isMobile ? 130 : 180;
+            const cardWidth = isMobile ? 140 : 180;
             const cardHeight = isMobile ? 68 : 78;
             const avatarSize = isMobile ? 16 : 22;
-            const fontSize = isMobile ? 10 : 12;
+            const fontSize = isMobile ? 8 : 12;
             const leftOffset = isMobile ? 28 : 36;   // 文字起始位置（头像右侧）
             const valueLeft = isMobile ? 78 : 108;   // 数值起始位置
             const targetName = waterfallSeriesName || (seriesKeys[0] || '');
@@ -6436,7 +6436,7 @@
             const graphic = [
                 {
                     type: 'group',
-                    left: isMobile ? 50 : 75,   // 整个卡片左侧边距，移动端靠左一些
+                    left: isMobile ? 65 : 75,   // 整个卡片左侧边距，移动端靠左一些
                     top: 50,
                     children: [
                         // 背景矩形
