@@ -5092,6 +5092,14 @@
         async function refreshPrices(autoRefresh = false) {
             alignDataLengths();
             if (isRefreshing) return;
+
+            // ★ 如果是自动刷新，显示中央遮罩
+            const overlay = document.getElementById('autoRefreshOverlay');
+            if (autoRefresh && overlay) {
+                overlay.style.display = 'flex';
+                void overlay.offsetHeight; // 强制重绘
+            }
+
             const codeMap = {};
             seriesList.forEach(s => {
                 if (s.code && s.code.trim()) {
@@ -5101,12 +5109,14 @@
             const codes = Object.values(codeMap);
             if (codes.length === 0) {
                 setStatus('info', '没有股票代码，请先输入');
+                if (autoRefresh && overlay) overlay.style.display = 'none';
                 return;
             }
             seriesList.forEach(s => s.updateStatus = 'idle');
             isRefreshing = true;
             refreshPriceIconBtn.disabled = true;
             setStatus('loading', '获取实时行情...');
+
             try {
                 let quotes = null;
                 let usedApi = '';
@@ -5130,6 +5140,7 @@
                         throw new Error('获取数据失败');
                     }
                 }
+
                 let latestDataDate = null;
                 for (const quote of Object.values(quotes)) {
                     if (quote && quote.updateTime) {
@@ -5141,8 +5152,10 @@
                         }
                     }
                 }
+
                 const today = getTodayStr();
                 const targetDate = latestDataDate || today;
+
                 if (!dates.includes(targetDate)) {
                     const oldLen = dates.length;
                     dates.push(targetDate);
@@ -5153,11 +5166,13 @@
                     });
                     sortAllData();
                 }
+
                 const targetIdx = dates.indexOf(targetDate);
                 if (targetIdx === -1) {
                     setStatus('error', '日期处理异常');
                     throw new Error('日期索引错误');
                 }
+
                 let updatedCount = 0;
                 const todayStr = getTodayStr();
                 if (targetDate !== todayStr) {
@@ -5165,6 +5180,7 @@
                 } else {
                     setStatus('loading', '获取复权价格中...');
                 }
+
                 const entries = Object.entries(codeMap);
                 const total = entries.length;
                 const tasks = entries.map(async ([name, code], index) => {
@@ -5224,6 +5240,7 @@
                     setStatus('loading', `获取价格中 (${index + 1}/${total})...`);
                     return {name, price, s};
                 });
+
                 const results = await Promise.all(tasks);
                 for (const result of results) {
                     if (!result) continue;
@@ -5242,39 +5259,91 @@
                         s.updateStatus = 'error';
                     }
                 }
+
                 const px = getSeries('飘小仙');
                 if (px) {px.data = px.data.map(() => 1);}
+
                 sortAllData();
-                // ★ 新增：如果是自动刷新，将排行图日期更新为最新日期
+
+                // ★ 如果是自动刷新，将排行图日期更新为最新日期
                 if (autoRefresh && dates.length > 0) {
                     const latestDate = dates[dates.length - 1];
                     rankingDate = latestDate;
                     if (rankingDateInput) rankingDateInput.value = latestDate;
-                    // 如果当前视图是排行图，自动更新标题
                     if (viewMode === 'ranking') {
                         mainTitleInput.value = `🌫️ 日涨跌排行 · ${latestDate}`;
                     }
-                    // 注意：不需要单独调用 updateViewUI，因为下面 renderChart 会重新渲染
                 }
+
                 renderTables();
                 renderChart();
                 resetDanmaku();
                 saveState();
+
                 const statusMsg = targetDate !== todayStr ?
                     `已更新 ${updatedCount} 只股票 (${usedApi}，采用前复权价格)，最新数据日期: ${targetDate}（非交易日）` :
                     `已更新 ${updatedCount} 只股票 (${usedApi}，采用前复权价格)，日期已对齐至 ${targetDate}`;
                 setStatus('success', statusMsg);
                 lastUpdateTime.textContent = '更新于 ' + new Date().toLocaleTimeString();
                 buildAndRenderPriceInfo();
+
+                // ★ 自动刷新完成，隐藏遮罩（延迟1200ms让用户看清结果）
+                if (autoRefresh && overlay) {
+                    const content = overlay.querySelector('div:first-child');
+                    if (content) {
+                        content.innerHTML = `
+                    <div style="font-size:56px; margin-bottom:16px; line-height:1.2;">✅</div>
+                    <div style="font-size:24px; font-weight:700; color:var(--text-primary); letter-spacing:0.5px;">数据已更新</div>
+                    <div style="font-size:15px; color:var(--text-muted); margin-top:10px; font-weight:400;">${updatedCount} 只股票 · ${targetDate}</div>
+                `;
+                        setTimeout(() => {
+                            overlay.style.display = 'none';
+                            // 恢复原始内容（下次使用）
+                            overlay.querySelector('div:first-child').innerHTML = `
+                        <div style="font-size:56px; margin-bottom:16px; line-height:1.2;">🔄</div>
+                        <div style="font-size:24px; font-weight:700; color:var(--text-primary); letter-spacing:0.5px;">正在获取最新数据...</div>
+                        <div style="font-size:15px; color:var(--text-muted); margin-top:10px; font-weight:400;">从腾讯接口同步实时行情</div>
+                        <div style="margin-top:20px; display:flex; justify-content:center; gap:6px;">
+                            <span style="display:inline-block; width:10px; height:10px; border-radius:50%; background:#3b82f6; animation:pulse-dot 1.2s infinite;"></span>
+                            <span style="display:inline-block; width:10px; height:10px; border-radius:50%; background:#3b82f6; animation:pulse-dot 1.2s infinite 0.2s;"></span>
+                            <span style="display:inline-block; width:10px; height:10px; border-radius:50%; background:#3b82f6; animation:pulse-dot 1.2s infinite 0.4s;"></span>
+                        </div>
+                    `;
+                        }, 1200);
+                    }
+                }
+
             } catch (error) {
                 console.error('刷新过程异常:', error);
                 setStatus('error', '刷新失败，请重试');
+                if (autoRefresh && overlay) {
+                    const content = overlay.querySelector('div:first-child');
+                    if (content) {
+                        content.innerHTML = `
+                    <div style="font-size:56px; margin-bottom:16px; line-height:1.2;">❌</div>
+                    <div style="font-size:24px; font-weight:700; color:#ef4444; letter-spacing:0.5px;">数据获取失败</div>
+                    <div style="font-size:15px; color:var(--text-muted); margin-top:10px; font-weight:400;">请检查网络连接后手动刷新</div>
+                `;
+                        setTimeout(() => {
+                            overlay.style.display = 'none';
+                            overlay.querySelector('div:first-child').innerHTML = `
+                        <div style="font-size:56px; margin-bottom:16px; line-height:1.2;">🔄</div>
+                        <div style="font-size:24px; font-weight:700; color:var(--text-primary); letter-spacing:0.5px;">正在获取最新数据...</div>
+                        <div style="font-size:15px; color:var(--text-muted); margin-top:10px; font-weight:400;">从腾讯接口同步实时行情</div>
+                        <div style="margin-top:20px; display:flex; justify-content:center; gap:6px;">
+                            <span style="display:inline-block; width:10px; height:10px; border-radius:50%; background:#3b82f6; animation:pulse-dot 1.2s infinite;"></span>
+                            <span style="display:inline-block; width:10px; height:10px; border-radius:50%; background:#3b82f6; animation:pulse-dot 1.2s infinite 0.2s;"></span>
+                            <span style="display:inline-block; width:10px; height:10px; border-radius:50%; background:#3b82f6; animation:pulse-dot 1.2s infinite 0.4s;"></span>
+                        </div>
+                    `;
+                        }, 1800);
+                    }
+                }
             } finally {
                 isRefreshing = false;
                 refreshPriceIconBtn.disabled = false;
             }
         }
-
         // ================================================================
         //  历史数据校验
         // ================================================================
@@ -7049,6 +7118,25 @@
         }
         setInterval(autoThemeByTime, 60000);
     </script>
+    <!-- ★ 自动刷新中央提示遮罩 -->
+    <div id="autoRefreshOverlay"
+        style="display:none; position:fixed; inset:0; z-index:99999; background:rgba(0,0,0,0.55); backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px); display:none; align-items:center; justify-content:center; flex-direction:column;">
+        <div
+            style="background:var(--bg-app); border-radius:28px; padding:48px 64px; text-align:center; box-shadow:0 30px 80px rgba(0,0,0,0.4); max-width:480px; width:90%; transform:scale(1); transition:transform 0.3s ease;">
+            <div style="font-size:56px; margin-bottom:16px; line-height:1.2;">🔄</div>
+            <div style="font-size:24px; font-weight:700; color:var(--text-primary); letter-spacing:0.5px;">正在获取最新数据...
+            </div>
+            <div style="font-size:15px; color:var(--text-muted); margin-top:10px; font-weight:400;">从腾讯接口同步实时行情</div>
+            <div style="margin-top:20px; display:flex; justify-content:center; gap:6px;">
+                <span
+                    style="display:inline-block; width:10px; height:10px; border-radius:50%; background:#3b82f6; animation:pulse-dot 1.2s infinite;"></span>
+                <span
+                    style="display:inline-block; width:10px; height:10px; border-radius:50%; background:#3b82f6; animation:pulse-dot 1.2s infinite 0.2s;"></span>
+                <span
+                    style="display:inline-block; width:10px; height:10px; border-radius:50%; background:#3b82f6; animation:pulse-dot 1.2s infinite 0.4s;"></span>
+            </div>
+        </div>
+    </div>
 </body>
 
 </html>
