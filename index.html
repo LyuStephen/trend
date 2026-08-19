@@ -6866,18 +6866,21 @@
                 '中国铁建': 'sh601186',
                 '飘小仙': ''
             };
-            seriesList = Object.keys(defaultSeriesData).map(name => ({
-                name: name,
-                color: defaultColors[name] || '#3b82f6',
-                data: [...defaultSeriesData[name]],
-                highData: new Array(defaultSeriesData[name].length).fill(0),
-                lowData: new Array(defaultSeriesData[name].length).fill(0),
-                avatarUrl: '',
-                avatarData: null,
-                remark: defaultRemarks[name] || '',
-                code: defaultCodes[name] || '',
-                danmaku: []
-            }));
+            seriesList = Object.keys(defaultSeriesData).map(name => {
+                const remark = defaultRemarks[name] || '';
+                return {
+                    name: name,
+                    color: defaultColors[name] || '#3b82f6',
+                    data: [...defaultSeriesData[name]],
+                    highData: new Array(defaultSeriesData[name].length).fill(0),
+                    lowData: new Array(defaultSeriesData[name].length).fill(0),
+                    avatarUrl: '',
+                    avatarData: null,
+                    remark: remark,
+                    code: defaultCodes[name] || '',
+                    danmaku: remark ? [remark] : ['默认弹幕']   // ★ 将备注作为弹幕
+                };
+            });
             seriesKeys = seriesList.map(s => s.name);
             yMin = -50;
             yMax = 150;
