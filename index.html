@@ -6181,7 +6181,6 @@
         function renderTrendChart() {
             const latestIdx = getLatestIdx();
             const latestDate = dates[latestIdx];
-            const prevIdx = latestIdx - 1;   // ★ 新增：用于计算当日变化率
 
             function getAvatarSrcForChart(series) {
                 if (series.avatarData) return series.avatarData;
@@ -6189,24 +6188,21 @@
                 return DEFAULT_AVATAR_SVG;
             }
 
-            // ★ 修改开始：按当日变化率（降序）排序图例
+            // ★ 按总变化率（相对首日）降序排序图例
             const sortedKeys = [...seriesKeys].sort((a, b) => {
                 const sA = getSeries(a);
                 const sB = getSeries(b);
                 if (!sA || !sB) return 0;
-                let aChange = 0, bChange = 0;
-                if (prevIdx >= 0) {
-                    const prevA = sA.data[prevIdx];
-                    const currA = sA.data[latestIdx];
-                    aChange = (prevA === 0) ? 0 : ((currA - prevA) / prevA) * 100;
-                    const prevB = sB.data[prevIdx];
-                    const currB = sB.data[latestIdx];
-                    bChange = (prevB === 0) ? 0 : ((currB - prevB) / prevB) * 100;
-                }
-                // 飘小仙强制为 0（如原逻辑）
+                const baseA = sA.data[0] || 1;
+                const baseB = sB.data[0] || 1;
+                const currA = sA.data[latestIdx];
+                const currB = sB.data[latestIdx];
+                let aChange = (baseA === 0) ? 0 : ((currA - baseA) / baseA) * 100;
+                let bChange = (baseB === 0) ? 0 : ((currB - baseB) / baseB) * 100;
+                // 飘小仙强制为 0（其值恒为 1，总变化率为 0）
                 if (a === '飘小仙') aChange = 0;
                 if (b === '飘小仙') bChange = 0;
-                return bChange - aChange; // 降序：涨幅大的在前
+                return bChange - aChange; // 降序：总涨幅大的排前面
             });
             // ★ 修改结束
 
