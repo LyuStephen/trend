@@ -3881,6 +3881,11 @@
         // ================================================================
         function renderSeriesManager() {
             const latestIdx = dates.length - 1;
+            seriesList.forEach(s => {
+                if (!s.danmaku || s.danmaku.length === 0) {
+                    s.danmaku = s.remark && s.remark.trim() ? [s.remark] : ['默认弹幕'];
+                }
+            });
             seriesList.sort((a, b) => {
                 const aChange = calcTotalChange(a.data[0], a.data[latestIdx]);
                 const bChange = calcTotalChange(b.data[0], b.data[latestIdx]);
