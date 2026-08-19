@@ -2113,7 +2113,7 @@
                         style="display:inline-flex; gap:8px; border-radius:6px;">
                         <button class="panel-tab-btn active" data-view="trend">🌈 趋势图</button>
                         <button class="panel-tab-btn" data-view="waterfall">🪨 瀑布图</button>
-                        <button class="panel-tab-btn" data-view="ranking">🌫️ 排行图</button>
+                        <button class="panel-tab-btn" data-view="ranking">🌫️ 当日图</button>
                     </span>
                 </div>
                 <div
@@ -5111,15 +5111,21 @@
         //  实时股价更新
         // ================================================================
         async function refreshPrices(autoRefresh = false) {
+            const overlay = document.getElementById('autoRefreshOverlay');
+            if (overlay) {
+                if (!autoRefresh) {
+                    // 手动刷新时，强制隐藏可能残留的遮罩
+                    overlay.style.display = 'none';
+                } else {
+                    // 自动刷新时，显示遮罩（保留原有逻辑）
+                    overlay.style.display = 'flex';
+                    void overlay.offsetHeight;
+                }
+            }
             alignDataLengths();
             if (isRefreshing) return;
 
-            // ★ 如果是自动刷新，显示中央遮罩
-            const overlay = document.getElementById('autoRefreshOverlay');
-            if (autoRefresh && overlay) {
-                overlay.style.display = 'flex';
-                void overlay.offsetHeight; // 强制重绘
-            }
+            
 
             const codeMap = {};
             seriesList.forEach(s => {
@@ -6634,7 +6640,9 @@
         document.getElementById('addDateBtn').addEventListener('click', insertDateColumn);
         document.getElementById('delDateBtn').addEventListener('click', deleteDateColumn);
         document.getElementById('addColBtn').addEventListener('click', addColumn);
-        document.getElementById('refreshPriceIconBtn').addEventListener('click', refreshPrices);
+        document.getElementById('refreshPriceIconBtn').addEventListener('click', function () {
+            refreshPrices(false);
+        });
         document.getElementById('statsToggleBtn').addEventListener('click', function () {
             statsDisplayMode = statsDisplayMode === 'count' ? 'percent' : 'count';
             this.textContent = statsDisplayMode === 'percent' ? '📊 显示天数' : '📊 显示百分比';
