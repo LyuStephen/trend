@@ -5089,7 +5089,7 @@
         // ================================================================
         //  实时股价更新
         // ================================================================
-        async function refreshPrices() {
+        async function refreshPrices(autoRefresh = false) {
             alignDataLengths();
             if (isRefreshing) return;
             const codeMap = {};
@@ -5245,6 +5245,17 @@
                 const px = getSeries('飘小仙');
                 if (px) {px.data = px.data.map(() => 1);}
                 sortAllData();
+                // ★ 新增：如果是自动刷新，将排行图日期更新为最新日期
+                if (autoRefresh && dates.length > 0) {
+                    const latestDate = dates[dates.length - 1];
+                    rankingDate = latestDate;
+                    if (rankingDateInput) rankingDateInput.value = latestDate;
+                    // 如果当前视图是排行图，自动更新标题
+                    if (viewMode === 'ranking') {
+                        mainTitleInput.value = `🌫️ 日涨跌排行 · ${latestDate}`;
+                    }
+                    // 注意：不需要单独调用 updateViewUI，因为下面 renderChart 会重新渲染
+                }
                 renderTables();
                 renderChart();
                 resetDanmaku();
@@ -5841,6 +5852,25 @@
                 }, true);
                 return;
             }
+
+            // ★ 新增：按总变化率（相对首日）降序排序图例
+            const latestIdx = dates.length - 1;
+            const waterfallSortedKeys = [...seriesKeys].sort((a, b) => {
+                const sA = getSeries(a);
+                const sB = getSeries(b);
+                if (!sA || !sB) return 0;
+                const baseA = sA.data[0] || 1;
+                const baseB = sB.data[0] || 1;
+                const currA = sA.data[latestIdx];
+                const currB = sB.data[latestIdx];
+                let aChange = (baseA === 0) ? 0 : ((currA - baseA) / baseA) * 100;
+                let bChange = (baseB === 0) ? 0 : ((currB - baseB) / baseB) * 100;
+                if (a === '飘小仙') aChange = 0;
+                if (b === '飘小仙') bChange = 0;
+                return bChange - aChange; // 降序
+            });
+            // ★ 结束
+
             const isDark = document.body.classList.contains('dark');
             const allSeriesData = {};
             seriesKeys.forEach(key => {
@@ -5958,13 +5988,14 @@
                 });
             });
 
+            // ★ 图例选择状态：使用 waterfallSortedKeys 构建
             const legendSelected = {};
-            seriesKeys.forEach(key => {
+            waterfallSortedKeys.forEach(key => {
                 legendSelected[key] = (key === targetName);
             });
 
-            const latestIdx = dates.length - 1;
-            const latestChange = calcTotalChange(s.data[0], s.data[latestIdx]);
+            const latestIdx2 = dates.length - 1;
+            const latestChange = calcTotalChange(s.data[0], s.data[latestIdx2]);
             let firstPlaceDays = 0;
             for (let i = 0; i < dates.length; i++) {
                 const changes = seriesKeys.map(key => {
@@ -5981,7 +6012,7 @@
             let diff = 0;
             if (shSeries) {
                 const shBase = shSeries.data[0];
-                const shChange = calcTotalChange(shBase, shSeries.data[latestIdx]);
+                const shChange = calcTotalChange(shBase, shSeries.data[latestIdx2]);
                 diff = latestChange - shChange;
                 diffToSH = (diff >= 0 ? '+' : '') + diff.toFixed(2) + '%';
             }
@@ -6086,7 +6117,7 @@
                     }
                 },
                 legend: {
-                    data: seriesKeys,
+                    data: waterfallSortedKeys,        // ★ 使用排序后的键
                     selected: legendSelected,
                     icon: 'circle',
                     top: 0,
@@ -6154,7 +6185,7 @@
             myChart.on('legendselectchanged', function (params) {
                 if (params.name && seriesKeys.includes(params.name)) {
                     const newSelected = {};
-                    seriesKeys.forEach(name => {
+                    waterfallSortedKeys.forEach(name => {   // ★ 使用排序后的键
                         newSelected[name] = (name === params.name);
                     });
                     myChart.setOption({legend: {selected: newSelected}});
@@ -6174,7 +6205,6 @@
             });
             setTimeout(() => {resetDanmaku();}, 100);
         }
-
         // ================================================================
         //  渲染趋势图
         // ================================================================
@@ -6669,7 +6699,7 @@
                     });
                 }
                 setTimeout(buildAndRenderPriceInfo, 300);
-                setTimeout(() => {refreshPrices();}, 2500);
+                setTimeout(() => {refreshPrices(true);}, 2500);
                 console.log('✅ 初始化完成，数据来源：' + message);
                 const expandBtn = document.querySelector('#priceInfoDetails .expand-table-btn');
                 if (expandBtn) {expandBtn.click();}
@@ -6705,7 +6735,7 @@
                             setStatus('info', '已从本地缓存恢复（远程不可用）');
                             updateViewUI();
                             saveState();
-                            setTimeout(() => {refreshPrices();}, 2500);
+                            setTimeout(() => {refreshPrices(true);}, 2500);
                         });
                         return;
                     }
