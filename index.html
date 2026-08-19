@@ -3177,7 +3177,7 @@
             userThemeOverride = state.userThemeOverride !== undefined ? state.userThemeOverride : false;
             if (state.showGrid !== undefined) showGrid = state.showGrid;
             gridToggle.textContent = showGrid ? '📏' : '📏';
-            viewMode = state.viewMode || 'trend';
+            viewMode = 'trend';
             waterfallSeriesName = state.waterfallSeriesName || (seriesKeys[0] || '');
             if (!seriesKeys.includes(waterfallSeriesName) && seriesKeys.length > 0) {
                 waterfallSeriesName = seriesKeys[0];
