@@ -336,6 +336,16 @@
             overflow: hidden;
         }
 
+        #danmakuCanvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 10;
+        }
+
         #trendChart {
             width: 100%;
             height: 100%;
@@ -2909,14 +2919,19 @@
 
         function initDanmaku() {
             if (!danmakuEnabled) return;
-            const rect = chartContainer.getBoundingClientRect();
             const width = chartContainer.clientWidth;
             const height = chartContainer.clientHeight;
-            danmakuCanvas.width = width * window.devicePixelRatio;
-            danmakuCanvas.height = height * window.devicePixelRatio;
+            // 容器尺寸未就绪时延迟重试
+            if (width === 0 || height === 0) {
+                setTimeout(initDanmaku, 200);
+                return;
+            }
+            const dpr = window.devicePixelRatio || 1;
+            danmakuCanvas.width = width * dpr;
+            danmakuCanvas.height = height * dpr;
             danmakuCanvas.style.width = width + 'px';
             danmakuCanvas.style.height = height + 'px';
-            ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+            ctx.scale(dpr, dpr);
             danmakuItems = [];
             const config = getDanmakuConfig();
             const selected = pickRandomDanmaku(config.count);
@@ -2924,8 +2939,9 @@
                 const d = new Danmaku(item.text, item.avatarUrl, item.name, item.color, width, height);
                 danmakuItems.push(d);
             });
-            if (danmakuItems.length > 0) startDanmakuAnimation();
-            else {
+            if (danmakuItems.length > 0) {
+                startDanmakuAnimation();
+            } else {
                 stopDanmakuAnimation();
                 ctx.clearRect(0, 0, width, height);
             }
