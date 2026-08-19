@@ -6405,6 +6405,11 @@
         //  重置 Y 轴
         // ================================================================
         function resetYAxis() {
+            // ★ 排行图下直接重新渲染，恢复默认范围
+            if (viewMode === 'ranking') {
+                renderChart();
+                return;
+            }
             let allChanges = [];
             seriesList.forEach(s => {
                 const base = s.data[0];
@@ -6428,6 +6433,11 @@
         chartDom.addEventListener('dblclick', resetYAxis);
 
         resetZoomBtnChart.addEventListener('click', function () {
+            // ★ 排行图下直接重新渲染，恢复默认范围
+            if (viewMode === 'ranking') {
+                renderChart();
+                return;
+            }
             myChart.dispatchAction({type: 'dataZoom', start: 0, end: 100, dataZoomIndex: 0});
         });
 
