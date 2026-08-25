@@ -5983,21 +5983,8 @@
             // ★ 结束
 
             const isDark = document.body.classList.contains('dark');
-            // ★ 自定义每个系列的红绿颜色对，以便区分不同指标
-            const colorPairsList = [
-                {up: '#e64340', down: '#07c160'}, // 指标1: 红/绿
-                {up: '#f59e0b', down: '#3b82f6'}, // 指标2: 橙/蓝（修改第二个指标的红绿颜色）
-                {up: '#8b5cf6', down: '#ec4899'}, // 指标3: 紫/粉
-                {up: '#14b8a6', down: '#f472b6'}, // 指标4: 青/粉红
-                {up: '#f97316', down: '#6366f1'}, // 指标5: 橙/靛
-            ];
-            // 只为选中的系列分配颜色，确保它们使用不同的颜色对
-            const colorPairsMap = {};
-            selectedKeys.forEach((key, idx) => {
-                colorPairsMap[key] = colorPairsList[idx % colorPairsList.length];
-            });
 
-            // ★★★ 关键修复：提前计算图例选中状态和分组信息 ★★★
+            // ★★★ 关键修复：先计算图例选中状态和分组信息 ★★★
             const legendSelected = {};
             if (waterfallSelectedSet.size === 0) {
                 waterfallSortedKeys.forEach(key => legendSelected[key] = true);
@@ -6010,6 +5997,20 @@
             // 计算当前选中的系列列表（用于分组）
             const selectedKeys = waterfallSortedKeys.filter(k => legendSelected[k]);
             const totalSelected = selectedKeys.length;
+
+            // ★ 自定义每个系列的红绿颜色对，以便区分不同指标
+            // 只为选中的系列分配颜色，确保它们使用不同的颜色对
+            const colorPairsList = [
+                {up: '#e64340', down: '#07c160'}, // 指标1: 红/绿
+                {up: '#f59e0b', down: '#3b82f6'}, // 指标2: 橙/蓝（修改第二个指标的红绿颜色）
+                {up: '#8b5cf6', down: '#ec4899'}, // 指标3: 紫/粉
+                {up: '#14b8a6', down: '#f472b6'}, // 指标4: 青/粉红
+                {up: '#f97316', down: '#6366f1'}, // 指标5: 橙/靛
+            ];
+            const colorPairsMap = {};
+            selectedKeys.forEach((key, idx) => {
+                colorPairsMap[key] = colorPairsList[idx % colorPairsList.length];
+            });
 
             const allSeriesData = {};
             seriesKeys.forEach(key => {
@@ -6386,7 +6387,7 @@
                 }
             });
             setTimeout(() => {resetDanmaku();}, 100);
-        }
+        }        
         // ================================================================
         //  渲染趋势图
         // ================================================================
