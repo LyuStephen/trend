@@ -2648,6 +2648,7 @@
         let waterfallShowLabels = false;
         let viewMode = 'trend';
         let waterfallSeriesName = seriesKeys[0] || '';
+        let waterfallSelectedSet = new Set();
         let rankingDate = dates[dates.length - 1] || '';
         let rankingAutoSetDone = false;
         let trendLegendSelected = new Set();
@@ -3146,7 +3147,8 @@
                 importExportOpen: importExportGroup.classList.contains('open'),
                 userThemeOverride: userThemeOverride,
                 viewMode: viewMode,
-                waterfallSeriesName: waterfallSeriesName
+                waterfallSeriesName: waterfallSeriesName,
+                waterfallSelectedSet: Array.from(waterfallSelectedSet),
             };
         }
 
@@ -3181,6 +3183,19 @@
             waterfallSeriesName = state.waterfallSeriesName || (seriesKeys[0] || '');
             if (!seriesKeys.includes(waterfallSeriesName) && seriesKeys.length > 0) {
                 waterfallSeriesName = seriesKeys[0];
+            }
+            waterfallSeriesName = state.waterfallSeriesName || (seriesKeys[0] || '');
+            if (state.waterfallSelectedSet) {
+                waterfallSelectedSet = new Set(state.waterfallSelectedSet);
+                // 过滤掉已不存在的系列
+                waterfallSelectedSet = new Set(Array.from(waterfallSelectedSet).filter(k => seriesKeys.includes(k)));
+            } else {
+                // 兼容旧状态：默认选中 waterfallSeriesName
+                waterfallSelectedSet = new Set([waterfallSeriesName]);
+            }
+            // 确保至少选中一个
+            if (waterfallSelectedSet.size === 0 && seriesKeys.length > 0) {
+                waterfallSelectedSet.add(seriesKeys[0]);
             }
             if (state.trendLegendSelected !== undefined) {
                 if (Array.isArray(state.trendLegendSelected)) {
@@ -5125,7 +5140,7 @@
             alignDataLengths();
             if (isRefreshing) return;
 
-            
+
 
             const codeMap = {};
             seriesList.forEach(s => {
@@ -6084,11 +6099,18 @@
                 });
             });
 
-            // ★ 图例选择状态：使用 waterfallSortedKeys 构建
+            // ★ 图例选择状态：使用 waterfallSelectedSet
             const legendSelected = {};
-            waterfallSortedKeys.forEach(key => {
-                legendSelected[key] = (key === targetName);
-            });
+            if (waterfallSelectedSet.size === 0) {
+                // 若没有选中任何系列，则默认全选（实际上会选中全部）
+                waterfallSortedKeys.forEach(key => legendSelected[key] = true);
+            } else {
+                waterfallSortedKeys.forEach(key => legendSelected[key] = waterfallSelectedSet.has(key));
+            }
+            // 确保至少有一个选中，若全为false则强制选中第一个
+            if (!waterfallSortedKeys.some(key => legendSelected[key])) {
+                legendSelected[waterfallSortedKeys[0]] = true;
+            }
 
             const latestIdx2 = dates.length - 1;
             const latestChange = calcTotalChange(s.data[0], s.data[latestIdx2]);
@@ -6279,18 +6301,45 @@
             myChart.resize();
             myChart.off('legendselectchanged');
             myChart.on('legendselectchanged', function (params) {
-                if (params.name && seriesKeys.includes(params.name)) {
-                    const newSelected = {};
-                    waterfallSortedKeys.forEach(name => {   // ★ 使用排序后的键
-                        newSelected[name] = (name === params.name);
-                    });
-                    myChart.setOption({legend: {selected: newSelected}});
-                    waterfallSeriesName = params.name;
-                    document.getElementById('waterfallSeriesSelect').value = params.name;
-                    mainTitleInput.value = `🪨 瀑布图 · ${params.name}`;
-                    renderWaterfall();
-                    saveState();
+                if (legendChanging) return;
+                const name = params.name;
+                if (!name || !seriesKeys.includes(name)) return;
+
+                if (ctrlPressed) {
+                    // Ctrl+点击：切换该系列的选中状态
+                    if (waterfallSelectedSet.has(name)) {
+                        waterfallSelectedSet.delete(name);
+                    } else {
+                        waterfallSelectedSet.add(name);
+                    }
+                } else {
+                    // 普通点击：如果该系列已选中且是唯一选中的，则取消全部；否则只选中该系列
+                    const onlyThis = waterfallSelectedSet.size === 1 && waterfallSelectedSet.has(name);
+                    if (onlyThis) {
+                        waterfallSelectedSet.clear();
+                    } else {
+                        waterfallSelectedSet.clear();
+                        waterfallSelectedSet.add(name);
+                    }
                 }
+
+                // 若全部取消，则自动选中第一个系列
+                if (waterfallSelectedSet.size === 0 && waterfallSortedKeys.length > 0) {
+                    waterfallSelectedSet.add(waterfallSortedKeys[0]);
+                }
+
+                // 更新主系列名为第一个选中的
+                const firstSelected = waterfallSelectedSet.values().next().value;
+                if (firstSelected) {
+                    waterfallSeriesName = firstSelected;
+                    document.getElementById('waterfallSeriesSelect').value = firstSelected;
+                    mainTitleInput.value = `🪨 瀑布图 · ${firstSelected}`;
+                }
+
+                legendChanging = true;
+                renderWaterfall();
+                legendChanging = false;
+                saveState();
             });
             myChart.off('click');
             myChart.on('click', function (params) {
