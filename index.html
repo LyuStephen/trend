@@ -5995,6 +5995,21 @@
             waterfallSortedKeys.forEach((key, idx) => {
                 colorPairsMap[key] = colorPairsList[idx % colorPairsList.length];
             });
+
+            // ★★★ 关键修复：提前计算图例选中状态和分组信息 ★★★
+            const legendSelected = {};
+            if (waterfallSelectedSet.size === 0) {
+                waterfallSortedKeys.forEach(key => legendSelected[key] = true);
+            } else {
+                waterfallSortedKeys.forEach(key => legendSelected[key] = waterfallSelectedSet.has(key));
+            }
+            if (!waterfallSortedKeys.some(key => legendSelected[key])) {
+                legendSelected[waterfallSortedKeys[0]] = true;
+            }
+            // 计算当前选中的系列列表（用于分组）
+            const selectedKeys = waterfallSortedKeys.filter(k => legendSelected[k]);
+            const totalSelected = selectedKeys.length;
+
             const allSeriesData = {};
             seriesKeys.forEach(key => {
                 const series = getSeries(key);
@@ -6092,6 +6107,7 @@
                 }
                 return rect;
             }
+
             const allSeries = [];
             waterfallSortedKeys.forEach(key => {
                 const data = allSeriesData[key];
@@ -6132,20 +6148,7 @@
                 });
             });
 
-            // ★ 图例选择状态：使用 waterfallSelectedSet（已移到 renderItem 之前）
-            const legendSelected = {};
-            if (waterfallSelectedSet.size === 0) {
-                waterfallSortedKeys.forEach(key => legendSelected[key] = true);
-            } else {
-                waterfallSortedKeys.forEach(key => legendSelected[key] = waterfallSelectedSet.has(key));
-            }
-            if (!waterfallSortedKeys.some(key => legendSelected[key])) {
-                legendSelected[waterfallSortedKeys[0]] = true;
-            }
-            // 计算当前选中的系列列表（用于分组）
-            const selectedKeys = waterfallSortedKeys.filter(k => legendSelected[k]);
-            const totalSelected = selectedKeys.length;
-
+            // 以下部分保持不变（图表卡片信息等）
             const latestIdx2 = dates.length - 1;
             const latestChange = calcTotalChange(s.data[0], s.data[latestIdx2]);
             let firstPlaceDays = 0;
@@ -6269,7 +6272,7 @@
                     }
                 },
                 legend: {
-                    data: waterfallSortedKeys,        // ★ 使用排序后的键
+                    data: waterfallSortedKeys,
                     selected: legendSelected,
                     icon: 'circle',
                     top: 0,
@@ -6333,6 +6336,8 @@
 
             myChart.setOption(option, true);
             myChart.resize();
+
+            // 图例交互事件（保持多选逻辑）
             myChart.off('legendselectchanged');
             myChart.on('legendselectchanged', function (params) {
                 if (legendChanging) return;
@@ -6340,14 +6345,12 @@
                 if (!name || !seriesKeys.includes(name)) return;
 
                 if (ctrlPressed) {
-                    // Ctrl+点击：切换该系列的选中状态
                     if (waterfallSelectedSet.has(name)) {
                         waterfallSelectedSet.delete(name);
                     } else {
                         waterfallSelectedSet.add(name);
                     }
                 } else {
-                    // 普通点击：如果该系列已选中且是唯一选中的，则取消全部；否则只选中该系列
                     const onlyThis = waterfallSelectedSet.size === 1 && waterfallSelectedSet.has(name);
                     if (onlyThis) {
                         waterfallSelectedSet.clear();
@@ -6357,12 +6360,10 @@
                     }
                 }
 
-                // 若全部取消，则自动选中第一个系列
                 if (waterfallSelectedSet.size === 0 && waterfallSortedKeys.length > 0) {
                     waterfallSelectedSet.add(waterfallSortedKeys[0]);
                 }
 
-                // 更新主系列名为第一个选中的
                 const firstSelected = waterfallSelectedSet.values().next().value;
                 if (firstSelected) {
                     waterfallSeriesName = firstSelected;
@@ -6375,6 +6376,7 @@
                 legendChanging = false;
                 saveState();
             });
+
             myChart.off('click');
             myChart.on('click', function (params) {
                 if (params.componentType === 'series' && params.seriesType === 'custom') {
@@ -6383,7 +6385,7 @@
                 }
             });
             setTimeout(() => {resetDanmaku();}, 100);
-        }
+        }        
         // ================================================================
         //  渲染趋势图
         // ================================================================
