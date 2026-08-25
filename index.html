@@ -5409,17 +5409,16 @@
             let totalMatched = 0;
             const errors = [];
             setStatus('loading', `历史校验中 (${names.length} 只)...`);
+
             for (const name of names) {
                 const code = codeMap[name];
                 const s = getSeries(name);
                 if (!s) continue;
+
+                // 格式化代码（只执行一次）
                 let formattedCode = formatStockCode(code);
                 if (/^\d{5,6}$/.test(formattedCode)) {
-                    if (formattedCode.startsWith('6')) {
-                        formattedCode = 'sh' + formattedCode;
-                    } else {
-                        formattedCode = 'sz' + formattedCode;
-                    }
+                    formattedCode = formattedCode.startsWith('6') ? 'sh' + formattedCode : 'sz' + formattedCode;
                 }
                 if (/^[A-Z]{1,5}$/.test(formattedCode) && !formattedCode.startsWith('us')) {
                     formattedCode = 'us' + formattedCode;
@@ -5428,62 +5427,70 @@
                     formattedCode = 'hk' + formattedCode;
                 }
                 console.log(`[${name}] 原始代码: ${code} → 格式化: ${formattedCode}`);
-                const url =
-                    `https://web.ifzq.gtimg.cn/appstock/app/fqkline/get?param=${formattedCode},day,${startDate},${endDate},${count},qfq`;
+
+                // ★ 使用新接口
+                const url = `https://web.ifzq.gtimg.cn/appstock/app/newfqkline/get?_var=kline_dayqfq&param=${formattedCode},day,${startDate},${endDate},${count},qfq`;
+                console.log(`[${name}] 请求URL: ${url}`);
+
                 try {
                     const response = await fetch(url, {
                         mode: 'cors',
                         headers: {'Referer': 'https://finance.sina.com.cn'}
                     });
                     if (!response.ok) throw new Error(`HTTP ${response.status}`);
-                    const json = await response.json();
+
+                    const rawText = await response.text();
+                    // 去除 JSONP 回调前缀 "kline_dayqfq="
+                    const jsonText = rawText.replace(/^[^=]*=/, '');
+                    const json = JSON.parse(jsonText);
+
+                    if (json.code !== 0) {
+                        throw new Error(`接口返回错误码: ${json.code}, 消息: ${json.msg || '未知'}`);
+                    }
+
+                    // 数据路径: data[code].day
                     let klineData = null;
                     const dataKey = formattedCode;
-                    if (json?.data?.[dataKey]?.qfqday) {
-                        klineData = json.data[dataKey].qfqday;
-                    } else if (json?.data?.[dataKey]?.day) {
+                    if (json?.data?.[dataKey]?.day) {
                         klineData = json.data[dataKey].day;
-                    } else if (json?.data) {
-                        for (const key of Object.keys(json.data)) {
-                            if (json.data[key]?.qfqday && Array.isArray(json.data[key].qfqday)) {
-                                klineData = json.data[key].qfqday;
-                                break;
-                            }
+                    } else {
+                        for (const key of Object.keys(json.data || {})) {
                             if (json.data[key]?.day && Array.isArray(json.data[key].day)) {
                                 klineData = json.data[key].day;
                                 break;
                             }
                         }
                     }
-                    if (!klineData || !Array.isArray(klineData) || klineData.length === 0) {
+
+                    if (!klineData || klineData.length === 0) {
                         console.warn(`[${name}] 无历史K线数据，URL: ${url}`);
                         errors.push(`${name}: 无数据返回`);
                         s.updateStatus = 'error';
                         continue;
                     }
                     console.log(`[${name}] 获取到 ${klineData.length} 条K线数据`);
+
+                    // ★ 新接口字段索引：日期[0], 最高[2], 最低[3], 收盘[4]
                     const dataMap = {};
                     klineData.forEach(row => {
                         if (row && row.length >= 5) {
                             const dateStr = row[0];
-                            const close = parseFloat(row[2]);
-                            const high = parseFloat(row[3]);
-                            const low = parseFloat(row[4]);
+                            const close = parseFloat(row[4]);
+                            const high = parseFloat(row[2]);
+                            const low = parseFloat(row[3]);
                             if (dateStr && !isNaN(close) && !isNaN(high) && !isNaN(low) && close > 0) {
                                 dataMap[dateStr] = {close, high, low};
                             }
                         }
                     });
+
                     const dateKeys = Object.keys(dataMap);
-                    console.log(
-                        `[${name}] 可匹配的日期范围: ${dateKeys[0] || '无'} ~ ${dateKeys[dateKeys.length - 1] || '无'}`
-                    );
-                    console.log(
-                        `[${name}] 你的日期范围: ${dates[0]} ~ ${dates[dates.length - 1]}`);
+                    console.log(`[${name}] 可匹配的日期范围: ${dateKeys[0] || '无'} ~ ${dateKeys[dateKeys.length - 1] || '无'}`);
+
                     let matched = 0;
                     for (let i = 0; i < dates.length; i++) {
                         const d = dates[i];
-                        if (dataMap[d] !== undefined) {
+                        if (dataMap[d]) {
                             s.data[i] = dataMap[d].close;
                             if (!s.highData) s.highData = new Array(dates.length).fill(0);
                             if (!s.lowData) s.lowData = new Array(dates.length).fill(0);
@@ -5494,6 +5501,7 @@
                             updateLinkedCells(name, dates[i]);
                         }
                     }
+
                     if (matched > 0) {
                         updatedCount++;
                         s.updateStatus = 'success';
@@ -5503,9 +5511,7 @@
                         const firstKlineDate = dateKeys[0];
                         const lastKlineDate = dateKeys[dateKeys.length - 1];
                         if (firstKlineDate && lastKlineDate) {
-                            console.warn(
-                                `[${name}] 你的日期 (${dates[0]} ~ ${dates[dates.length - 1]}) 不在K线范围 (${firstKlineDate} ~ ${lastKlineDate}) 内`
-                            );
+                            console.warn(`[${name}] 你的日期 (${dates[0]} ~ ${dates[dates.length - 1]}) 不在K线范围 (${firstKlineDate} ~ ${lastKlineDate}) 内`);
                             errors.push(`${name}: 日期范围不匹配 (K线: ${firstKlineDate} ~ ${lastKlineDate})`);
                         } else {
                             errors.push(`${name}: 无匹配数据`);
@@ -5517,12 +5523,16 @@
                     s.updateStatus = 'error';
                 }
             }
+
+            // ★ 修复“飘小仙”数据
             const px = getSeries('飘小仙');
             if (px) {px.data = px.data.map(() => 1);}
+
             renderTables();
             renderChart();
             resetDanmaku();
             saveState();
+
             let msg = `📊 历史校验完成\n\n`;
             msg += `✅ 更新: ${updatedCount} 只股票，共 ${totalMatched} 条数据\n`;
             if (errors.length > 0) {
@@ -5539,6 +5549,7 @@
                 `校验完成: ${updatedCount} 只更新，${totalMatched} 条匹配`);
             lastUpdateTime.textContent = '校验于 ' + new Date().toLocaleTimeString();
         }
+        
 
         // ================================================================
         //  状态指示器
@@ -6090,7 +6101,7 @@
                     encode: {x: 0, y: [1, 2]},
                     label: {show: false},
                     z: 2,
-                    itemStyle: { color: s.color }
+                    itemStyle: {color: s.color}
                 });
                 allSeries.push({
                     name: key,
