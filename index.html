@@ -6029,7 +6029,7 @@
                 };
             });
 
-            // ★ 自定义渲染函数：支持分组柱状图 + 区分颜色
+            // ★ 自定义渲染函数：支持分组柱状图 + 区分颜色（修正居中）
             function renderItem(params, api) {
                 const dataIndex = params.dataIndex;
                 const seriesName = params.seriesName;
@@ -6045,25 +6045,13 @@
                 const coordEnd = api.coord([xValue, endY]);
                 if (!coordStart || !coordEnd) return null;
 
-                // 计算该日期的柱体总宽度（bandWidth）
-                let bandWidth = 20;
-                const curX = api.coord([dataIndex, 0])[0];
-                let nextX = curX;
-                if (dataIndex + 1 < dates.length) {
-                    nextX = api.coord([dataIndex + 1, 0])[0];
-                } else if (dataIndex - 1 >= 0) {
-                    nextX = api.coord([dataIndex - 1, 0])[0];
-                }
-                if (nextX && curX) {
-                    bandWidth = Math.abs(nextX - curX) * 0.85;
-                    bandWidth = Math.min(bandWidth, 40);
-                    bandWidth = Math.max(bandWidth, 4);
-                }
-
-                // 分组计算：每个系列分配子宽度
-                const groupWidth = bandWidth * 0.8;
+                // ★★★ 使用 api.size() 获取一个类别的像素宽度（固定）
+                const categoryWidth = api.size([1, 0])[0]; // x轴上一个类别的宽度
+                // 组宽度占类别宽度的 80%（可调整）
+                const groupWidth = categoryWidth * 0.8;
                 const subWidth = groupWidth / Math.max(1, totalSelected);
                 const xOffset = (idxInSelected - (totalSelected - 1) / 2) * subWidth;
+                // 组的中心为 coordStart[0]（数据点位置）
                 const x = coordStart[0] - groupWidth / 2 + xOffset;
                 const y = Math.min(coordStart[1], coordEnd[1]);
                 const height = Math.abs(coordStart[1] - coordEnd[1]);
@@ -6109,7 +6097,6 @@
                 }
                 return rect;
             }
-
             const allSeries = [];
             waterfallSortedKeys.forEach(key => {
                 const data = allSeriesData[key];
