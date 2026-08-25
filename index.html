@@ -6033,59 +6033,35 @@
             function renderItem(params, api) {
                 const dataIndex = params.dataIndex;
                 const seriesName = params.seriesName;
-
-                // 检查当前系列是否在选中的列表中
                 const idxInSelected = selectedKeys.indexOf(seriesName);
-                if (idxInSelected === -1) return null; // 未选中则不渲染
-
+                if (idxInSelected === -1) return null;
                 const xValue = api.value(0);
                 const startY = api.value(1);
                 const endY = api.value(2);
                 const coordStart = api.coord([xValue, startY]);
                 const coordEnd = api.coord([xValue, endY]);
                 if (!coordStart || !coordEnd) return null;
-
-                // ★★★ 使用 api.size() 获取一个类别的像素宽度（固定）
-                const categoryWidth = api.size([1, 0])[0]; // x轴上一个类别的宽度
-                // 组宽度占类别宽度的 80%（可调整）
-                const groupWidth = categoryWidth * 0.8;
-                const subWidth = groupWidth / Math.max(1, totalSelected);
-                const xOffset = (idxInSelected - (totalSelected - 1) / 2) * subWidth;
-                // 组的中心为 coordStart[0]（数据点位置）
-                const x = coordStart[0] - groupWidth / 2 + xOffset;
+                // 固定柱形宽度（像素），不随选中数量变化
+                const isMobile = isMobileView();
+                const barWidth = isMobile ? 18 : 26;
+                const x = coordStart[0] - barWidth / 2;
                 const y = Math.min(coordStart[1], coordEnd[1]);
                 const height = Math.abs(coordStart[1] - coordEnd[1]);
-                const isUp = endY >= startY;
-                const pair = totalSelected === 1
-                    ? {up: '#e64340', down: '#07c160'}
-                    : (colorPairsMap[seriesName] || colorPairsList[0]);
-                const color = isUp ? pair.up : pair.down;
-
+                // 使用系列自带颜色，并设透明度
+                const color = api.color();
                 const rect = {
                     type: 'rect',
-                    shape: {x: x, y: y, width: subWidth * 0.9, height: height},
-                    style: {fill: color, stroke: color, lineWidth: 1}
+                    shape: {x: x, y: y, width: barWidth, height: height},
+                    style: {fill: color, stroke: color, lineWidth: 1, opacity: 0.8}
                 };
-
-                // 如果开启标签显示，添加文本
+                // 可选标签（仅显示终点值，位置根据涨跌调整）
                 if (waterfallShowLabels) {
+                    const isUp = endY >= startY;
                     rect.children = [{
                         type: 'text',
                         style: {
-                            text: startY.toFixed(2) + '%',
-                            x: coordStart[0] + xOffset,
-                            y: coordStart[1] + (isUp ? 16 : -8),
-                            fill: '#6b7280',
-                            fontSize: font('label'),
-                            fontWeight: 'bold',
-                            textAlign: 'center',
-                            textBaseline: isUp ? 'top' : 'bottom'
-                        }
-                    }, {
-                        type: 'text',
-                        style: {
                             text: endY.toFixed(2) + '%',
-                            x: coordStart[0] + xOffset,
+                            x: coordStart[0],
                             y: coordEnd[1] + (isUp ? -8 : 16),
                             fill: '#000000',
                             fontSize: font('label'),
@@ -6114,7 +6090,7 @@
                     encode: {x: 0, y: [1, 2]},
                     label: {show: false},
                     z: 2,
-                    itemStyle: {color: color}
+                    itemStyle: { color: s.color }
                 });
                 allSeries.push({
                     name: key,
@@ -6246,12 +6222,23 @@
                     trigger: 'axis',
                     formatter: function (params) {
                         if (!params || params.length === 0) return '';
-                        const p = params[0];
-                        if (!p) return '';
-                        const idx = p.dataIndex;
-                        const data = allSeriesData[targetName];
-                        if (!data) return '';
-                        return `<strong>${dates[idx]}</strong><br/>起点: ${data.baseData[idx].toFixed(2)}%<br/>终点: ${data.totalChanges[idx].toFixed(2)}%<br/>日变化: ${data.dayChanges[idx].toFixed(2)}%`;
+                        const idx = params[0].dataIndex;
+                        const date = dates[idx];
+                        let html = `<strong>${date}</strong><br/>`;
+                        // 遍历所有选中系列，显示每个的起点、终点、日变化
+                        selectedKeys.forEach(key => {
+                            const s = getSeries(key);
+                            if (!s) return;
+                            const data = allSeriesData[key];
+                            if (!data) return;
+                            const start = data.baseData[idx];
+                            const end = data.totalChanges[idx];
+                            const dayChange = data.dayChanges[idx];
+                            const color = s.color || '#3b82f6';
+                            html += `<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${color};margin-right:4px;"></span>`;
+                            html += `${key}: 起点 ${start.toFixed(2)}% → 终点 ${end.toFixed(2)}% (日变化 ${dayChange.toFixed(2)}%)<br/>`;
+                        });
+                        return html;
                     },
                     backgroundColor: isDark ? '#2d3748' : '#ffffff',
                     borderColor: isDark ? '#334155' : '#eef2f6',
