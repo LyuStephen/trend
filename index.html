@@ -5991,8 +5991,9 @@
                 {up: '#14b8a6', down: '#f472b6'}, // 指标4: 青/粉红
                 {up: '#f97316', down: '#6366f1'}, // 指标5: 橙/靛
             ];
+            // 只为选中的系列分配颜色，确保它们使用不同的颜色对
             const colorPairsMap = {};
-            waterfallSortedKeys.forEach((key, idx) => {
+            selectedKeys.forEach((key, idx) => {
                 colorPairsMap[key] = colorPairsList[idx % colorPairsList.length];
             });
 
@@ -6385,7 +6386,7 @@
                 }
             });
             setTimeout(() => {resetDanmaku();}, 100);
-        }        
+        }
         // ================================================================
         //  渲染趋势图
         // ================================================================
