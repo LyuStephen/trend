@@ -3184,7 +3184,7 @@
             if (!seriesKeys.includes(waterfallSeriesName) && seriesKeys.length > 0) {
                 waterfallSeriesName = seriesKeys[0];
             }
-            
+
             if (state.waterfallSelectedSet) {
                 waterfallSelectedSet = new Set(state.waterfallSelectedSet);
                 // 过滤掉已不存在的系列
@@ -6051,7 +6051,9 @@
                 const y = Math.min(coordStart[1], coordEnd[1]);
                 const height = Math.abs(coordStart[1] - coordEnd[1]);
                 const isUp = endY >= startY;
-                const pair = colorPairsMap[seriesName] || colorPairsList[0];
+                const pair = totalSelected === 1
+                    ? {up: '#e64340', down: '#07c160'}
+                    : (colorPairsMap[seriesName] || colorPairsList[0]);
                 const color = isUp ? pair.up : pair.down;
 
                 const rect = {
@@ -6094,8 +6096,10 @@
             waterfallSortedKeys.forEach(key => {
                 const data = allSeriesData[key];
                 if (!data) return;
-                const pair = colorPairsMap[key];
-                const color = pair ? pair.up : '#3b82f6';
+                // 单指标时线条用红色，多指标时使用各自颜色对的 up 色
+                const color = totalSelected === 1
+                    ? '#e64340'
+                    : (colorPairsMap[key] ? colorPairsMap[key].up : '#3b82f6');
 
                 allSeries.push({
                     name: key,
