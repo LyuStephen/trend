@@ -3184,7 +3184,7 @@
             if (!seriesKeys.includes(waterfallSeriesName) && seriesKeys.length > 0) {
                 waterfallSeriesName = seriesKeys[0];
             }
-            waterfallSeriesName = state.waterfallSeriesName || (seriesKeys[0] || '');
+            
             if (state.waterfallSelectedSet) {
                 waterfallSelectedSet = new Set(state.waterfallSelectedSet);
                 // 过滤掉已不存在的系列
@@ -5983,6 +5983,18 @@
             // ★ 结束
 
             const isDark = document.body.classList.contains('dark');
+            // ★ 自定义每个系列的红绿颜色对，以便区分不同指标
+            const colorPairsList = [
+                {up: '#e64340', down: '#07c160'}, // 指标1: 红/绿
+                {up: '#f59e0b', down: '#3b82f6'}, // 指标2: 橙/蓝（修改第二个指标的红绿颜色）
+                {up: '#8b5cf6', down: '#ec4899'}, // 指标3: 紫/粉
+                {up: '#14b8a6', down: '#f472b6'}, // 指标4: 青/粉红
+                {up: '#f97316', down: '#6366f1'}, // 指标5: 橙/靛
+            ];
+            const colorPairsMap = {};
+            waterfallSortedKeys.forEach((key, idx) => {
+                colorPairsMap[key] = colorPairsList[idx % colorPairsList.length];
+            });
             const allSeriesData = {};
             seriesKeys.forEach(key => {
                 const series = getSeries(key);
@@ -6000,14 +6012,23 @@
                 };
             });
 
+            // ★ 自定义渲染函数：支持分组柱状图 + 区分颜色
             function renderItem(params, api) {
                 const dataIndex = params.dataIndex;
+                const seriesName = params.seriesName;
+
+                // 检查当前系列是否在选中的列表中
+                const idxInSelected = selectedKeys.indexOf(seriesName);
+                if (idxInSelected === -1) return null; // 未选中则不渲染
+
                 const xValue = api.value(0);
                 const startY = api.value(1);
                 const endY = api.value(2);
                 const coordStart = api.coord([xValue, startY]);
                 const coordEnd = api.coord([xValue, endY]);
                 if (!coordStart || !coordEnd) return null;
+
+                // 计算该日期的柱体总宽度（bandWidth）
                 let bandWidth = 20;
                 const curX = api.coord([dataIndex, 0])[0];
                 let nextX = curX;
@@ -6020,25 +6041,32 @@
                     bandWidth = Math.abs(nextX - curX) * 0.85;
                     bandWidth = Math.min(bandWidth, 40);
                     bandWidth = Math.max(bandWidth, 4);
-                } else {
-                    bandWidth = 20;
                 }
-                const x = coordStart[0] - bandWidth / 2;
+
+                // 分组计算：每个系列分配子宽度
+                const groupWidth = bandWidth * 0.8;
+                const subWidth = groupWidth / Math.max(1, totalSelected);
+                const xOffset = (idxInSelected - (totalSelected - 1) / 2) * subWidth;
+                const x = coordStart[0] - groupWidth / 2 + xOffset;
                 const y = Math.min(coordStart[1], coordEnd[1]);
                 const height = Math.abs(coordStart[1] - coordEnd[1]);
                 const isUp = endY >= startY;
-                const color = isUp ? '#e64340' : '#07c160';
+                const pair = colorPairsMap[seriesName] || colorPairsList[0];
+                const color = isUp ? pair.up : pair.down;
+
                 const rect = {
                     type: 'rect',
-                    shape: {x, y, width: bandWidth, height},
+                    shape: {x: x, y: y, width: subWidth * 0.9, height: height},
                     style: {fill: color, stroke: color, lineWidth: 1}
                 };
+
+                // 如果开启标签显示，添加文本
                 if (waterfallShowLabels) {
                     rect.children = [{
                         type: 'text',
                         style: {
                             text: startY.toFixed(2) + '%',
-                            x: coordStart[0],
+                            x: coordStart[0] + xOffset,
                             y: coordStart[1] + (isUp ? 16 : -8),
                             fill: '#6b7280',
                             fontSize: font('label'),
@@ -6050,7 +6078,7 @@
                         type: 'text',
                         style: {
                             text: endY.toFixed(2) + '%',
-                            x: coordStart[0],
+                            x: coordStart[0] + xOffset,
                             y: coordEnd[1] + (isUp ? -8 : 16),
                             fill: '#000000',
                             fontSize: font('label'),
@@ -6062,12 +6090,13 @@
                 }
                 return rect;
             }
-
             const allSeries = [];
-            seriesKeys.forEach(key => {
+            waterfallSortedKeys.forEach(key => {
                 const data = allSeriesData[key];
                 if (!data) return;
-                const color = getSeries(key)?.color || '#3b82f6';
+                const pair = colorPairsMap[key];
+                const color = pair ? pair.up : '#3b82f6';
+
                 allSeries.push({
                     name: key,
                     type: 'custom',
@@ -6076,7 +6105,7 @@
                     encode: {x: 0, y: [1, 2]},
                     label: {show: false},
                     z: 2,
-                    itemStyle: {color}
+                    itemStyle: {color: color}
                 });
                 allSeries.push({
                     name: key,
@@ -6085,8 +6114,8 @@
                     smooth: true,
                     symbol: 'circle',
                     symbolSize: 8,
-                    lineStyle: {color, width: 2.5},
-                    itemStyle: {color},
+                    lineStyle: {color: color, width: 2.5},
+                    itemStyle: {color: color},
                     z: 3,
                     label: {
                         show: waterfallShowLabels,
@@ -6099,18 +6128,19 @@
                 });
             });
 
-            // ★ 图例选择状态：使用 waterfallSelectedSet
+            // ★ 图例选择状态：使用 waterfallSelectedSet（已移到 renderItem 之前）
             const legendSelected = {};
             if (waterfallSelectedSet.size === 0) {
-                // 若没有选中任何系列，则默认全选（实际上会选中全部）
                 waterfallSortedKeys.forEach(key => legendSelected[key] = true);
             } else {
                 waterfallSortedKeys.forEach(key => legendSelected[key] = waterfallSelectedSet.has(key));
             }
-            // 确保至少有一个选中，若全为false则强制选中第一个
             if (!waterfallSortedKeys.some(key => legendSelected[key])) {
                 legendSelected[waterfallSortedKeys[0]] = true;
             }
+            // 计算当前选中的系列列表（用于分组）
+            const selectedKeys = waterfallSortedKeys.filter(k => legendSelected[k]);
+            const totalSelected = selectedKeys.length;
 
             const latestIdx2 = dates.length - 1;
             const latestChange = calcTotalChange(s.data[0], s.data[latestIdx2]);
