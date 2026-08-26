@@ -5549,7 +5549,7 @@
                 `校验完成: ${updatedCount} 只更新，${totalMatched} 条匹配`);
             lastUpdateTime.textContent = '校验于 ' + new Date().toLocaleTimeString();
         }
-        
+
 
         // ================================================================
         //  状态指示器
@@ -6052,20 +6052,21 @@
                 const coordStart = api.coord([xValue, startY]);
                 const coordEnd = api.coord([xValue, endY]);
                 if (!coordStart || !coordEnd) return null;
-                // 固定柱形宽度（像素），不随选中数量变化
+                // 固定柱形宽度
                 const isMobile = isMobileView();
                 const barWidth = isMobile ? 18 : 26;
                 const x = coordStart[0] - barWidth / 2;
                 const y = Math.min(coordStart[1], coordEnd[1]);
                 const height = Math.abs(coordStart[1] - coordEnd[1]);
-                // 使用系列自带颜色，并设透明度
-                const color = api.color();
+                // ★★★ 关键修复：从系列对象获取颜色，不依赖 api.color()
+                const s = getSeries(seriesName);
+                const color = s ? s.color : '#3b82f6';
                 const rect = {
                     type: 'rect',
                     shape: {x: x, y: y, width: barWidth, height: height},
                     style: {fill: color, stroke: color, lineWidth: 1, opacity: 0.8}
                 };
-                // 可选标签（仅显示终点值，位置根据涨跌调整）
+                // 可选标签
                 if (waterfallShowLabels) {
                     const isUp = endY >= startY;
                     rect.children = [{
@@ -6101,7 +6102,7 @@
                     encode: {x: 0, y: [1, 2]},
                     label: {show: false},
                     z: 2,
-                    itemStyle: {color: s.color}
+                    itemStyle: {color: getSeries(key).color}   // 使用当前系列颜色
                 });
                 allSeries.push({
                     name: key,
