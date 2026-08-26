@@ -6052,9 +6052,11 @@
                 const coordStart = api.coord([xValue, startY]);
                 const coordEnd = api.coord([xValue, endY]);
                 if (!coordStart || !coordEnd) return null;
-                // 固定柱形宽度
-                const isMobile = isMobileView();
-                const barWidth = isMobile ? 18 : 26;
+                // 动态计算柱形宽度，避免相邻重叠
+                const categoryWidth = api.size([1, 0])[0]; // X轴上一个类别的像素宽度
+                const maxWidth = isMobileView() ? 18 : 26;
+                // 取间距的70%与最大宽度的较小值，确保不重叠
+                const barWidth = Math.min(maxWidth, categoryWidth * 0.7);
                 const x = coordStart[0] - barWidth / 2;
                 const y = Math.min(coordStart[1], coordEnd[1]);
                 const height = Math.abs(coordStart[1] - coordEnd[1]);
