@@ -5402,20 +5402,28 @@
                 return;
             }
             const startDate = dates[0];
-            const endDate = dates[dates.length - 1];
+            // ★ 以「今天」和 dates[] 最新日期中的较大者作为 endDate，
+            //   保证能拉到最新的交易日（即使本地 dates[] 落后）
+            const todayStr0 = getTodayStr();
+            const lastLocal = dates[dates.length - 1];
+            const endDate = (lastLocal && lastLocal > todayStr0) ? lastLocal : todayStr0;
             const dayDiff = Math.ceil((new Date(endDate) - new Date(startDate)) / (1000 * 60 * 60 * 24)) + 20;
             const count = Math.min(Math.max(dayDiff, 50), 500);
-            let updatedCount = 0;
-            let totalMatched = 0;
             const errors = [];
             setStatus('loading', `历史校验中 (${names.length} 只)...`);
+
+            // ════════════════════════════════════════════════════════
+            //  阶段一：拉取所有 K 线数据，缓存在内存，不直接改 s.data
+            // ════════════════════════════════════════════════════════
+            const klineMap = {};             // seriesName -> { date: {close, high, low} }
+            const allKlineDates = new Set();  // 所有返回过的交易日
 
             for (const name of names) {
                 const code = codeMap[name];
                 const s = getSeries(name);
                 if (!s) continue;
 
-                // 格式化代码（只执行一次）
+                // 代码格式化（保持原逻辑）
                 let formattedCode = formatStockCode(code);
                 if (/^\d{5,6}$/.test(formattedCode)) {
                     formattedCode = formattedCode.startsWith('6') ? 'sh' + formattedCode : 'sz' + formattedCode;
@@ -5428,7 +5436,6 @@
                 }
                 console.log(`[${name}] 原始代码: ${code} → 格式化: ${formattedCode}`);
 
-                // ★ 使用新接口
                 const url = `https://web.ifzq.gtimg.cn/appstock/app/newfqkline/get?_var=kline_dayqfq&param=${formattedCode},day,${startDate},${endDate},${count},qfq`;
                 console.log(`[${name}] 请求URL: ${url}`);
 
@@ -5440,7 +5447,6 @@
                     if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
                     const rawText = await response.text();
-                    // 兼容 var xxx= / kline_dayqfq= 等 JSONP 前缀，从第一个 { 开始截取
                     const jsonMatch = rawText.match(/=\s*(\{[\s\S]*\})\s*;?\s*$/);
                     const jsonText = jsonMatch ? jsonMatch[1] : rawText.replace(/^[^{]*/, '');
                     const json = JSON.parse(jsonText);
@@ -5448,9 +5454,7 @@
                     if (json.code !== 0) {
                         throw new Error(`接口返回错误码: ${json.code}, 消息: ${json.msg || '未知'}`);
                     }
-                    console.log(`[${name}] data 键:`, Object.keys(json.data || {}), '子字段:', Object.keys(json.data?.[formattedCode] || {}));
-                    
-                    // 数据路径: 优先 qfqday（前复权），回退到 day（不复权）
+
                     let klineData = null;
                     const dataKey = formattedCode;
                     const node = json?.data?.[dataKey];
@@ -5472,9 +5476,8 @@
                         s.updateStatus = 'error';
                         continue;
                     }
-                    console.log(`[${name}] 获取到 ${klineData.length} 条K线数据`);
 
-                    // ★ 腾讯K线字段索引：日期[0] 开盘[1] 收盘[2] 最高[3] 最低[4] 成交量[5]
+                    // 字段索引：日期[0] 开盘[1] 收盘[2] 最高[3] 最低[4] 成交量[5]
                     const dataMap = {};
                     klineData.forEach(row => {
                         if (row && row.length >= 5) {
@@ -5488,39 +5491,14 @@
                         }
                     });
 
-                    const dateKeys = Object.keys(dataMap);
-                    console.log(`[${name}] 可匹配的日期范围: ${dateKeys[0] || '无'} ~ ${dateKeys[dateKeys.length - 1] || '无'}`);
-
-                    let matched = 0;
-                    for (let i = 0; i < dates.length; i++) {
-                        const d = dates[i];
-                        if (dataMap[d]) {
-                            s.data[i] = dataMap[d].close;
-                            if (!s.highData) s.highData = new Array(dates.length).fill(0);
-                            if (!s.lowData) s.lowData = new Array(dates.length).fill(0);
-                            s.highData[i] = dataMap[d].high;
-                            s.lowData[i] = dataMap[d].low;
-                            matched++;
-                            totalMatched++;
-                            updateLinkedCells(name, dates[i]);
+                    klineMap[name] = dataMap;
+                    Object.keys(dataMap).forEach(d => {
+                        // 只收集在 [startDate, endDate] 区间内的交易日
+                        if (d >= startDate && d <= endDate) {
+                            allKlineDates.add(d);
                         }
-                    }
-
-                    if (matched > 0) {
-                        updatedCount++;
-                        s.updateStatus = 'success';
-                        console.log(`[${name}] ✅ 更新了 ${matched} 条历史数据`);
-                    } else {
-                        s.updateStatus = 'error';
-                        const firstKlineDate = dateKeys[0];
-                        const lastKlineDate = dateKeys[dateKeys.length - 1];
-                        if (firstKlineDate && lastKlineDate) {
-                            console.warn(`[${name}] 你的日期 (${dates[0]} ~ ${dates[dates.length - 1]}) 不在K线范围 (${firstKlineDate} ~ ${lastKlineDate}) 内`);
-                            errors.push(`${name}: 日期范围不匹配 (K线: ${firstKlineDate} ~ ${lastKlineDate})`);
-                        } else {
-                            errors.push(`${name}: 无匹配数据`);
-                        }
-                    }
+                    });
+                    console.log(`[${name}] 获取到 ${Object.keys(dataMap).length} 条K线数据，累计交易日 ${allKlineDates.size} 个`);
                 } catch (err) {
                     console.error(`[${name}] 获取历史数据失败:`, err);
                     errors.push(`${name}: ${err.message || '网络错误'}`);
@@ -5528,7 +5506,119 @@
                 }
             }
 
-            // ★ 修复“飘小仙”数据
+            // ════════════════════════════════════════════════════════
+            //  阶段二：把 K 线里有、dates[] 里没有的交易日补进来
+            // ════════════════════════════════════════════════════════
+            const existingSet = new Set(dates);
+            const missingDates = [];
+            allKlineDates.forEach(d => {
+                if (!existingSet.has(d)) missingDates.push(d);
+            });
+
+            let addedDateCount = 0;
+            let addedListStr = '';
+            if (missingDates.length > 0) {
+                // 备份旧数据（按日期索引）
+                const oldDataBySeries = {};
+                seriesList.forEach(s => {
+                    const oldMap = {};
+                    dates.forEach((d, i) => {
+                        oldMap[d] = {
+                            v: s.data[i],
+                            h: (s.highData && s.highData[i]) || 0,
+                            l: (s.lowData && s.lowData[i]) || 0
+                        };
+                    });
+                    oldDataBySeries[s.name] = oldMap;
+                });
+
+                const newDates = [...dates, ...missingDates].sort();
+                addedDateCount = missingDates.length;
+                addedListStr = missingDates.slice().sort().join(', ');
+
+                seriesList.forEach(s => {
+                    const oldMap = oldDataBySeries[s.name] || {};
+                    const kline = klineMap[s.name] || {};
+
+                    const newData = [];
+                    const newHigh = [];
+                    const newLow = [];
+
+                    // 初始前值：用原始第一日的值兜底
+                    let lastKnown = {
+                        v: (s.data && s.data[0] !== undefined) ? s.data[0] : 1,
+                        h: (s.highData && s.highData[0]) || 0,
+                        l: (s.lowData && s.lowData[0]) || 0
+                    };
+
+                    newDates.forEach(d => {
+                        if (oldMap[d] !== undefined) {
+                            // 已有日期 → 保留原值（阶段三再被 K 线覆盖）
+                            newData.push(oldMap[d].v);
+                            newHigh.push(oldMap[d].h);
+                            newLow.push(oldMap[d].l);
+                            lastKnown = {v: oldMap[d].v, h: oldMap[d].h, l: oldMap[d].l};
+                        } else if (kline[d]) {
+                            // 新增日期且 K 线有 → 用 K 线值
+                            newData.push(kline[d].close);
+                            newHigh.push(kline[d].high);
+                            newLow.push(kline[d].low);
+                            lastKnown = {v: kline[d].close, h: kline[d].high, l: kline[d].low};
+                        } else {
+                            // 新增日期且 K 线没有 → 用前一交易日的值（停牌/无数据）
+                            newData.push(lastKnown.v);
+                            newHigh.push(lastKnown.h);
+                            newLow.push(lastKnown.l);
+                        }
+                    });
+
+                    s.data = newData;
+                    s.highData = newHigh;
+                    s.lowData = newLow;
+                });
+
+                dates = newDates;
+                console.log(`✅ 已补充 ${addedDateCount} 个交易日: ${addedListStr}`);
+            }
+
+            // ════════════════════════════════════════════════════════
+            //  阶段三：用 K 线数据刷新所有日期（覆盖手工录入值）
+            // ════════════════════════════════════════════════════════
+            let updatedCount = 0;
+            let totalMatched = 0;
+
+            for (const name of names) {
+                const s = getSeries(name);
+                if (!s) continue;
+                const dataMap = klineMap[name];
+                if (!dataMap) continue;
+
+                if (!s.highData) s.highData = new Array(dates.length).fill(0);
+                if (!s.lowData) s.lowData = new Array(dates.length).fill(0);
+
+                let matched = 0;
+                for (let i = 0; i < dates.length; i++) {
+                    const d = dates[i];
+                    if (dataMap[d]) {
+                        s.data[i] = dataMap[d].close;
+                        s.highData[i] = dataMap[d].high;
+                        s.lowData[i] = dataMap[d].low;
+                        matched++;
+                        totalMatched++;
+                    }
+                }
+
+                if (matched > 0) {
+                    updatedCount++;
+                    s.updateStatus = 'success';
+                    console.log(`[${name}] ✅ 更新了 ${matched} 条历史数据`);
+                } else {
+                    s.updateStatus = 'error';
+                    errors.push(`${name}: 无匹配数据`);
+                }
+            }
+
+            // 修复“飘小仙”数据（永远为 1）
             const px = getSeries('飘小仙');
             if (px) {px.data = px.data.map(() => 1);}
 
@@ -5538,11 +5628,14 @@
             saveState();
 
             let msg = `📊 历史校验完成\n\n`;
+            if (addedDateCount > 0) {
+                msg += `🆕 补充交易日: ${addedDateCount} 个\n  ${addedListStr}\n\n`;
+            }
             msg += `✅ 更新: ${updatedCount} 只股票，共 ${totalMatched} 条数据\n`;
             if (errors.length > 0) {
                 msg += `\n⚠️ 失败详情:\n${errors.map(e => `  • ${e}`).join('\n')}`;
             }
-            if (updatedCount === 0) {
+            if (updatedCount === 0 && addedDateCount === 0) {
                 msg += `\n\n💡 建议:\n`;
                 msg += `1. 检查股票代码是否正确（如 sh000001、usNVDA）\n`;
                 msg += `2. 检查日期是否为交易日（周末/节假日无数据）\n`;
@@ -5550,7 +5643,7 @@
             }
             alert(msg);
             setStatus(updatedCount > 0 ? 'success' : 'error',
-                `校验完成: ${updatedCount} 只更新，${totalMatched} 条匹配`);
+                `校验完成: ${updatedCount} 只更新，${totalMatched} 条匹配${addedDateCount > 0 ? `，新增 ${addedDateCount} 日` : ''}`);
             lastUpdateTime.textContent = '校验于 ' + new Date().toLocaleTimeString();
         }
 
