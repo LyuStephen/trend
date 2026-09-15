@@ -5440,25 +5440,29 @@
                     if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
                     const rawText = await response.text();
-                    // 去除 JSONP 回调前缀 "kline_dayqfq="
-                    const jsonText = rawText.replace(/^[^=]*=/, '');
+                    // 兼容 var xxx= / kline_dayqfq= 等 JSONP 前缀，从第一个 { 开始截取
+                    const jsonMatch = rawText.match(/=\s*(\{[\s\S]*\})\s*;?\s*$/);
+                    const jsonText = jsonMatch ? jsonMatch[1] : rawText.replace(/^[^{]*/, '');
                     const json = JSON.parse(jsonText);
 
                     if (json.code !== 0) {
                         throw new Error(`接口返回错误码: ${json.code}, 消息: ${json.msg || '未知'}`);
                     }
-
-                    // 数据路径: data[code].day
+                    console.log(`[${name}] data 键:`, Object.keys(json.data || {}), '子字段:', Object.keys(json.data?.[formattedCode] || {}));
+                    
+                    // 数据路径: 优先 qfqday（前复权），回退到 day（不复权）
                     let klineData = null;
                     const dataKey = formattedCode;
-                    if (json?.data?.[dataKey]?.day) {
-                        klineData = json.data[dataKey].day;
+                    const node = json?.data?.[dataKey];
+                    if (node?.qfqday && Array.isArray(node.qfqday)) {
+                        klineData = node.qfqday;
+                    } else if (node?.day && Array.isArray(node.day)) {
+                        klineData = node.day;
                     } else {
                         for (const key of Object.keys(json.data || {})) {
-                            if (json.data[key]?.day && Array.isArray(json.data[key].day)) {
-                                klineData = json.data[key].day;
-                                break;
-                            }
+                            const n = json.data[key];
+                            if (n?.qfqday && Array.isArray(n.qfqday)) {klineData = n.qfqday; break;}
+                            if (n?.day && Array.isArray(n.day)) {klineData = n.day; break;}
                         }
                     }
 
@@ -5470,14 +5474,14 @@
                     }
                     console.log(`[${name}] 获取到 ${klineData.length} 条K线数据`);
 
-                    // ★ 新接口字段索引：日期[0], 最高[2], 最低[3], 收盘[4]
+                    // ★ 腾讯K线字段索引：日期[0] 开盘[1] 收盘[2] 最高[3] 最低[4] 成交量[5]
                     const dataMap = {};
                     klineData.forEach(row => {
                         if (row && row.length >= 5) {
                             const dateStr = row[0];
-                            const close = parseFloat(row[4]);
-                            const high = parseFloat(row[2]);
-                            const low = parseFloat(row[3]);
+                            const close = parseFloat(row[2]);
+                            const high = parseFloat(row[3]);
+                            const low = parseFloat(row[4]);
                             if (dateStr && !isNaN(close) && !isNaN(high) && !isNaN(low) && close > 0) {
                                 dataMap[dateStr] = {close, high, low};
                             }
