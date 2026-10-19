@@ -2587,7 +2587,8 @@
             '上证': [4106.25, 4110.77, 4120.22, 4027.26, 4073.9, 4094.4, 4112.45],
             '长安汽车': [7.27, 7.02, 7.03, 6.86, 7.23, 7.17, 7.19],
             '中国铁建': [6.3, 6.23, 6.14, 6.02, 6.04, 5.95, 6.05],
-            '飘小仙': [1, 1, 1, 1, 1, 1, 1]
+            '飘小仙': [1, 1, 1, 1, 1, 1, 1],
+            '年化1%': [1, 1.00013368, 1.00026738, 1.00040110, 1.00080235, 1.00093614, 1.00106995]
         };
         let seriesColors = {
             '英伟达': '#288500',
@@ -2599,7 +2600,8 @@
             '上证': '#3be1f7',
             '长安汽车': '#e6740a',
             '中国铁建': '#f50aab',
-            '飘小仙': '#ef4444'
+            '飘小仙': '#ef4444',
+            '年化1%': '#0ea5e9'
         };
         let seriesRemarks = {
             '英伟达': '不去科技半导体没有明天',
@@ -2611,7 +2613,8 @@
             '上证': '缅A',
             '长安汽车': '长安改名以后叫长套',
             '中国铁建': '我在中国铁建死扛',
-            '飘小仙': '有没有可能最终我因一分没投荣获本群投资大赛的第1名'
+            '飘小仙': '有没有可能最终我因一分没投荣获本群投资大赛的第1名',
+            '年化1%': '年化1%无风险收益基准线'
         };
         let seriesCodes = {
             '英伟达': 'usNVDA',
@@ -2623,7 +2626,8 @@
             '上证': 'SH000001',
             '长安汽车': 'sz000625',
             '中国铁建': 'sh601186',
-            '飘小仙': ''
+            '飘小仙': '',
+            '年化1%': ''
         };
 
         let dates = [...initialDates];
@@ -3044,12 +3048,42 @@
             return ((curr - prev) / prev) * 100;
         }
 
+        // ★★★ 年化收益基准指标配置 ★★★
+        const ANNUAL_RATE = 0.01;            // 年化收益率：0.05 = 5%，改这里即可
+        const ANNUAL_SERIES_PREFIX = '年化'; // 名称以此开头的系列会被自动重算
+
+        function isAnnualSeries(name) {
+            return typeof name === 'string' && name.indexOf(ANNUAL_SERIES_PREFIX) === 0;
+        }
+
+        // 以 dates[0]（初试日期，即 6 月 23 日）为基准 1，按年化复利生成数值
+        function calcAnnualSeries(datesArr, rate) {
+            if (!datesArr || datesArr.length === 0) return [];
+            const baseTime = new Date(datesArr[0]).getTime();
+            return datesArr.map(function (d) {
+                const t = new Date(d).getTime();
+                if (isNaN(t) || isNaN(baseTime)) return 1;
+                const days = (t - baseTime) / 86400000;
+                return Math.pow(1 + rate, days / 365);
+            });
+        }
+
+        // 重算所有“年化”系列，使其与当前 dates 严格对齐
+        function refreshAnnualSeries() {
+            seriesList.forEach(function (s) {
+                if (isAnnualSeries(s.name)) {
+                    s.data = calcAnnualSeries(dates, ANNUAL_RATE);
+                }
+            });
+        }
+
         function alignDataLengths() {
             const len = dates.length;
             seriesList.forEach(s => {
                 while (s.data.length < len) s.data.push(s.data[0] || 1);
                 while (s.data.length > len) s.data.pop();
             });
+            refreshAnnualSeries();
         }
 
         function getLatestIdx() {return dates.length - 1;}
@@ -4369,6 +4403,7 @@
         //  渲染表格
         // ================================================================
         function renderTables() {
+            refreshAnnualSeries();
             function renderHead(dateCols) {
                 let html = `<tr><th style="text-align:left; padding-left:8px;">📊 指标</th>`;
                 dateCols.forEach(dateStr => {
@@ -7029,7 +7064,8 @@
                 '上证': [4106.25, 4110.77, 4120.22, 4027.26, 4073.9, 4094.4, 4112.45],
                 '长安汽车': [7.27, 7.02, 7.03, 6.86, 7.23, 7.17, 7.19],
                 '中国铁建': [6.3, 6.23, 6.14, 6.02, 6.04, 5.95, 6.05],
-                '飘小仙': [1, 1, 1, 1, 1, 1, 1]
+                '飘小仙': [1, 1, 1, 1, 1, 1, 1],
+                '年化1%': [1, 1.00013368, 1.00026738, 1.00040110, 1.00080235, 1.00093614, 1.00106995]
             };
             const defaultColors = {
                 '英伟达': '#288500',
@@ -7041,7 +7077,8 @@
                 '上证': '#3be1f7',
                 '长安汽车': '#e6740a',
                 '中国铁建': '#f50aab',
-                '飘小仙': '#ef4444'
+                '飘小仙': '#ef4444',
+                '年化1%': '#0ea5e9'
             };
             const defaultRemarks = {
                 '英伟达': '不去科技半导体没有明天',
@@ -7053,7 +7090,8 @@
                 '上证': '缅A',
                 '长安汽车': '长安改名以后叫长套',
                 '中国铁建': '我在中国铁建死扛',
-                '飘小仙': '有没有可能最终我因一分没投荣获本群投资大赛的第1名'
+                '飘小仙': '有没有可能最终我因一分没投荣获本群投资大赛的第1名',
+                '年化1%': '年化1%无风险收益基准线'
             };
             const defaultCodes = {
                 '英伟达': 'usNVDA',
@@ -7065,7 +7103,8 @@
                 '上证': 'SH000001',
                 '长安汽车': 'sz000625',
                 '中国铁建': 'sh601186',
-                '飘小仙': ''
+                '飘小仙': '',
+                '年化1%': ''
             };
             seriesList = Object.keys(defaultSeriesData).map(name => {
                 const remark = defaultRemarks[name] || '';
