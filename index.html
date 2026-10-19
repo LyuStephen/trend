@@ -5848,25 +5848,26 @@
                     const currVal = s.data[idx];
                     change = calcDailyChange(prevVal, currVal);
                 }
-                let highChange = 0,
-                    lowChange = 0;
-                if (prevIdx >= 0) {
-                    const prevClose = s.data[prevIdx];
-                    const currHigh = (s.highData && s.highData[idx] !== undefined) ? s.highData[idx] : 0;
-                    const currLow = (s.lowData && s.lowData[idx] !== undefined) ? s.lowData[idx] : 0;
-                    highChange = (prevClose !== 0) ? ((currHigh - prevClose) / prevClose) * 100 : 0;
-                    lowChange = (prevClose !== 0) ? ((currLow - prevClose) / prevClose) * 100 : 0;
-                }
                 let price = s.data[idx] || 0;
                 let high = (s.highData && s.highData[idx] !== undefined) ? s.highData[idx] : 0;
                 let low = (s.lowData && s.lowData[idx] !== undefined) ? s.lowData[idx] : 0;
                 if (key === '飘小仙') {
+                    // 飘小仙恒为 1，无涨跌
                     change = 0;
-                    highChange = 0;
-                    lowChange = 0;
                     price = 1;
                     high = 1;
                     low = 1;
+                } else if (isAnnualSeries(key) && price > 0) {
+                    // 年化系列无盘中高低，用当日收盘价填充（参考飘小仙）
+                    if (!(high > 0)) high = price;
+                    if (!(low > 0)) low = price;
+                }
+                let highChange = 0,
+                    lowChange = 0;
+                if (prevIdx >= 0) {
+                    const prevClose = s.data[prevIdx];
+                    highChange = (prevClose !== 0) ? ((high - prevClose) / prevClose) * 100 : 0;
+                    lowChange = (prevClose !== 0) ? ((low - prevClose) / prevClose) * 100 : 0;
                 }
                 items.push({
                     name: key,
@@ -6945,25 +6946,26 @@
                     const currVal = s.data[idx];
                     change = calcDailyChange(prevVal, currVal);
                 }
-                let highChange = 0,
-                    lowChange = 0;
-                if (prevIdx >= 0) {
-                    const prevClose = s.data[prevIdx];
-                    const currHigh = (s.highData && s.highData[idx] !== undefined) ? s.highData[idx] : 0;
-                    const currLow = (s.lowData && s.lowData[idx] !== undefined) ? s.lowData[idx] : 0;
-                    highChange = (prevClose !== 0) ? ((currHigh - prevClose) / prevClose) * 100 : 0;
-                    lowChange = (prevClose !== 0) ? ((currLow - prevClose) / prevClose) * 100 : 0;
-                }
                 let price = s.data[idx] || 0;
                 let high = (s.highData && s.highData[idx] !== undefined) ? s.highData[idx] : 0;
                 let low = (s.lowData && s.lowData[idx] !== undefined) ? s.lowData[idx] : 0;
                 if (key === '飘小仙') {
+                    // 飘小仙恒为 1，无涨跌
                     change = 0;
-                    highChange = 0;
-                    lowChange = 0;
                     price = 1;
                     high = 1;
                     low = 1;
+                } else if (isAnnualSeries(key) && price > 0) {
+                    // 年化系列无盘中高低，用当日收盘价填充（参考飘小仙）
+                    if (!(high > 0)) high = price;
+                    if (!(low > 0)) low = price;
+                }
+                let highChange = 0,
+                    lowChange = 0;
+                if (prevIdx >= 0) {
+                    const prevClose = s.data[prevIdx];
+                    highChange = (prevClose !== 0) ? ((high - prevClose) / prevClose) * 100 : 0;
+                    lowChange = (prevClose !== 0) ? ((low - prevClose) / prevClose) * 100 : 0;
                 }
                 items.push({
                     name: key,
