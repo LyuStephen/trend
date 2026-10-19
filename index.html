@@ -4752,6 +4752,8 @@
             }
             const totalDays = dates.length;
             const tradingDays = Math.max(0, totalDays - 1);
+            const latestIdx = dates.length - 1;
+            const INITIAL_CAPITAL = 1000000; // 期初本金 100 万
 
             const positiveDays = {};
             const negativeDays = {};
@@ -4810,6 +4812,7 @@
             const modeLabel = isPercent ? '（%）' : '（天数）';
             let headHtml = `<tr>
                 <th style="text-align:left; padding-left:8px;">📊 指标</th>
+                <th style="text-align:center;">💰 当前资产（100万本金）</th>
                 <th style="text-align:center;">🏆 登顶 ${modeLabel}</th>
                 <th style="text-align:center;">📈 收益为正 ${modeLabel}</th>
                 <th style="text-align:center;">📉 收益为负 ${modeLabel}</th>
@@ -4835,10 +4838,26 @@
                 const negCount = negativeDays[key] || 0;
                 const beatCount = beatSHCount[key] || 0;
 
+                // 💰 当前资产 = 期初本金 × (1 + 总变化率)
+                let assets = INITIAL_CAPITAL;
+                if (latestIdx >= 0 && s.data && s.data[0] !== undefined && s.data[latestIdx] !== undefined) {
+                    const base = s.data[0];
+                    const latestVal = s.data[latestIdx];
+                    const totalChangePct = calcTotalChange(base, latestVal);
+                    assets = INITIAL_CAPITAL * (1 + totalChangePct / 100);
+                }
+                const assetsStr = isFinite(assets)
+                    ? assets.toLocaleString('zh-CN', {minimumFractionDigits: 2, maximumFractionDigits: 2})
+                    : '—';
+                const assetsColor = assets > INITIAL_CAPITAL
+                    ? '#dc2626'
+                    : (assets < INITIAL_CAPITAL ? '#16a34a' : 'var(--text-secondary)');
+
                 bodyHtml += `<tr>
                     <td style="text-align:left; padding-left:8px; font-weight:600;">
                         <span class="color-dot" style="background:${color};"></span> ${key}
                     </td>
+                    <td style="text-align:center; font-weight:600; color:${assetsColor}; font-variant-numeric:tabular-nums;">${assetsStr}</td>
                     <td style="text-align:center; font-weight:600; color:#f59e0b;">${formatValue(firstCount, tradingDays)}</td>
                     <td style="text-align:center; font-weight:600; color:#16a34a;">${formatValue(posCount, tradingDays)}</td>
                     <td style="text-align:center; font-weight:600; color:#dc2626;">${formatValue(negCount, tradingDays)}</td>
