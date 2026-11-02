@@ -5421,6 +5421,21 @@
                         const q = findQuote(quotes, s.code);
                         s.highData[targetIdx] = (q && q.high) || price;
                         s.lowData[targetIdx] = (q && q.low) || price;
+                        // ★ 美股特殊处理：
+                        //   withUSBackShift 渲染时会把数组整体后移一位，
+                        //   当日图最终读到的是 highData[targetIdx - 1]。
+                        //   若该位置仍为 0（从未被 verifyHistoricalData 填充过），
+                        //   兜底逻辑会用 price 顶替 → high==low==price → 灰框宽度 0 不可见。
+                        //   这里把最新日的实时高/低同步写一份到前一日，保证灰框可见。
+                        //   若该位置已有真实历史数据（> 0），保留不动，避免污染。
+                        if (isUSSeries(s) && targetIdx > 0) {
+                            if (!(s.highData[targetIdx - 1] > 0)) {
+                                s.highData[targetIdx - 1] = (q && q.high) || price;
+                            }
+                            if (!(s.lowData[targetIdx - 1] > 0)) {
+                                s.lowData[targetIdx - 1] = (q && q.low) || price;
+                            }
+                        }
                         updateLinkedCells(name, targetDate);
                         updatedCount++;
                         s.updateStatus = 'success';
