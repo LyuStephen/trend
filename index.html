@@ -5755,7 +5755,7 @@
                 if (!s.highData) s.highData = new Array(dates.length).fill(0);
                 if (!s.lowData) s.lowData = new Array(dates.length).fill(0);
 
-                
+
 
                 let matched = 0;
                 for (let i = 0; i < dates.length; i++) {
@@ -5974,8 +5974,9 @@
                     price = 1;
                     high = 1;
                     low = 1;
-                } else if (isAnnualSeries(key) && price > 0) {
-                    // 年化系列无盘中高低，用当日收盘价填充（参考飘小仙）
+                } else if (price > 0) {
+                    // ★ 所有普通股票：若无 high/low 数据，用当日收盘价兜底，
+                    // 防止计算出 -100% 导致 X 轴崩溃或图表偏移
                     if (!(high > 0)) high = price;
                     if (!(low > 0)) low = price;
                 }
@@ -7158,8 +7159,8 @@
                     price = 1;
                     high = 1;
                     low = 1;
-                } else if (isAnnualSeries(key) && price > 0) {
-                    // 年化系列无盘中高低，用当日收盘价填充（参考飘小仙）
+                } else if (price > 0) {
+                    // ★ 所有普通股票：若无 high/low 数据，用当日收盘价兜底
                     if (!(high > 0)) high = price;
                     if (!(low > 0)) low = price;
                 }
