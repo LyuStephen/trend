@@ -5755,8 +5755,7 @@
                 if (!s.highData) s.highData = new Array(dates.length).fill(0);
                 if (!s.lowData) s.lowData = new Array(dates.length).fill(0);
 
-                // ★ 统一调用 isUSSeries，后续新增美股自动生效
-                const isUS = isUSSeries(s);
+                
 
                 let matched = 0;
                 for (let i = 0; i < dates.length; i++) {
@@ -5767,9 +5766,9 @@
                         s.lowData[i] = dataMap[d].low;
                         matched++;
                         totalMatched++;
-                    } else if (isUS && i > 0) {
-                        // ★ 美股休市日：K 线无数据时沿用前一个有效值，
-                        //   避免保留新增指标时的初始值 1
+                    } else if (i > 0) {
+                        // ★ 所有系列（A股/港股/美股）：K线无数据时沿用前一个有效值，
+                        //   覆盖中秋/国庆/港股佛诞/圣诞等休市日，避免保留初始值 1
                         s.data[i] = s.data[i - 1];
                         s.highData[i] = s.highData[i - 1];
                         s.lowData[i] = s.lowData[i - 1];
