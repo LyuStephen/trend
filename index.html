@@ -6468,12 +6468,21 @@
                             if (!s) return;
                             const data = allSeriesData[key];
                             if (!data) return;
+                            // ★ 美股：标注该柱子实际来自哪个交易日的数据
+                            let usNote = '';
+                            if (isUSSeries(s)) {
+                                if (idx === 0) {
+                                    usNote = ` <span style="color:#94a3b8;font-size:11px;">（美股首日无前值）</span>`;
+                                } else {
+                                    usNote = ` <span style="color:#94a3b8;font-size:11px;">（美股数据日：${dates[idx - 1]}）</span>`;
+                                }
+                            }
                             const start = data.baseData[idx];
                             const end = data.totalChanges[idx];
                             const dayChange = data.dayChanges[idx];
                             const color = s.color || '#3b82f6';
                             html += `<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${color};margin-right:4px;"></span>`;
-                            html += `${key}: 起点 ${start.toFixed(2)}% → 终点 ${end.toFixed(2)}% (日变化 ${dayChange.toFixed(2)}%)<br/>`;
+                            html += `${key}${usNote}: 起点 ${start.toFixed(2)}% → 终点 ${end.toFixed(2)}% (日变化 ${dayChange.toFixed(2)}%)<br/>`;
                         });
                         return html;
                     },
