@@ -2658,13 +2658,16 @@
         let trendLegendSelected = new Set();
         let ctrlPressed = false;
 
+        let shiftPressed = false;
         document.addEventListener('keydown', function (e) {
             if (e.ctrlKey || e.metaKey) ctrlPressed = true;
+            if (e.shiftKey) shiftPressed = true;
         });
         document.addEventListener('keyup', function (e) {
             if (!e.ctrlKey && !e.metaKey) ctrlPressed = false;
+            if (!e.shiftKey) shiftPressed = false;
         });
-        window.addEventListener('blur', function () {ctrlPressed = false;});
+        window.addEventListener('blur', function () {ctrlPressed = false; shiftPressed = false;});
 
         // DOM 引用
         const chartDom = document.getElementById('trendChart');
@@ -6606,14 +6609,29 @@
             myChart.setOption(option, true);
             myChart.resize();
 
-            // 图例交互事件（保持多选逻辑）
+            // 图例交互事件（Shift=反选 / Ctrl=多选 / 普通=仅显示该系列）
             myChart.off('legendselectchanged');
             myChart.on('legendselectchanged', function (params) {
                 if (legendChanging) return;
                 const name = params.name;
                 if (!name || !seriesKeys.includes(name)) return;
 
-                if (ctrlPressed) {
+                if (shiftPressed && waterfallSortedKeys.length > 1) {
+                    // Shift 反选：全部显示时点击 → 仅隐藏该系列；否则toggle该项
+                    if (waterfallSelectedSet.size === 0) {
+                        waterfallSortedKeys.forEach(k => {if (k !== name) waterfallSelectedSet.add(k);});
+                    } else {
+                        if (waterfallSelectedSet.has(name)) {
+                            waterfallSelectedSet.delete(name);
+                        } else {
+                            waterfallSelectedSet.add(name);
+                        }
+                        // 全部被选中 → 回到"全显示"（空集）
+                        if (waterfallSortedKeys.every(k => waterfallSelectedSet.has(k))) {
+                            waterfallSelectedSet.clear();
+                        }
+                    }
+                } else if (ctrlPressed) {
                     if (waterfallSelectedSet.has(name)) {
                         waterfallSelectedSet.delete(name);
                     } else {
@@ -6629,7 +6647,8 @@
                     }
                 }
 
-                if (waterfallSelectedSet.size === 0 && waterfallSortedKeys.length > 0) {
+                // 注意：Shift 反选过程中集合可能暂时为空（= 全显示），不强制加回第一个
+                if (waterfallSelectedSet.size === 0 && waterfallSortedKeys.length > 0 && !shiftPressed) {
                     waterfallSelectedSet.add(waterfallSortedKeys[0]);
                 }
 
@@ -6832,14 +6851,29 @@
             myChart.setOption(option, true);
             myChart.resize();
 
-            // 图例点击事件（保持原有交互）
+            // 图例点击事件（Shift=反选 / Ctrl=多选 / 普通=仅显示该系列）
             myChart.off('legendselectchanged');
             myChart.on('legendselectchanged', function (params) {
                 if (legendChanging) return;
                 if (viewMode !== 'trend') return;
                 const name = params.name;
                 if (!name) return;
-                if (ctrlPressed) {
+                if (shiftPressed && sortedKeys.length > 1) {
+                    // Shift 反选：全部显示时点击 → 仅隐藏该系列；否则toggle该项
+                    if (trendLegendSelected.size === 0) {
+                        sortedKeys.forEach(k => {if (k !== name) trendLegendSelected.add(k);});
+                    } else {
+                        if (trendLegendSelected.has(name)) {
+                            trendLegendSelected.delete(name);
+                        } else {
+                            trendLegendSelected.add(name);
+                        }
+                        // 全部被选中 → 回到"全显示"（空集）
+                        if (sortedKeys.every(k => trendLegendSelected.has(k))) {
+                            trendLegendSelected.clear();
+                        }
+                    }
+                } else if (ctrlPressed) {
                     if (trendLegendSelected.has(name)) {
                         trendLegendSelected.delete(name);
                     } else {
