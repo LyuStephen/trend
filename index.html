@@ -3121,6 +3121,18 @@
             return 'unknown';
         }
 
+        // ★ 统一判断“是否为美股系列”
+        //   - 代码以 US 开头（如 usNVDA、usAAPL）
+        //   - 或纯 1-5 位字母（如 NVDA、AAPL，与 formatStockCode 的规则一致）
+        //   后续新增任何美股，只要代码符合上述规则，无需再改后移名单
+        function isUSSeries(s) {
+            if (!s || !s.code) return false;
+            const c = s.code.trim().toUpperCase();
+            if (c.startsWith('US')) return true;
+            if (/^[A-Z]{1,5}$/.test(c)) return true;
+            return false;
+        }
+
         function getXueqiuLink(code) {
             if (!code) return '#';
             let c = code.trim().toUpperCase();
@@ -5685,6 +5697,9 @@
                 if (!s.highData) s.highData = new Array(dates.length).fill(0);
                 if (!s.lowData) s.lowData = new Array(dates.length).fill(0);
 
+                // ★ 统一调用 isUSSeries，后续新增美股自动生效
+                const isUS = isUSSeries(s);
+
                 let matched = 0;
                 for (let i = 0; i < dates.length; i++) {
                     const d = dates[i];
@@ -5694,6 +5709,12 @@
                         s.lowData[i] = dataMap[d].low;
                         matched++;
                         totalMatched++;
+                    } else if (isUS && i > 0) {
+                        // ★ 美股休市日：K 线无数据时沿用前一个有效值，
+                        //   避免保留新增指标时的初始值 1
+                        s.data[i] = s.data[i - 1];
+                        s.highData[i] = s.highData[i - 1];
+                        s.lowData[i] = s.lowData[i - 1];
                     }
                 }
 
@@ -5772,24 +5793,39 @@
             const latestIdx = dates.length - 1;
             const grid = myChart.getModel().getComponent('grid');
             if (!grid) return;
-            avatarPositions = [];
-            seriesKeys.forEach(key => {
-                const s = getSeries(key);
-                if (!s) return;
-                const base = s.data[0];
-                const latestVal = s.data[latestIdx];
-                const change = calcTotalChange(base, latestVal);
-                const coord = myChart.convertToPixel('grid', [latestIdx, change]);
-                if (coord && !isNaN(coord[0]) && !isNaN(coord[1])) {
-                    avatarPositions.push({
-                        seriesName: key,
-                        color: s.color,
-                        remark: s.remark || '',
-                        coord: coord,
-                        change: change
-                    });
+
+            // ★ 与 renderChart() 保持一致：临时后移美股，使悬停圆心与 markPoint 头像对齐
+            const usSeries = seriesList.filter(s => isUSSeries(s));
+            const usBackups = [];
+            usSeries.forEach(s => {
+                usBackups.push({series: s, data: s.data});
+                if (Array.isArray(s.data) && s.data.length > 1) {
+                    s.data = [s.data[0], ...s.data.slice(0, -1)];
                 }
             });
+
+            avatarPositions = [];
+            try {
+                seriesKeys.forEach(key => {
+                    const s = getSeries(key);
+                    if (!s) return;
+                    const base = s.data[0];
+                    const latestVal = s.data[latestIdx];
+                    const change = calcTotalChange(base, latestVal);
+                    const coord = myChart.convertToPixel('grid', [latestIdx, change]);
+                    if (coord && !isNaN(coord[0]) && !isNaN(coord[1])) {
+                        avatarPositions.push({
+                            seriesName: key,
+                            color: s.color,
+                            remark: s.remark || '',
+                            coord: coord,
+                            change: change
+                        });
+                    }
+                });
+            } finally {
+                usBackups.forEach(b => {b.series.data = b.data;});
+            }
         }
 
         function initCustomTooltip() {
@@ -6772,23 +6808,28 @@
         //  主渲染函数
         // ================================================================
         function renderChart() {
-            const nv = getSeries('英伟达');
-            const nvBackup = nv ? {
-                data: nv.data,
-                highData: nv.highData,
-                lowData: nv.lowData
-            } : null;
+            // ★ 自动识别所有美股，后续新增美股无需再维护名单
+            const usSeries = seriesList.filter(s => isUSSeries(s));
+            const usBackups = [];
 
-            // ★ 无侵入后移：仅在图表渲染期间，把英伟达数据整体后移一位
-            if (nv && Array.isArray(nv.data) && nv.data.length > 1) {
-                nv.data = [nv.data[0], ...nv.data.slice(0, -1)];
-                if (Array.isArray(nv.highData)) {
-                    nv.highData = [nv.highData[0], ...nv.highData.slice(0, -1)];
+            // ★ 无侵入后移：仅在图表渲染期间，把美股数据整体后移一位
+            usSeries.forEach(s => {
+                usBackups.push({
+                    series: s,
+                    data: s.data,
+                    highData: s.highData,
+                    lowData: s.lowData
+                });
+                if (Array.isArray(s.data) && s.data.length > 1) {
+                    s.data = [s.data[0], ...s.data.slice(0, -1)];
+                    if (Array.isArray(s.highData)) {
+                        s.highData = [s.highData[0], ...s.highData.slice(0, -1)];
+                    }
+                    if (Array.isArray(s.lowData)) {
+                        s.lowData = [s.lowData[0], ...s.lowData.slice(0, -1)];
+                    }
                 }
-                if (Array.isArray(nv.lowData)) {
-                    nv.lowData = [nv.lowData[0], ...nv.lowData.slice(0, -1)];
-                }
-            }
+            });
 
             try {
                 const currentMode = viewMode;
@@ -6802,11 +6843,11 @@
                 }
                 renderTrendChart();
             } finally {
-                if (nv && nvBackup) {
-                    nv.data = nvBackup.data;
-                    nv.highData = nvBackup.highData;
-                    nv.lowData = nvBackup.lowData;
-                }
+                usBackups.forEach(b => {
+                    b.series.data = b.data;
+                    b.series.highData = b.highData;
+                    b.series.lowData = b.lowData;
+                });
             }
 
             setTimeout(() => {resetDanmaku();}, 100);
