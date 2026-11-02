@@ -5794,18 +5794,9 @@
             const grid = myChart.getModel().getComponent('grid');
             if (!grid) return;
 
-            // ★ 与 renderChart() 保持一致：临时后移美股，使悬停圆心与 markPoint 头像对齐
-            const usSeries = seriesList.filter(s => isUSSeries(s));
-            const usBackups = [];
-            usSeries.forEach(s => {
-                usBackups.push({series: s, data: s.data});
-                if (Array.isArray(s.data) && s.data.length > 1) {
-                    s.data = [s.data[0], ...s.data.slice(0, -1)];
-                }
-            });
-
+            // ★ 复用 withUSBackShift，使悬停圆心与 markPoint 头像始终对齐
             avatarPositions = [];
-            try {
+            withUSBackShift(() => {
                 seriesKeys.forEach(key => {
                     const s = getSeries(key);
                     if (!s) return;
@@ -5823,9 +5814,7 @@
                         });
                     }
                 });
-            } finally {
-                usBackups.forEach(b => {b.series.data = b.data;});
-            }
+            });
         }
 
         function initCustomTooltip() {
@@ -6594,7 +6583,7 @@
                 }
 
                 legendChanging = true;
-                renderWaterfall();
+                renderChart();
                 legendChanging = false;
                 saveState();
             });
@@ -6603,7 +6592,7 @@
             myChart.on('click', function (params) {
                 if (params.componentType === 'series' && params.seriesType === 'custom') {
                     waterfallShowLabels = !waterfallShowLabels;
-                    renderWaterfall();
+                    renderChart();
                 }
             });
             setTimeout(() => {resetDanmaku();}, 100);
@@ -6816,12 +6805,11 @@
         // ================================================================
         //  主渲染函数
         // ================================================================
-        function renderChart() {
-            // ★ 自动识别所有美股，后续新增美股无需再维护名单
+        // ★ 统一封装“美股临时后移 → 执行渲染 → 恢复原始数据”
+        //   所有渲染入口都应通过 renderChart()，避免某处漏掉后移
+        function withUSBackShift(fn) {
             const usSeries = seriesList.filter(s => isUSSeries(s));
             const usBackups = [];
-
-            // ★ 无侵入后移：仅在图表渲染期间，把美股数据整体后移一位
             usSeries.forEach(s => {
                 usBackups.push({
                     series: s,
@@ -6839,8 +6827,19 @@
                     }
                 }
             });
-
             try {
+                return fn();
+            } finally {
+                usBackups.forEach(b => {
+                    b.series.data = b.data;
+                    b.series.highData = b.highData;
+                    b.series.lowData = b.lowData;
+                });
+            }
+        }
+
+        function renderChart() {
+            withUSBackShift(() => {
                 const currentMode = viewMode;
                 if (currentMode === 'waterfall') {
                     renderWaterfall();
@@ -6851,13 +6850,7 @@
                     return;
                 }
                 renderTrendChart();
-            } finally {
-                usBackups.forEach(b => {
-                    b.series.data = b.data;
-                    b.series.highData = b.highData;
-                    b.series.lowData = b.lowData;
-                });
-            }
+            });
 
             setTimeout(() => {resetDanmaku();}, 100);
         }
