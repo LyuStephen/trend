@@ -5488,9 +5488,20 @@
                 if (/^\d{5}$/.test(formattedCode) && !formattedCode.startsWith('hk')) {
                     formattedCode = 'hk' + formattedCode;
                 }
-                console.log(`[${name}] 原始代码: ${code} → 格式化: ${formattedCode}`);
 
-                const url = `https://web.ifzq.gtimg.cn/appstock/app/newfqkline/get?_var=kline_dayqfq&param=${formattedCode},day,${startDate},${endDate},${count},qfq`;
+                // ★ 新增：腾讯 K 线接口对美股需要交易所后缀
+                let klineCode = formattedCode;
+                if (formattedCode.startsWith('us')) {
+                    const usKlineCodeMap = {
+                        'usNVDA': 'usNVDA.OQ' // 英伟达，NASDAQ
+                    };
+                    // 其他美股默认尝试 .OQ，如接口无数据可按控制台日志补映射
+                    klineCode = usKlineCodeMap[formattedCode] || (formattedCode + '.OQ');
+                }
+
+                console.log(`[${name}] 原始代码: ${code} → 实时/显示代码: ${formattedCode} → K线代码: ${klineCode}`);
+
+                const url = `https://web.ifzq.gtimg.cn/appstock/app/newfqkline/get?_var=kline_dayqfq&param=${klineCode},day,${startDate},${endDate},${count},qfq`;
                 console.log(`[${name}] 请求URL: ${url}`);
 
                 try {
@@ -5510,8 +5521,28 @@
                     }
 
                     let klineData = null;
-                    const dataKey = formattedCode;
-                    const node = json?.data?.[dataKey];
+                    const dataKey = klineCode;
+                    let node = json?.data?.[dataKey];
+
+                    // ★ 兼容腾讯返回 key 大小写、带/不带后缀的情况
+                    if (!node) {
+                        const baseKey = dataKey.replace(/\.[A-Z]+$/i, '');
+                        const candidates = [
+                            dataKey,
+                            dataKey.toLowerCase(),
+                            dataKey.toUpperCase(),
+                            baseKey,
+                            baseKey.toLowerCase(),
+                            baseKey.toUpperCase()
+                        ];
+                        for (const k of candidates) {
+                            if (json?.data?.[k]) {
+                                node = json.data[k];
+                                break;
+                            }
+                        }
+                    }
+
                     if (node?.qfqday && Array.isArray(node.qfqday)) {
                         klineData = node.qfqday;
                     } else if (node?.day && Array.isArray(node.day)) {
@@ -5546,12 +5577,16 @@
                     });
 
                     klineMap[name] = dataMap;
-                    Object.keys(dataMap).forEach(d => {
-                        // 只收集在 [startDate, endDate] 区间内的交易日
-                        if (d >= startDate && d <= endDate) {
-                            allKlineDates.add(d);
-                        }
-                    });
+
+                    // ★ 美股不参与全局 dates 扩充，避免把美股交易日混入 A 股日期轴
+                    if (!formattedCode.startsWith('us')) {
+                        Object.keys(dataMap).forEach(d => {
+                            // 只收集在 [startDate, endDate] 区间内的交易日
+                            if (d >= startDate && d <= endDate) {
+                                allKlineDates.add(d);
+                            }
+                        });
+                    }
                     console.log(`[${name}] 获取到 ${Object.keys(dataMap).length} 条K线数据，累计交易日 ${allKlineDates.size} 个`);
                 } catch (err) {
                     console.error(`[${name}] 获取历史数据失败:`, err);
@@ -6737,16 +6772,43 @@
         //  主渲染函数
         // ================================================================
         function renderChart() {
-            const currentMode = viewMode;
-            if (currentMode === 'waterfall') {
-                renderWaterfall();
-                return;
+            const nv = getSeries('英伟达');
+            const nvBackup = nv ? {
+                data: nv.data,
+                highData: nv.highData,
+                lowData: nv.lowData
+            } : null;
+
+            // ★ 无侵入后移：仅在图表渲染期间，把英伟达数据整体后移一位
+            if (nv && Array.isArray(nv.data) && nv.data.length > 1) {
+                nv.data = [nv.data[0], ...nv.data.slice(0, -1)];
+                if (Array.isArray(nv.highData)) {
+                    nv.highData = [nv.highData[0], ...nv.highData.slice(0, -1)];
+                }
+                if (Array.isArray(nv.lowData)) {
+                    nv.lowData = [nv.lowData[0], ...nv.lowData.slice(0, -1)];
+                }
             }
-            if (currentMode === 'ranking') {
-                renderRankingChart();
-                return;
+
+            try {
+                const currentMode = viewMode;
+                if (currentMode === 'waterfall') {
+                    renderWaterfall();
+                    return;
+                }
+                if (currentMode === 'ranking') {
+                    renderRankingChart();
+                    return;
+                }
+                renderTrendChart();
+            } finally {
+                if (nv && nvBackup) {
+                    nv.data = nvBackup.data;
+                    nv.highData = nvBackup.highData;
+                    nv.lowData = nvBackup.lowData;
+                }
             }
-            renderTrendChart();
+
             setTimeout(() => {resetDanmaku();}, 100);
         }
 
