@@ -6864,12 +6864,53 @@
                 renderChart();
                 return;
             }
-            let allChanges = [];
-            seriesList.forEach(s => {
-                const base = s.data[0];
-                s.data.forEach(v => {allChanges.push(calcTotalChange(base, v));});
+
+            // ★ 根据当前视图，确定“可见系列”
+            //   - 趋势图：trendLegendSelected 非空表示只显示这些；为空表示全部显示
+            //   - 瀑布图：waterfallSelectedSet 非空表示只显示这些；为空表示全部显示
+            let visibleKeys;
+            if (viewMode === 'waterfall') {
+                if (waterfallSelectedSet.size > 0) {
+                    visibleKeys = seriesKeys.filter(k => waterfallSelectedSet.has(k));
+                } else {
+                    visibleKeys = [...seriesKeys];
+                }
+            } else { // trend
+                if (trendLegendSelected.size > 0) {
+                    visibleKeys = seriesKeys.filter(k => trendLegendSelected.has(k));
+                } else {
+                    visibleKeys = [...seriesKeys];
+                }
+            }
+
+            // 极端情况：过滤后为空，回退到全部
+            if (visibleKeys.length === 0) {
+                visibleKeys = [...seriesKeys];
+            }
+
+            // ★ 用 withUSBackShift 包住计算，使 Y 轴范围与图表实际显示（美股后移后）的数据一致
+            const allChanges = [];
+            withUSBackShift(() => {
+                visibleKeys.forEach(key => {
+                    const s = getSeries(key);
+                    if (!s) return;
+                    const base = s.data[0];
+                    if (base === 0) return;
+                    s.data.forEach(v => {
+                        allChanges.push(calcTotalChange(base, v));
+                    });
+                });
             });
-            if (allChanges.length === 0) return;
+
+            if (allChanges.length === 0) {
+                // 没有有效数据时，给一个默认范围，避免 Y 轴空白
+                yMin = -50;
+                yMax = 150;
+                renderChart();
+                saveState();
+                return;
+            }
+
             let min = Math.min(...allChanges);
             let max = Math.max(...allChanges);
             const padding = (max - min) * 0.15 || 10;
