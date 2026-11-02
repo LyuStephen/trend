@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <link rel="icon"
         href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🤣</text></svg>">
-    <title>安动徐生</title>
+    <title>乐子人大赛</title>
     <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js">
     </script>
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js">
@@ -6559,7 +6559,7 @@
                         const idx = params[0].dataIndex;
                         const date = dates[idx];
                         let html = `<strong>${date}</strong><br/>`;
-                        // 遍历所有选中系列，显示每个的当日变化率和总变化率
+                        // 遍历所有选中系列，显示每个的累计、当日涨跌、当日实际涨跌
                         selectedKeys.forEach(key => {
                             const s = getSeries(key);
                             if (!s) return;
@@ -6574,17 +6574,33 @@
                                     usNote = ` <span style="color:#94a3b8;font-size:11px;">（美股数据日：${dates[idx - 1]}）</span>`;
                                 }
                             }
+
+                            // 1. 累计（总变化率）
                             const totalChange = data.totalChanges[idx];
+
+                            // 2. 当日涨跌（瀑布图柱子高度，即总变化率的变化）
                             const dayChange = data.dayChanges[idx];
+
+                            // 3. 当日实际涨跌（相对前一日的真实日K线涨跌幅）
+                            let actualDayChange = 0;
+                            if (idx > 0) {
+                                actualDayChange = calcDailyChange(s.data[idx - 1], s.data[idx]);
+                            } else {
+                                actualDayChange = totalChange; // 首日没有前值，等同于累计
+                            }
+
                             const color = s.color || '#3b82f6';
 
                             // 红正绿负
-                            const dayColor = dayChange >= 0 ? '#e64340' : '#07c160';
                             const totalColor = totalChange >= 0 ? '#e64340' : '#07c160';
+                            const dayColor = dayChange >= 0 ? '#e64340' : '#07c160';
+                            const actualColor = actualDayChange >= 0 ? '#e64340' : '#07c160';
 
                             html += `<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${color};margin-right:4px;"></span>`;
-                            html += `${key}${usNote}: 总变化 <span style="color:${totalColor};font-weight:bold;">${totalChange > 0 ? '+' : ''}${totalChange.toFixed(2)}%</span> `;
-                            html += `(当日 <span style="color:${dayColor};font-weight:bold;">${dayChange > 0 ? '+' : ''}${dayChange.toFixed(2)}%</span>)<br/>`;
+                            html += `${key}${usNote}: `;
+                            html += `累计 <span style="color:${totalColor};font-weight:bold;">${totalChange > 0 ? '+' : ''}${totalChange.toFixed(2)}%</span> | `;
+                            html += `当日涨跌 <span style="color:${dayColor};font-weight:bold;">${dayChange > 0 ? '+' : ''}${dayChange.toFixed(2)}%</span> | `;
+                            html += `当日实际涨跌 <span style="color:${actualColor};font-weight:bold;">${actualDayChange > 0 ? '+' : ''}${actualDayChange.toFixed(2)}%</span><br/>`;
                         });
                         return html;
                     },
