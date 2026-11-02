@@ -2657,7 +2657,6 @@
         let rankingAutoSetDone = false;
         let trendLegendSelected = new Set();
         let ctrlPressed = false;
-        let chartBaseIndex = 0; // ★ 新增：趋势图的动态基准索引
 
         document.addEventListener('keydown', function (e) {
             if (e.ctrlKey || e.metaKey) ctrlPressed = true;
@@ -5923,24 +5922,6 @@
                 customTooltip.style.display = 'none';
             });
             myChart.on('dataZoom', updateAvatarPositions);
-
-            // ★ 新增：监听缩放事件，防抖后更新基准并重算
-            let zoomDebounceTimer = null;
-            myChart.on('dataZoom', function () {
-                if (legendChanging) return;
-                if (viewMode !== 'trend') return; // 只在趋势图下生效
-                if (zoomDebounceTimer) clearTimeout(zoomDebounceTimer);
-                zoomDebounceTimer = setTimeout(() => {
-                    const dz = myChart.getOption().dataZoom?.[0];
-                    if (!dz) return;
-                    // 根据百分比计算当前起始索引
-                    const startIdx = Math.round((dz.start / 100) * (dates.length - 1));
-                    if (startIdx !== chartBaseIndex) {
-                        chartBaseIndex = startIdx;
-                        renderChart(); // 重新渲染图表
-                    }
-                }, 300); // 300ms防抖，避免拖动时频繁重绘
-            });
         }
 
         function initChartClick() { }
@@ -6678,11 +6659,6 @@
         //  渲染趋势图
         // ================================================================
         function renderTrendChart() {
-            // ★ 新增：获取当前 dataZoom 状态，以便重绘后恢复视图
-            const currentZoom = myChart.getOption().dataZoom?.[0];
-            const startZoom = currentZoom ? currentZoom.start : 0;
-            const endZoom = currentZoom ? currentZoom.end : 100;
-
             const latestIdx = getLatestIdx();
             const latestDate = dates[latestIdx];
 
@@ -6694,7 +6670,19 @@
 
             // ★ 按总变化率（相对首日）降序排序图例
             const sortedKeys = [...seriesKeys].sort((a, b) => {
-                // ...
+                const sA = getSeries(a);
+                const sB = getSeries(b);
+                if (!sA || !sB) return 0;
+                const baseA = sA.data[0] || 1;
+                const baseB = sB.data[0] || 1;
+                const currA = sA.data[latestIdx];
+                const currB = sB.data[latestIdx];
+                let aChange = (baseA === 0) ? 0 : ((currA - baseA) / baseA) * 100;
+                let bChange = (baseB === 0) ? 0 : ((currB - baseB) / baseB) * 100;
+                // 飘小仙强制为 0（其值恒为 1，总变化率为 0）
+                if (a === '飘小仙') aChange = 0;
+                if (b === '飘小仙') bChange = 0;
+                return bChange - aChange; // 降序：总涨幅大的排前面
             });
             // ★ 修改结束
 
@@ -6703,8 +6691,7 @@
                 const s = getSeries(key);
                 if (!s) return null;
                 const data = s.data;
-                // ★ 关键修改：基准取 chartBaseIndex，若越界则回退到 0
-                const base = data[chartBaseIndex] || data[0];
+                const base = data[0];
                 const changeData = data.map(v => calcTotalChange(base, v));
                 const latestChange = changeData[latestIdx];
                 const avatarSize = isMobileView() ? 20 : 42;
@@ -6824,8 +6811,8 @@
                 },
                 dataZoom: [{
                     type: 'slider',
-                    start: startZoom,  // ★ 恢复用户的缩放起点
-                    end: endZoom,      // ★ 恢复用户的缩放终点
+                    start: 0,
+                    end: 100,
                     height: isMobileView() ? 16 : 14,
                     bottom: isMobileView() ? 20 : 4,
                     borderColor: isDark ? '#334155' : '#eef2f6',
@@ -6965,7 +6952,7 @@
                 visibleKeys.forEach(key => {
                     const s = getSeries(key);
                     if (!s) return;
-                    const base = s.data[chartBaseIndex] || s.data[0]; // ★ 动态基准
+                    const base = s.data[0];
                     if (base === 0) return;
                     s.data.forEach(v => {
                         allChanges.push(calcTotalChange(base, v));
