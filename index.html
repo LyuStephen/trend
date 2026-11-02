@@ -6428,8 +6428,10 @@
 
             // 以下部分保持不变（图表卡片信息等）
             const latestIdx2 = dates.length - 1;
-            const latestChange = calcTotalChange(s.data[0], s.data[latestIdx2]);
-            let firstPlaceDays = 0;
+
+            // 预先计算所有指标的登顶天数
+            const firstPlaceDaysMap = {};
+            seriesKeys.forEach(k => firstPlaceDaysMap[k] = 0);
             for (let i = 0; i < dates.length; i++) {
                 const changes = seriesKeys.map(key => {
                     const series = getSeries(key);
@@ -6438,97 +6440,116 @@
                 });
                 const maxChange = Math.max(...changes.map(c => c.change));
                 const topKeys = changes.filter(c => c.change === maxChange).map(c => c.key);
-                if (topKeys.includes(targetName)) firstPlaceDays++;
+                topKeys.forEach(k => {if (firstPlaceDaysMap[k] !== undefined) firstPlaceDaysMap[k]++;});
             }
             const shSeries = getSeries('上证');
-            let diffToSH = '--';
-            let diff = 0;
-            if (shSeries) {
-                const shBase = shSeries.data[0];
-                const shChange = calcTotalChange(shBase, shSeries.data[latestIdx2]);
-                diff = latestChange - shChange;
-                diffToSH = (diff >= 0 ? '+' : '') + diff.toFixed(2) + '%';
-            }
-            const avatarSrc = getAvatarSrc(s);
+            const shChange = shSeries ? calcTotalChange(shSeries.data[0], shSeries.data[latestIdx2]) : 0;
 
-            const graphic = [{
-                type: 'group',
-                left: isMobile ? 65 : 75,
-                top: 50,
-                children: [{
-                    type: 'rect',
-                    shape: {width: cardWidth, height: cardHeight},
-                    style: {
-                        fill: isDark ? 'rgba(30,41,59,0.85)' : 'rgba(255,255,255,0.85)',
-                        stroke: isDark ? '#334155' : '#eef2f6',
-                        lineWidth: 1,
-                        cornerRadius: 6
-                    }
-                }, {
-                    type: 'image',
-                    style: {
-                        image: avatarSrc,
-                        x: 8,
-                        y: 8,
-                        width: avatarSize,
-                        height: avatarSize,
-                        borderRadius: avatarSize / 2
-                    },
-                    z: 10
-                }, {
-                    type: 'text',
-                    left: leftOffset,
-                    top: isMobile ? 10 : 12,
-                    style: {
-                        text: `🏆 登顶 ${firstPlaceDays} 天`,
-                        fontSize: fontSize,
-                        fill: isDark ? '#e2e8f0' : '#1e293b',
-                        fontWeight: 'bold'
-                    }
-                }, {
-                    type: 'text',
-                    left: leftOffset,
-                    top: isMobile ? 28 : 32,
-                    style: {
-                        text: '📈 总变化率 ',
-                        fontSize: fontSize,
-                        fill: isDark ? '#e2e8f0' : '#1e293b',
-                        textBaseline: 'top'
-                    }
-                }, {
-                    type: 'text',
-                    left: valueLeft,
-                    top: isMobile ? 28 : 32,
-                    style: {
-                        text: `${latestChange >= 0 ? '+' : ''}${latestChange.toFixed(2)}%`,
-                        fontSize: fontSize,
-                        fill: latestChange >= 0 ? '#e64340' : '#07c160',
-                        fontWeight: 'bold',
-                        textBaseline: 'top'
-                    }
-                }, {
-                    type: 'text',
-                    left: leftOffset,
-                    top: isMobile ? 46 : 52,
-                    style: {
-                        text: '📊 跑赢上证 ',
-                        fontSize: fontSize,
-                        fill: isDark ? '#e2e8f0' : '#1e293b',
-                        textBaseline: 'top'
-                    }
-                }, {
-                    type: 'text',
-                    left: valueLeft,
-                    top: isMobile ? 46 : 52,
-                    style: {
-                        text: diffToSH,
-                        fontSize: fontSize,
-                        fill: diff >= 0 ? '#e64340' : '#07c160',
-                        fontWeight: 'bold',
-                        textBaseline: 'top'
-                    }
-                }]
-            }];
+            // 确定要显示的卡片指标（最多两个，优先取 waterfallSelectedSet 中的最早两个）
+            let displayKeys = [];
+            if (waterfallSelectedSet.size > 0) {
+                displayKeys = Array.from(waterfallSelectedSet).slice(0, 2);
+            } else {
+                displayKeys = waterfallSortedKeys.slice(0, 2);
+            }
+
+            const graphic = [];
+            displayKeys.forEach((displayKey, index) => {
+                const displaySeries = getSeries(displayKey);
+                if (!displaySeries) return;
+
+                const latestChange = calcTotalChange(displaySeries.data[0], displaySeries.data[latestIdx2]);
+                const firstPlaceDays = firstPlaceDaysMap[displayKey] || 0;
+                let diffToSH = '--';
+                let diff = 0;
+                if (shSeries) {
+                    diff = latestChange - shChange;
+                    diffToSH = (diff >= 0 ? '+' : '') + diff.toFixed(2) + '%';
+                }
+                const avatarSrc = getAvatarSrc(displaySeries);
+
+                // 计算每个卡片的 top 偏移，如果显示两个卡片，第二个向下移动
+                const cardTop = 50 + index * (cardHeight + 8);
+
+                graphic.push({
+                    type: 'group',
+                    left: isMobile ? 65 : 75,
+                    top: cardTop,
+                    children: [{
+                        type: 'rect',
+                        shape: {width: cardWidth, height: cardHeight},
+                        style: {
+                            fill: isDark ? 'rgba(30,41,59,0.85)' : 'rgba(255,255,255,0.85)',
+                            stroke: isDark ? '#334155' : '#eef2f6',
+                            lineWidth: 1,
+                            cornerRadius: 6
+                        }
+                    }, {
+                        type: 'image',
+                        style: {
+                            image: avatarSrc,
+                            x: 8,
+                            y: 8,
+                            width: avatarSize,
+                            height: avatarSize,
+                            borderRadius: avatarSize / 2
+                        },
+                        z: 10
+                    }, {
+                        type: 'text',
+                        left: leftOffset,
+                        top: isMobile ? 10 : 12,
+                        style: {
+                            text: `🏆 登顶 ${firstPlaceDays} 天`,
+                            fontSize: fontSize,
+                            fill: isDark ? '#e2e8f0' : '#1e293b',
+                            fontWeight: 'bold'
+                        }
+                    }, {
+                        type: 'text',
+                        left: leftOffset,
+                        top: isMobile ? 28 : 32,
+                        style: {
+                            text: '📈 总变化率 ',
+                            fontSize: fontSize,
+                            fill: isDark ? '#e2e8f0' : '#1e293b',
+                            textBaseline: 'top'
+                        }
+                    }, {
+                        type: 'text',
+                        left: valueLeft,
+                        top: isMobile ? 28 : 32,
+                        style: {
+                            text: `${latestChange >= 0 ? '+' : ''}${latestChange.toFixed(2)}%`,
+                            fontSize: fontSize,
+                            fill: latestChange >= 0 ? '#e64340' : '#07c160',
+                            fontWeight: 'bold',
+                            textBaseline: 'top'
+                        }
+                    }, {
+                        type: 'text',
+                        left: leftOffset,
+                        top: isMobile ? 46 : 52,
+                        style: {
+                            text: '📊 跑赢上证 ',
+                            fontSize: fontSize,
+                            fill: isDark ? '#e2e8f0' : '#1e293b',
+                            textBaseline: 'top'
+                        }
+                    }, {
+                        type: 'text',
+                        left: valueLeft,
+                        top: isMobile ? 46 : 52,
+                        style: {
+                            text: diffToSH,
+                            fontSize: fontSize,
+                            fill: diff >= 0 ? '#e64340' : '#07c160',
+                            fontWeight: 'bold',
+                            textBaseline: 'top'
+                        }
+                    }]
+                });
+            });
 
             const option = {
                 tooltip: {
@@ -6538,7 +6559,7 @@
                         const idx = params[0].dataIndex;
                         const date = dates[idx];
                         let html = `<strong>${date}</strong><br/>`;
-                        // 遍历所有选中系列，显示每个的起点、终点、日变化
+                        // 遍历所有选中系列，显示每个的当日变化率和总变化率
                         selectedKeys.forEach(key => {
                             const s = getSeries(key);
                             if (!s) return;
@@ -6553,12 +6574,17 @@
                                     usNote = ` <span style="color:#94a3b8;font-size:11px;">（美股数据日：${dates[idx - 1]}）</span>`;
                                 }
                             }
-                            const start = data.baseData[idx];
-                            const end = data.totalChanges[idx];
+                            const totalChange = data.totalChanges[idx];
                             const dayChange = data.dayChanges[idx];
                             const color = s.color || '#3b82f6';
+
+                            // 红正绿负
+                            const dayColor = dayChange >= 0 ? '#e64340' : '#07c160';
+                            const totalColor = totalChange >= 0 ? '#e64340' : '#07c160';
+
                             html += `<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${color};margin-right:4px;"></span>`;
-                            html += `${key}${usNote}: 起点 ${start.toFixed(2)}% → 终点 ${end.toFixed(2)}% (日变化 ${dayChange.toFixed(2)}%)<br/>`;
+                            html += `${key}${usNote}: 总变化 <span style="color:${totalColor};font-weight:bold;">${totalChange > 0 ? '+' : ''}${totalChange.toFixed(2)}%</span> `;
+                            html += `(当日 <span style="color:${dayColor};font-weight:bold;">${dayChange > 0 ? '+' : ''}${dayChange.toFixed(2)}%</span>)<br/>`;
                         });
                         return html;
                     },
