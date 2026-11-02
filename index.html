@@ -4901,10 +4901,10 @@
                 return count;
             };
 
-            let bodyHtml = '';
-            seriesKeys.forEach(key => {
+            // ★ 1. 先收集所有数据并计算资产
+            const statsRows = seriesKeys.map(key => {
                 const s = getSeries(key);
-                if (!s) return;
+                if (!s) return null;
                 const color = s.color || '#3b82f6';
                 const firstCount = firstPlaceDays[key] || 0;
                 const posCount = positiveDays[key] || 0;
@@ -4919,6 +4919,17 @@
                     const totalChangePct = calcTotalChange(base, latestVal);
                     assets = INITIAL_CAPITAL * (1 + totalChangePct / 100);
                 }
+                return {key, color, firstCount, posCount, negCount, beatCount, assets};
+            }).filter(Boolean);
+
+            // ★ 2. 按照当前资产严格降序排序（不受旧的 seriesKeys 顺序影响）
+            statsRows.sort((a, b) => b.assets - a.assets);
+
+            // ★ 3. 生成 HTML
+            let bodyHtml = '';
+            statsRows.forEach(row => {
+                const {key, color, firstCount, posCount, negCount, beatCount, assets} = row;
+
                 const assetsStr = isFinite(assets)
                     ? assets.toLocaleString('zh-CN', {minimumFractionDigits: 2, maximumFractionDigits: 2})
                     : '—';
