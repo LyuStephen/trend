@@ -3427,9 +3427,67 @@
             return true;
         }
 
+        // ★ 自定义 JSON 格式化：
+        //   - 纯数字/字符串数组（长度 > 15）每 15 个一行，避免 data 一个数字占一行
+        //   - 短数组保持一行展示
+        //   - 对象/对象数组按标准缩进递归展开
+        function formatStateJson(state) {
+            const PER_LINE = 15;
+            const INDENT = '  ';
+
+            function formatNumberArray(arr, depth) {
+                const pad = INDENT.repeat(depth + 1);
+                const closePad = INDENT.repeat(depth);
+                const items = arr.map(v => JSON.stringify(v));
+                const lines = [];
+                for (let i = 0; i < items.length; i += PER_LINE) {
+                    lines.push(pad + items.slice(i, i + PER_LINE).join(', '));
+                }
+                return '[\n' + lines.join(',\n') + '\n' + closePad + ']';
+            }
+
+            function formatValue(v, depth) {
+                const pad = INDENT.repeat(depth + 1);
+                const closePad = INDENT.repeat(depth);
+
+                if (v === null || v === undefined) return 'null';
+                if (typeof v === 'number') return JSON.stringify(v);
+                if (typeof v === 'boolean') return String(v);
+                if (typeof v === 'string') return JSON.stringify(v);
+
+                if (Array.isArray(v)) {
+                    if (v.length === 0) return '[]';
+                    const allPrimitive = v.every(x =>
+                        x === null || typeof x === 'number' ||
+                        typeof x === 'boolean' || typeof x === 'string'
+                    );
+                    if (allPrimitive && v.length > PER_LINE) {
+                        return formatNumberArray(v, depth);
+                    }
+                    if (allPrimitive) {
+                        return '[' + v.map(x => JSON.stringify(x)).join(', ') + ']';
+                    }
+                    const items = v.map(x => pad + formatValue(x, depth + 1));
+                    return '[\n' + items.join(',\n') + '\n' + closePad + ']';
+                }
+
+                if (typeof v === 'object') {
+                    const keys = Object.keys(v);
+                    if (keys.length === 0) return '{}';
+                    const items = keys.map(k =>
+                        pad + JSON.stringify(k) + ': ' + formatValue(v[k], depth + 1)
+                    );
+                    return '{\n' + items.join(',\n') + '\n' + closePad + '}';
+                }
+                return 'null';
+            }
+
+            return formatValue(state, 0);
+        }
+
         function exportJson() {
             const state = getCurrentState();
-            const json = JSON.stringify(state, null, 2);
+            const json = formatStateJson(state);
             const blob = new Blob([json], {type: 'application/json'});
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
