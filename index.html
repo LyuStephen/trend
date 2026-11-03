@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <link rel="icon"
-        href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🤣</text></svg>">
+        href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🍎</text></svg>">
     <title>安动徐生</title>
     <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js">
     </script>
@@ -6600,11 +6600,13 @@
                             const dayColor = dayChange >= 0 ? '#e64340' : '#07c160';
                             const actualColor = actualDayChange >= 0 ? '#e64340' : '#07c160';
 
+                            html += `<div style="margin-bottom: 6px;">`;
                             html += `<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${color};margin-right:4px;"></span>`;
-                            html += `${key}${usNote}: `;
-                            html += `累计 <span style="color:${totalColor};font-weight:bold;">${totalChange > 0 ? '+' : ''}${totalChange.toFixed(2)}%</span> | `;
-                            html += `当日涨跌幅 <span style="color:${actualColor};font-weight:bold;">${actualDayChange > 0 ? '+' : ''}${actualDayChange.toFixed(2)}%</span><br/>`;
-                            html += `总收益变化 <span style="color:${dayColor};font-weight:bold;">${dayChange > 0 ? '+' : ''}${dayChange.toFixed(2)}%</span> | `;                            
+                            html += `<strong>${key}</strong>${usNote}<br/>`;
+                            html += `<span style="padding-left: 14px;">累计: <span style="color:${totalColor};font-weight:bold;">${totalChange > 0 ? '+' : ''}${totalChange.toFixed(2)}%</span></span><br/>`;
+                            html += `<span style="padding-left: 14px;">当日实际涨跌: <span style="color:${actualColor};font-weight:bold;">${actualDayChange > 0 ? '+' : ''}${actualDayChange.toFixed(2)}%</span></span><br/>`;
+                            html += `<span style="padding-left: 14px;">总收益变化: <span style="color:${dayColor};font-weight:bold;">${dayChange > 0 ? '+' : ''}${dayChange.toFixed(2)}%</span></span>`;
+                            html += `</div>`;
                         });
                         return html;
                     },
