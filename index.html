@@ -6603,8 +6603,8 @@
                             html += `<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${color};margin-right:4px;"></span>`;
                             html += `${key}${usNote}: `;
                             html += `累计 <span style="color:${totalColor};font-weight:bold;">${totalChange > 0 ? '+' : ''}${totalChange.toFixed(2)}%</span> | `;
-                            html += `总收益变化 <span style="color:${dayColor};font-weight:bold;">${dayChange > 0 ? '+' : ''}${dayChange.toFixed(2)}%</span> | `;
                             html += `当日涨跌幅 <span style="color:${actualColor};font-weight:bold;">${actualDayChange > 0 ? '+' : ''}${actualDayChange.toFixed(2)}%</span><br/>`;
+                            html += `总收益变化 <span style="color:${dayColor};font-weight:bold;">${dayChange > 0 ? '+' : ''}${dayChange.toFixed(2)}%</span> | `;                            
                         });
                         return html;
                     },
