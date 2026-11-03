@@ -3135,14 +3135,23 @@
             return s.data[Math.min(bi, s.data.length - 1)];
         }
 
+        // ★ 新增：计算图表 X 轴聚焦的起始日期
+        //   - 起点为最后一天时退到倒数第二天（避免窗口宽度为 0 导致渲染异常）
+        function getZoomStartDate() {
+            if (!dates || dates.length === 0) return '';
+            const total = dates.length;
+            let bi = Math.max(0, Math.min(getBaseIdx(), total - 1));
+            if (bi >= total - 1 && total >= 2) bi = total - 2;
+            return dates[bi];
+        }
+
         // ★ 新增：让图表 X 轴聚焦到当前起始日期 baseDate 之后
         function focusChartToBaseDate() {
             if (viewMode === 'ranking') return;
             if (!dates || dates.length === 0) return;
-            const bi = Math.max(0, Math.min(getBaseIdx(), dates.length - 1));
             myChart.dispatchAction({
                 type: 'dataZoom',
-                startValue: dates[bi],
+                startValue: getZoomStartDate(),
                 endValue: dates[dates.length - 1],
                 dataZoomIndex: 0
             });
@@ -6963,8 +6972,8 @@
                 },
                 dataZoom: [{
                     type: 'slider',
-                    start: 0,
-                    end: 100,
+                    startValue: getZoomStartDate(),
+                    endValue: dates[dates.length - 1],
                     height: isMobileView() ? 16 : 14,
                     bottom: isMobileView() ? 20 : 4,
                     borderColor: isDark ? '#334155' : '#eef2f6',
@@ -6975,7 +6984,7 @@
                         color: isDark ? '#94a3b8' : '#475569',
                         fontSize: font('tag')
                     },
-                    minSpan: 10,
+                    minSpan: 1,
                     maxSpan: 100
                 }],
                 series: allSeries,
@@ -7207,8 +7216,8 @@
                 },
                 dataZoom: [{
                     type: 'slider',
-                    start: 0,
-                    end: 100,
+                    startValue: getZoomStartDate(),
+                    endValue: dates[dates.length - 1],
                     height: isMobileView() ? 16 : 14,
                     bottom: isMobileView() ? 20 : 4,
                     borderColor: isDark ? '#334155' : '#eef2f6',
@@ -7219,7 +7228,7 @@
                         color: isDark ? '#94a3b8' : '#475569',
                         fontSize: font('tag')
                     },
-                    minSpan: 10,
+                    minSpan: 1,
                     maxSpan: 100
                 }],
                 series: series
