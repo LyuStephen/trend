@@ -7366,17 +7366,18 @@
             }
 
             // ★ 用 withUSBackShift 包住计算，使 Y 轴范围与图表实际显示（美股后移后）的数据一致
+            // ★★★ 关键修复：只统计「起点 baseDate 至今」的数据，忽略起点之前的早期历史 ★★★
+            const baseIdx = getBaseIdx();
             const allChanges = [];
             withUSBackShift(() => {
                 visibleKeys.forEach(key => {
                     const s = getSeries(key);
                     if (!s) return;
-                    // ★ 修改：基准改为 baseDate
                     const base = getBaseValue(s);
                     if (base === 0) return;
-                    s.data.forEach(v => {
-                        allChanges.push(calcTotalChange(base, v));
-                    });
+                    for (let i = baseIdx; i < s.data.length; i++) {
+                        allChanges.push(calcTotalChange(base, s.data[i]));
+                    }
                 });
             });
 
