@@ -3102,8 +3102,17 @@
             const sortedDates = combined.map(item => item.date);
             seriesList.forEach(s => {
                 const oldData = s.data.slice();
-                const newData = combined.map(item => oldData[item.index]);
-                s.data = newData;
+                s.data = combined.map(item => oldData[item.index]);
+
+                // ★ 修复历史Bug：必须同步重排 highData 和 lowData，否则会导致所有指标灰框错乱
+                if (s.highData) {
+                    const oldHigh = s.highData.slice();
+                    s.highData = combined.map(item => oldHigh[item.index]);
+                }
+                if (s.lowData) {
+                    const oldLow = s.lowData.slice();
+                    s.lowData = combined.map(item => oldLow[item.index]);
+                }
             });
             dates = sortedDates;
         }
@@ -5432,6 +5441,16 @@
                         const q = findQuote(quotes, s.code);
                         s.highData[targetIdx] = (q && q.high) || price;
                         s.lowData[targetIdx] = (q && q.low) || price;
+                        // ★ 美股特殊处理：
+                        //   为了应对 withUSBackShift 的后移，需将今天的高/低补一份到昨天
+                        if (isUSSeries(s) && targetIdx > 0) {
+                            if (!(s.highData[targetIdx - 1] > 0)) {
+                                s.highData[targetIdx - 1] = (q && q.high) || price;
+                            }
+                            if (!(s.lowData[targetIdx - 1] > 0)) {
+                                s.lowData[targetIdx - 1] = (q && q.low) || price;
+                            }
+                        }
                         updateLinkedCells(name, targetDate);
                         updatedCount++;
                         s.updateStatus = 'success';
@@ -6984,15 +7003,13 @@
         }
 
         function renderChart() {
-            if (viewMode === 'ranking') {
-                // ★ 当日图是横截面数据，不需要日期后移对齐，直接渲染，避免影响其他指标
-                renderRankingChart();
-                setTimeout(() => {resetDanmaku();}, 100);
-                return;
-            }
             withUSBackShift(() => {
                 if (viewMode === 'waterfall') {
                     renderWaterfall();
+                    return;
+                }
+                if (viewMode === 'ranking') {
+                    renderRankingChart();
                     return;
                 }
                 renderTrendChart();
