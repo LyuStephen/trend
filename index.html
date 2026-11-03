@@ -6020,12 +6020,21 @@
                     highChange = (prevClose !== 0) ? ((high - prevClose) / prevClose) * 100 : 0;
                     lowChange = (prevClose !== 0) ? ((low - prevClose) / prevClose) * 100 : 0;
                 }
+                let assetChange = 0;
+                if (key !== '飘小仙' && prevIdx >= 0) {
+                    const base = s.data[0];
+                    const prevTotal = calcTotalChange(base, s.data[prevIdx]);
+                    const currTotal = calcTotalChange(base, s.data[idx]);
+                    const INITIAL_CAPITAL = 1000000; // 期初本金 100 万
+                    assetChange = INITIAL_CAPITAL * (currTotal - prevTotal) / 100;
+                }
                 items.push({
                     name: key,
                     color: s.color,
                     change: change,
                     highChange: highChange,
                     lowChange: lowChange,
+                    assetChange: assetChange, // ★ 新增：当日资产变化量
                     remark: s.remark || '',
                     price: price,
                     high: high,
@@ -6115,10 +6124,26 @@
                         if (!bar) return '';
                         const idx = bar.dataIndex;
                         const item = items[idx];
+
+                        // 定义红升绿降的颜色
+                        const upColor = '#e64340';
+                        const downColor = '#07c160';
+                        const neutralColor = 'var(--text-secondary)';
+
+                        const changeColor = item.change > 0 ? upColor : (item.change < 0 ? downColor : neutralColor);
+                        const highColor = item.highChange > 0 ? upColor : (item.highChange < 0 ? downColor : neutralColor);
+                        const lowColor = item.lowChange > 0 ? upColor : (item.lowChange < 0 ? downColor : neutralColor);
+                        const assetColor = item.assetChange > 0 ? upColor : (item.assetChange < 0 ? downColor : neutralColor);
+
+                        // 格式化金额（带千分位和两位小数）
+                        const assetStr = Math.abs(item.assetChange).toLocaleString('zh-CN', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+                        const assetSign = item.assetChange > 0 ? '+' : (item.assetChange < 0 ? '-' : '');
+
                         return `<strong>${item.name}</strong><br/>
-                        当前变化率: <strong>${item.change.toFixed(2)}%</strong><br/>
-                        最高变化率: <strong>${item.highChange.toFixed(2)}%</strong><br/>
-                        最低变化率: <strong>${item.lowChange.toFixed(2)}%</strong>${item.remark ? '<br/>备注: ' + item.remark : ''}`;
+                        当日涨跌幅: <strong style="color:${changeColor}">${item.change > 0 ? '+' : ''}${item.change.toFixed(2)}%</strong><br/>
+                        总资产变化: <strong style="color:${assetColor}">${assetSign}${assetStr} 元</strong><br/>
+                        最高涨跌幅: <strong style="color:${highColor}">${item.highChange > 0 ? '+' : ''}${item.highChange.toFixed(2)}%</strong><br/>
+                        最低涨跌幅: <strong style="color:${lowColor}">${item.lowChange > 0 ? '+' : ''}${item.lowChange.toFixed(2)}%</strong>${item.remark ? '<br/>备注: ' + item.remark : ''}`;
                     },
                     backgroundColor: isDark ? '#2d3748' : '#ffffff',
                     borderColor: isDark ? '#334155' : '#eef2f6',
