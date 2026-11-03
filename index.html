@@ -2832,15 +2832,38 @@
                 }
             }
             refreshContent() {
-                const all = getAllDanmaku();
+                let all = getAllDanmaku();
                 if (all.length === 0) return;
-                let newItem;
-                let attempts = 0;
-                do {
-                    newItem = all[Math.floor(Math.random() * all.length)];
-                    attempts++;
-                } while (newItem.text === this.text && attempts < 10 && all.length > 1);
+
+                // ★ 核心修复：收集当前屏幕上所有其他弹幕的文本，避免同时出现两条一样的
+                const currentTexts = new Set();
+                danmakuItems.forEach(item => {
+                    if (item !== this) {
+                        currentTexts.add(item.text);
+                    }
+                });
+
+                // 从总池子中过滤掉正在屏幕上显示的那些
+                let available = all.filter(item => !currentTexts.has(item.text));
+
+                // 如果弹幕种类实在太少，屏幕已经被占满了，就只能回退到全部池子
+                if (available.length === 0) {
+                    available = all;
+                }
+
+                // 从可用的弹幕中随机选择一条
+                let newItem = available[Math.floor(Math.random() * available.length)];
+
+                // 如果选到的恰好是自己刚刚的老文本，且还有其他选项，就重新挑一个避开自己
+                if (newItem.text === this.text && available.length > 1) {
+                    const others = available.filter(item => item.text !== this.text);
+                    if (others.length > 0) {
+                        newItem = others[Math.floor(Math.random() * others.length)];
+                    }
+                }
+
                 if (!newItem) newItem = all[0];
+
                 this.text = newItem.text;
                 this.avatarUrl = newItem.avatarUrl;
                 this.color = newItem.color || '#3b82f6';
@@ -6629,8 +6652,8 @@
                             html += `<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${color};margin-right:4px;"></span>`;
                             html += `<strong>${key}</strong>${usNote}<br/>`;
                             html += `<span style="padding-left: 14px;">累计: <span style="color:${totalColor};font-weight:bold;">${totalChange > 0 ? '+' : ''}${totalChange.toFixed(2)}%</span></span><br/>`;
-                            html += `<span style="padding-left: 14px;">当日实际涨跌: <span style="color:${actualColor};font-weight:bold;">${actualDayChange > 0 ? '+' : ''}${actualDayChange.toFixed(2)}%</span></span><br/>`;
-                            html += `<span style="padding-left: 14px;">总收益变化: <span style="color:${dayColor};font-weight:bold;">${dayChange > 0 ? '+' : ''}${dayChange.toFixed(2)}%</span></span>`;
+                            html += `<span style="padding-left: 14px;">当日涨跌: <span style="color:${actualColor};font-weight:bold;">${actualDayChange > 0 ? '+' : ''}${actualDayChange.toFixed(2)}%</span></span><br/>`;
+                            html += `<span style="padding-left: 14px;">当日实际: <span style="color:${dayColor};font-weight:bold;">${dayChange > 0 ? '+' : ''}${dayChange.toFixed(2)}%</span></span>`;
                             html += `</div>`;
                         });
                         return html;
