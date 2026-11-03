@@ -2144,7 +2144,7 @@
                     </span>
                     <span class="ranking-date-picker" id="baseDatePicker" style="margin-left:10px;">
                         <span>🚩 起点</span>
-                        <select id="baseDateSelect"></select>
+                        <input type="date" id="baseDateInput">
                     </span>
                 </div>
                 <div class="header-actions">
@@ -3148,22 +3148,13 @@
             });
         }
 
-        // 起点选择器刷新（仅在日期或起点变化时重建，避免频繁丢焦点）
+        // 起点日期输入刷新（已从 select 改为 date input，与日期选择器体验一致）
         let _lastBaseDateSig = '';
         function refreshBaseDateSelect() {
-            const sel = document.getElementById('baseDateSelect');
-            if (!sel) return;
-            if (!dates.includes(baseDate)) {
-                baseDate = dates[0] || '';
-            }
-            sel.innerHTML = '';
-            dates.forEach(d => {
-                const opt = document.createElement('option');
-                opt.value = d;
-                opt.textContent = d;
-                if (d === baseDate) opt.selected = true;
-                sel.appendChild(opt);
-            });
+            const inp = document.getElementById('baseDateInput');
+            if (!inp) return;
+            if (!baseDate) baseDate = dates[0] || '';
+            inp.value = baseDate;
         }
 
         function maybeRefreshBaseDateSelect() {
@@ -3171,6 +3162,48 @@
             if (sig === _lastBaseDateSig) return;
             _lastBaseDateSig = sig;
             refreshBaseDateSelect();
+        }
+
+        // 本地安全的"日期字符串 + N 天"（避免 toISOString 的时区偏差）
+        function addDaysStr(dateStr, n) {
+            const d = new Date(dateStr + 'T00:00:00'); // 解析为本地零点
+            d.setDate(d.getDate() + n);
+            const y = d.getFullYear();
+            const m = String(d.getMonth() + 1).padStart(2, '0');
+            const day = String(d.getDate()).padStart(2, '0');
+            return `${y}-${m}-${day}`;
+        }
+
+        // ★ 当起点早于当前 dates[0] 时，自动把 dates 往前扩展到该起点
+        //   各 series 用首日值占位（变化率 0，安全无副作用）；随后可点【校验历史数据】拉真实价
+        function extendDatesToBaseDate(targetDate) {
+            if (!targetDate || !dates.length) return false;
+            if (targetDate >= dates[0]) return false;
+            const newDates = [];
+            let cur = targetDate;
+            let guard = 0;
+            while (cur < dates[0] && guard < 3660) {
+                newDates.push(cur);
+                cur = addDaysStr(cur, 1);
+                guard++;
+            }
+            if (!newDates.length) return false;
+            const prefixLen = newDates.length;
+            seriesList.forEach(s => {
+                const firstVal = (s.data && s.data[0] !== undefined) ? s.data[0] : 1;
+                s.data = [...new Array(prefixLen).fill(firstVal), ...s.data];
+                if (Array.isArray(s.highData)) {
+                    const firstHigh = s.highData[0] || 0;
+                    s.highData = [...new Array(prefixLen).fill(firstHigh), ...s.highData];
+                }
+                if (Array.isArray(s.lowData)) {
+                    const firstLow = s.lowData[0] || 0;
+                    s.lowData = [...new Array(prefixLen).fill(firstLow), ...s.lowData];
+                }
+            });
+            dates = [...newDates, ...dates];
+            console.log(`✅ 起点已扩展：新增 ${prefixLen} 个日期，范围 ${newDates[0]} ~ ${newDates[newDates.length - 1]}`);
+            return true;
         }
 
         // ★★★ 年化收益基准指标配置 ★★★
@@ -3545,23 +3578,47 @@
             }
         });
 
-        // ★ 新增：起点选择器事件
-        const baseDateSelectEl = document.getElementById('baseDateSelect');
-        if (baseDateSelectEl) {
-            baseDateSelectEl.addEventListener('change', function () {
+        // ★ 起点日期输入事件（date input，可选比当前数据更早的日期并自动扩展）
+        const baseDateInputEl = document.getElementById('baseDateInput');
+        if (baseDateInputEl) {
+            baseDateInputEl.addEventListener('change', function () {
                 const val = this.value;
-                if (val && dates.includes(val)) {
-                    baseDate = val;
-                    renderSeriesManager();
-                    renderTables();
-                    renderChart();
-                    // ★ 新增：切换起点后自动让图表 X 轴跟随新起点
-                    focusChartToBaseDate();
-                    resetDanmaku();
-                    saveState();
-                } else {
+                if (!val || !/^\d{4}-\d{2}-\d{2}$/.test(val)) {
                     this.value = baseDate;
+                    return;
                 }
+                const lastDate = dates[dates.length - 1];
+                if (lastDate && val > lastDate) {
+                    alert(`起点不能晚于最新数据日期 ${lastDate}`);
+                    this.value = baseDate;
+                    return;
+                }
+                if (!dates.includes(val)) {
+                    if (dates.length > 0 && val < dates[0]) {
+                        const ok = confirm(
+                            `起点 ${val} 早于当前数据范围（首日 ${dates[0]}）。\n\n` +
+                            `是否自动补齐日期？\n` +
+                            `（补齐后各指标将用首日值占位，随后可点【校验历史数据】拉取真实价格）`
+                        );
+                        if (!ok) {this.value = baseDate; return;}
+                        if (!extendDatesToBaseDate(val)) {
+                            alert('扩展日期失败');
+                            this.value = baseDate;
+                            return;
+                        }
+                    } else {
+                        alert('所选日期不在数据范围内（非交易日或超出范围）');
+                        this.value = baseDate;
+                        return;
+                    }
+                }
+                baseDate = val;
+                renderSeriesManager();
+                renderTables();
+                renderChart();
+                focusChartToBaseDate();
+                resetDanmaku();
+                saveState();
             });
         }
 
@@ -7617,7 +7674,7 @@
                             // ★ 新增：恢复本地缓存时初始化起点下拉
                             refreshBaseDateSelect();
                             renderChart();
-                            focusChartToBaseDate(); 
+                            focusChartToBaseDate();
                             initCustomTooltip();
                             initChartClick();
                             initResizeHandles();
