@@ -6633,6 +6633,7 @@
             });
 
             const allSeriesData = {};
+            const baseIdxW0 = getBaseIdx();   // ★ 提前取出起点索引，供数学堆叠使用
             seriesKeys.forEach(key => {
                 const series = getSeries(key);
                 if (!series) return;
@@ -6642,10 +6643,28 @@
                 const totalChanges = data.map(v => calcTotalChange(base, v));
                 const baseData = totalChanges.map((v, i) => i === 0 ? 0 : totalChanges[i - 1]);
                 const chartData = dates.map((d, i) => [d, baseData[i], totalChanges[i]]);
+
+                // ★ 新增：按当日涨跌幅"数学堆叠"（简单相加，不做复利）累计
+                //   从 baseDate 开始累计；起点之前置 null（不显示断点由 dataZoom 遮挡）
+                const cumDailyChanges = [];
+                let cum = null;
+                for (let i = 0; i < data.length; i++) {
+                    if (i < baseIdxW0) {
+                        cumDailyChanges.push(null);
+                    } else if (i === baseIdxW0) {
+                        cum = 0;
+                        cumDailyChanges.push(0);
+                    } else {
+                        cum += calcDailyChange(data[i - 1], data[i]);
+                        cumDailyChanges.push(cum);
+                    }
+                }
+
                 allSeriesData[key] = {
                     totalChanges,
                     baseData,
                     chartData,
+                    cumDailyChanges,   // ★ 新增
                     dayChanges: totalChanges.map((v, i) => i === 0 ? v : v - totalChanges[i - 1])
                 };
             });
@@ -6716,6 +6735,7 @@
                     z: 2,
                     itemStyle: {color: getSeries(key).color}   // 使用当前系列颜色
                 });
+                // 总变化率曲线（复利，实线）
                 allSeries.push({
                     name: key,
                     type: 'line',
@@ -6735,6 +6755,27 @@
                         fontWeight: 'bold'
                     }
                 });
+                // ★ 新增：数学堆叠曲线（当日涨跌幅简单累加，虚线）
+                //   与上面的复利总变化率曲线同色对比，便于直观查看差异
+                allSeries.push({
+                    name: key,
+                    type: 'line',
+                    data: data.cumDailyChanges,
+                    smooth: true,
+                    symbol: 'diamond',
+                    symbolSize: 6,
+                    showSymbol: false,                 // 数据点多，隐藏圆点避免拥挤
+                    connectNulls: false,               // 起点之前为 null，保持断点
+                    lineStyle: {
+                        color: color,
+                        width: 1.5,
+                        type: 'dashed',
+                        opacity: 0.8
+                    },
+                    itemStyle: {color: color, opacity: 0.8},
+                    z: 2,
+                    label: {show: false}
+                });
             });
 
             // 以下部分保持不变（图表卡片信息等）
@@ -6744,8 +6785,7 @@
             const firstPlaceDaysMap = {};
             seriesKeys.forEach(k => firstPlaceDaysMap[k] = 0);
             // ★ 修改：从基准日开始
-            const baseIdxW = getBaseIdx();
-            for (let i = baseIdxW; i < dates.length; i++) {
+            for (let i = baseIdxW0; i < dates.length; i++) {
                 const changes = seriesKeys.map(key => {
                     const series = getSeries(key);
                     if (!series) return {key, change: -Infinity};
@@ -6917,6 +6957,13 @@
                             html += `<span style="padding-left: 14px;">累计: <span style="color:${totalColor};font-weight:bold;">${totalChange > 0 ? '+' : ''}${totalChange.toFixed(2)}%</span></span><br/>`;
                             html += `<span style="padding-left: 14px;">当日涨跌: <span style="color:${actualColor};font-weight:bold;">${actualDayChange > 0 ? '+' : ''}${actualDayChange.toFixed(2)}%</span></span><br/>`;
                             html += `<span style="padding-left: 14px;">当日实际: <span style="color:${dayColor};font-weight:bold;">${dayChange > 0 ? '+' : ''}${dayChange.toFixed(2)}%</span></span>`;
+                            // ★ 新增：数学堆叠值
+                            const cumDaily = (data.cumDailyChanges && data.cumDailyChanges[idx] !== null && data.cumDailyChanges[idx] !== undefined)
+                                ? data.cumDailyChanges[idx] : null;
+                            if (cumDaily !== null) {
+                                const cumColor = cumDaily >= 0 ? '#e64340' : '#07c160';
+                                html += `<br/><span style="padding-left: 14px;">数学堆叠: <span style="color:${cumColor};font-weight:bold;">${cumDaily > 0 ? '+' : ''}${cumDaily.toFixed(2)}%</span></span>`;
+                            }
                             html += `</div>`;
                         });
                         return html;
