@@ -4495,10 +4495,10 @@
             seriesManager.querySelectorAll('.code-wrapper').forEach(wrapper => {
                 const input = wrapper.querySelector('.code-input');
                 const dropdown = wrapper.querySelector('.code-dropdown');
-                const seriesName = input.dataset.series;
                 input.addEventListener('input', function (e) {
                     const keyword = this.value.trim();
-                    const s = getSeries(seriesName);
+                    const currentName = this.dataset.series;
+                    const s = getSeries(currentName);
                     if (s) {
                         s.code = keyword;
                         saveState();
@@ -4509,7 +4509,7 @@
                     searchTimeout = setTimeout(() => {
                         searchStock(keyword, (results) => {
                             renderDropdown(results, dropdown, input,
-                                seriesName);
+                                input.dataset.series);
                         });
                     }, 200);
                 });
@@ -4630,7 +4630,8 @@
                 div.addEventListener('mousedown', function (e) {e.preventDefault();});
                 div.addEventListener('click', function () {
                     input.value = item.code;
-                    const s = getSeries(seriesName);
+                    const currentName = input.dataset.series;
+                    const s = getSeries(currentName);
                     if (s) {
                         s.code = item.code;
                         saveState();
@@ -5362,6 +5363,8 @@
                 name: newName,
                 color: newColor,
                 data: newData,
+                highData: new Array(dates.length).fill(0),
+                lowData: new Array(dates.length).fill(0),
                 avatarUrl: '',
                 avatarData: null,
                 remark: '新指标',
@@ -5396,6 +5399,9 @@
                 const body = c.substring(prefixMatch[0].length);
                 if (prefix === 'us') return 'us' + body.toUpperCase();
                 return prefix + body;
+            }
+            if (/^\d{5}$/.test(c)) {
+                return 'hk' + c;
             }
             if (/^\d{6}$/.test(c)) {
                 const prefix = c.startsWith('6') ? 'sh' : 'sz';
@@ -5657,7 +5663,7 @@
                     if (!s) return null;
                     const quote = findQuote(quotes, code);
                     let price = (quote && quote.price > 0) ? quote.price : 0;
-                    const isUSStock = code.trim().toUpperCase().startsWith('US');
+                    const isUSStock = isUSSeries(s);
                     if (!isUSStock) {
                         let formattedCode = formatStockCode(code);
                         if (/^\d{5,6}$/.test(formattedCode)) {
