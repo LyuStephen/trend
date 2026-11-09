@@ -2262,7 +2262,7 @@
                         </div>
                     </details>
 
-                    <details id="tempCalcDetails" open>
+                    <details id="tempCalcDetails">
                         <summary>🧮 临时计算表 <span
                                 style="font-weight:400;color:var(--text-muted);font-size:var(--font-size-tag);">（以选定起点重算总变化率）</span>
                             <button class="btn btn-outline expand-table-btn" data-target="tempCalcScroll"
@@ -2325,7 +2325,8 @@
                     <!-- ★ 新增：PE(TTM) 数据表 -->
                     <details id="peDetails" open>
                         <summary>💰 PE(TTM) <span
-                                style="font-weight:400;color:var(--text-muted);font-size:var(--font-size-tag);">（实时刷新当日写入，历史可手动补录，保存在 data.json）</span>
+                                style="font-weight:400;color:var(--text-muted);font-size:var(--font-size-tag);">（实时刷新当日写入，历史可手动补录，保存在
+                                data.json）</span>
                             <button class="btn btn-outline expand-table-btn" data-target="peScroll"
                                 style="font-size:var(--font-size-btn-xs); padding:0 8px; margin-left:8px;">📏
                                 显示全部</button>
@@ -2611,7 +2612,7 @@
         };
 
         // ★ 新增空数组工具
-        function emptyArr(n) { return new Array(n || 0).fill(0); }
+        function emptyArr(n) {return new Array(n || 0).fill(0);}
 
         let dates = [...initialDates];
         let seriesList = Object.keys(initialSeriesData).map(name => ({
@@ -2648,6 +2649,9 @@
         let trendLegendSelected = new Set();
         let ctrlPressed = false;
         let baseDate = dates[0] || '';
+        // ★ 新增：最新股价表中 PE / 换手率 显示模式（'vs'=相对上证, 'abs'=绝对值）
+        let priceTablePeMode = 'vs';
+        let priceTableTurnoverMode = 'vs';
 
         let shiftPressed = false;
         document.addEventListener('keydown', function (e) {
@@ -3236,6 +3240,8 @@
                 viewMode: viewMode,
                 waterfallSeriesName: waterfallSeriesName,
                 waterfallSelectedSet: Array.from(waterfallSelectedSet),
+                priceTablePeMode: priceTablePeMode,
+                priceTableTurnoverMode: priceTableTurnoverMode,
             };
         }
 
@@ -3299,6 +3305,8 @@
             }
             mainTitleInput.value = mainTitle;
             statsDisplayMode = state.statsDisplayMode || 'count';
+            priceTablePeMode = state.priceTablePeMode || 'vs';
+            priceTableTurnoverMode = state.priceTableTurnoverMode || 'vs';
             if (state.detailsOpen) {
                 rawDetails.open = state.detailsOpen.raw !== undefined ? state.detailsOpen.raw : false;
                 dailyDetails.open = state.detailsOpen.daily !== undefined ? state.detailsOpen.daily : false;
@@ -3660,12 +3668,12 @@
                     for (const d of dates) fallback.push([d]);
                     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(fallback), '原始值(降级)');
                 }
-                try {XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(dailyData), '当日变化率');} catch (e) {}
-                try {XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(totalData), '总变化率');} catch (e) {}
-                try {XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(peSheetData), 'PE(TTM)');} catch (e) {}
-                try {XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(amountSheetData), '成交额');} catch (e) {}
-                try {XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(turnoverSheetData), '换手率');} catch (e) {}
-                try {XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(infoData), '系列信息');} catch (e) {}
+                try {XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(dailyData), '当日变化率');} catch (e) { }
+                try {XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(totalData), '总变化率');} catch (e) { }
+                try {XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(peSheetData), 'PE(TTM)');} catch (e) { }
+                try {XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(amountSheetData), '成交额');} catch (e) { }
+                try {XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(turnoverSheetData), '换手率');} catch (e) { }
+                try {XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(infoData), '系列信息');} catch (e) { }
                 const wbout = XLSX.write(wb, {bookType: 'xlsx', type: 'array'});
                 const blob = new Blob([wbout], {type: 'application/octet-stream'});
                 const url = URL.createObjectURL(blob);
@@ -5244,7 +5252,7 @@
                                     }
                                 }
                             }
-                        } catch (e) {}
+                        } catch (e) { }
                     }
                     setStatus('loading', `获取价格中 (${index + 1}/${total})...`);
                     return {name, price, s};
@@ -5417,7 +5425,7 @@
                         const baseKey = dataKey.replace(/\.[A-Z]+$/i, '');
                         const candidates = [dataKey, dataKey.toLowerCase(), dataKey.toUpperCase(),
                             baseKey, baseKey.toLowerCase(), baseKey.toUpperCase()];
-                        for (const k of candidates) {if (json?.data?.[k]) {node = json.data[k]; break;}}
+                        for (const k of candidates) {if (json?.data?.[k]) {node = json.data[k]; break;} }
                     }
                     if (node?.qfqday && Array.isArray(node.qfqday)) klineData = node.qfqday;
                     else if (node?.day && Array.isArray(node.day)) klineData = node.day;
@@ -5563,6 +5571,7 @@
             }
 
             // 阶段四：滚动计算 52 周高低（250 个交易日）
+            //   ★ 修正：满 250 日后才填充（0 表示"未满窗口"，趋势图据此不绘制）
             const RANGE_N = 250;
             for (const name of names) {
                 const s = getSeries(name);
@@ -5572,7 +5581,8 @@
                 const h52 = new Array(n).fill(0);
                 const l52 = new Array(n).fill(0);
                 for (let i = 0; i < n; i++) {
-                    const start = Math.max(0, i - (RANGE_N - 1));
+                    if (i < RANGE_N - 1) {h52[i] = 0; l52[i] = 0; continue;}
+                    const start = i - (RANGE_N - 1);
                     let hi = -Infinity, lo = Infinity;
                     for (let j = start; j <= i; j++) {
                         const h = s.highData[j] || 0;
@@ -5701,6 +5711,13 @@
             return v.toFixed(0);
         }
 
+        // ★ 计算值：成交量(手) × 收盘价(元) / 100 = 万元
+        //   A股 1手=100股 → 手*100股/手 * 元/股 / 10000 = 手*元/100 (万元)
+        function calcAmountFromVolume(vol, price) {
+            if (!vol || !price || vol <= 0 || price <= 0) return null;
+            return vol * price / 100;
+        }
+
         function renderVolumeChart() {
             myChart.clear();
             const isDark = document.body.classList.contains('dark');
@@ -5717,11 +5734,13 @@
             if (trendLegendSelected.size === 0) sortedKeys.forEach(k => legendSelected[k] = true);
             else sortedKeys.forEach(k => legendSelected[k] = trendLegendSelected.has(k));
 
-            let hasAmount = false;
+            // 判断是否有真实成交额数据
+            let hasActualAmount = false;
             seriesList.forEach(s => {
-                if (Array.isArray(s.amountData) && s.amountData.some(v => v > 0)) hasAmount = true;
+                if (Array.isArray(s.amountData) && s.amountData.some(v => v > 0)) hasActualAmount = true;
             });
 
+            // 成交量折线（左轴）—— 进入 legend，可单独开关
             const volSeries = sortedKeys.map(key => {
                 const s = getSeries(key);
                 if (!s) return null;
@@ -5734,17 +5753,53 @@
                 };
             }).filter(Boolean);
 
-            const amountSeries = hasAmount ? sortedKeys.map(key => {
+            // ★ 成交额系列（右轴）：实际值 + 计算值
+            //   由于它们不在 legend.data 中，ECharts 不会自动跟随显隐，
+            //   因此这里根据 trendLegendSelected 状态直接决定是否加入 series 数组。
+            const isKeyVisible = (key) => {
+                if (trendLegendSelected.size === 0) return true;
+                return trendLegendSelected.has(key);
+            };
+            const amountActualSeries = [];
+            const amountCalcSeries = [];
+            sortedKeys.forEach(key => {
                 const s = getSeries(key);
-                if (!s) return null;
-                const data = (s.amountData || emptyArr(dates.length)).map(v => v > 0 ? v : null);
-                return {
-                    name: key + '_金额', type: 'bar', yAxisIndex: 1,
-                    data: data,
-                    itemStyle: {color: s.color, opacity: 0.35},
-                    barMaxWidth: 10
-                };
-            }).filter(Boolean) : [];
+                if (!s) return;
+                if (!isKeyVisible(key)) return;   // ★ 图例隐藏的指标，成交额也不显示
+
+                // 实际值（万元）
+                const actualData = (s.amountData || emptyArr(dates.length)).map(v => (v > 0 ? v : null));
+                if (hasActualAmount && actualData.some(v => v !== null)) {
+                    amountActualSeries.push({
+                        name: key + '_AMT',
+                        type: 'line', yAxisIndex: 1,
+                        data: actualData,
+                        smooth: true, symbol: 'none',
+                        lineStyle: {color: s.color, width: 1.5, type: 'dashed', opacity: 0.85},
+                        itemStyle: {color: s.color},
+                        connectNulls: false, z: 1,
+                        // 初始显隐与对应成交量一致
+                        dataZoomIndex: 0
+                    });
+                }
+
+                // 计算值（万元）
+                const calcData = (s.volumeData || []).map((v, i) => calcAmountFromVolume(v, s.data[i]));
+                if (calcData.some(v => v !== null)) {
+                    amountCalcSeries.push({
+                        name: key + '_AMT_CALC',
+                        type: 'line', yAxisIndex: 1,
+                        data: calcData,
+                        smooth: true, symbol: 'none',
+                        lineStyle: {color: s.color, width: 1.5, type: 'dotted', opacity: 0.55},
+                        itemStyle: {color: s.color},
+                        connectNulls: false, z: 1,
+                        dataZoomIndex: 0
+                    });
+                }
+            });
+
+            const hasAnyAmount = amountActualSeries.length > 0 || amountCalcSeries.length > 0;
 
             const yAxis = [{
                 type: 'value',
@@ -5762,7 +5817,7 @@
                 splitLine: {show: showGrid, lineStyle: {color: isDark ? '#334155' : '#eef2f6', opacity: 0.6}},
                 axisLine: {lineStyle: {color: isDark ? '#334155' : '#eef2f6'}}
             }];
-            if (hasAmount) {
+            if (hasAnyAmount) {
                 yAxis.push({
                     type: 'value',
                     name: '成交额 (万元)',
@@ -5779,6 +5834,9 @@
                 });
             }
 
+            // 图例中只出现成交量系列，成交额系列不进入图例
+            const legendData = [...sortedKeys];
+
             const option = {
                 tooltip: {
                     trigger: 'axis',
@@ -5788,40 +5846,49 @@
                     formatter: function (params) {
                         if (!params || params.length === 0) return '';
                         let out = `<strong>${params[0].axisValue}</strong><br/>`;
+                        // 按指标分组：成交量、实际成交额、计算成交额
                         const grouped = {};
                         params.forEach(p => {
-                            if (p.seriesName.endsWith('_金额')) {
-                                const baseName = p.seriesName.replace('_金额', '');
-                                if (!grouped[baseName]) grouped[baseName] = {};
-                                grouped[baseName].amount = p.value;
-                            } else {
-                                if (!grouped[p.seriesName]) grouped[p.seriesName] = {};
-                                grouped[p.seriesName].volume = p.value;
-                            }
+                            let key = p.seriesName;
+                            let kind = 'vol';
+                            if (key.endsWith('_AMT_CALC')) {key = key.replace('_AMT_CALC', ''); kind = 'calc';}
+                            else if (key.endsWith('_AMT')) {key = key.replace('_AMT', ''); kind = 'actual';}
+                            if (!grouped[key]) grouped[key] = {};
+                            grouped[key][kind] = p.value;
                         });
                         sortedKeys.forEach(key => {
                             const g = grouped[key];
                             if (!g) return;
                             const s = getSeries(key);
                             if (!s) return;
+                            const hasAny = (g.vol !== undefined && g.vol !== null) ||
+                                (g.actual !== undefined && g.actual !== null) ||
+                                (g.calc !== undefined && g.calc !== null);
+                            if (!hasAny) return;
                             out += `<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${s.color};margin-right:4px;"></span>`;
-                            out += `${key}: `;
-                            if (g.volume !== undefined && g.volume !== null) out += `量 ${formatBigNum(g.volume)} 手`;
-                            if (g.amount !== undefined && g.amount !== null && g.amount > 0) out += ` · 额 ${formatBigNum(g.amount)} 万元`;
-                            out += `<br/>`;
+                            out += `<strong>${key}</strong><br/>`;
+                            if (g.vol !== undefined && g.vol !== null) {
+                                out += `&nbsp;&nbsp;量: ${formatBigNum(g.vol)} 手<br/>`;
+                            }
+                            if (g.actual !== undefined && g.actual !== null && g.actual > 0) {
+                                out += `&nbsp;&nbsp;<span style="color:#94a3b8;">额(实际):</span> ${formatBigNum(g.actual)} 万元<br/>`;
+                            }
+                            if (g.calc !== undefined && g.calc !== null && g.calc > 0) {
+                                out += `&nbsp;&nbsp;<span style="color:#94a3b8;">额(计算):</span> ${formatBigNum(g.calc)} 万元<br/>`;
+                            }
                         });
                         return out;
                     }
                 },
                 legend: {
-                    data: sortedKeys, selected: legendSelected,
+                    data: legendData, selected: legendSelected,
                     icon: 'circle', top: 0, left: 'center',
                     itemWidth: 10, itemHeight: 10,
                     textStyle: {fontSize: font('legend'), color: isDark ? '#94a3b8' : '#475569'}
                 },
-                grid: {left: 70, right: hasAmount ? 70 : 30, top: 45, bottom: isMobile ? 55 : 50},
+                grid: {left: 70, right: hasAnyAmount ? 70 : 30, top: 45, bottom: isMobile ? 55 : 50},
                 xAxis: {
-                    type: 'category', data: dates, boundaryGap: hasAmount,
+                    type: 'category', data: dates, boundaryGap: false,
                     axisLine: {lineStyle: {color: isDark ? '#334155' : '#eef2f6'}},
                     axisLabel: {
                         color: isDark ? '#94a3b8' : '#475569',
@@ -5843,18 +5910,22 @@
                     textStyle: {color: isDark ? '#94a3b8' : '#475569', fontSize: font('tag')},
                     minSpan: 1, maxSpan: 100
                 }],
-                series: [...volSeries, ...amountSeries]
+                series: [...volSeries, ...amountActualSeries, ...amountCalcSeries]
             };
 
             myChart.setOption(option, true);
-            myChart.resize();
 
+            // ★ 关键：成交额系列不进 legend，但仍需跟随对应指标的显隐
+            //   ECharts 默认非 legend.data 中 series 也不受 legend 控制（始终显示），
+            //   这里通过 legendselectchanged 手动 dispatchAction，保持同步。
             myChart.off('legendselectchanged');
             myChart.on('legendselectchanged', function (params) {
                 if (legendChanging) return;
                 if (viewMode !== 'volume') return;
                 const name = params.name;
                 if (!name || !seriesKeys.includes(name)) return;
+
+                // 1) 更新 selected 状态（沿用与趋势图一致的交互）
                 if (shiftPressed && sortedKeys.length > 1) {
                     if (trendLegendSelected.size === 0) {
                         sortedKeys.forEach(k => {if (k !== name) trendLegendSelected.add(k);});
@@ -5871,11 +5942,16 @@
                     if (onlyThis) trendLegendSelected.clear();
                     else {trendLegendSelected.clear(); trendLegendSelected.add(name);}
                 }
+
+                // 注意：成交额 series 的显隐已在 renderVolumeChart 内部
+                // 通过 isKeyVisible 判断，无需在这里 dispatchAction
                 legendChanging = true;
                 renderVolumeChart();
                 legendChanging = false;
                 saveState();
             });
+
+            myChart.resize();
         }
 
         // ================================================================
@@ -6100,16 +6176,35 @@
                 return;
             }
             const sorted = [...items].sort((a, b) => b.change - a.change);
+
+            // ★ 表头：PE / 换手率 支持点击切换 VS上证 / 绝对值
+            const peLabel = priceTablePeMode === 'vs' ? 'PE vs 上证 ⇄' : 'PE 绝对值 ⇄';
+            const turnoverLabel = priceTableTurnoverMode === 'vs' ? '换手率 vs 上证 ⇄' : '换手率 绝对值 ⇄';
             tableHead.innerHTML = `
         <tr>
             <th style="text-align:left; padding-left:8px;">📊 指标</th>
             <th style="text-align:center;">💰 当前价</th>
             <th style="text-align:center;">📈 最高价</th>
             <th style="text-align:center;">📉 最低价</th>
-            <th style="text-align:center;">PE vs 上证</th>
-            <th style="text-align:center;">换手率 vs 上证</th>
+            <th data-toggle="pe" style="text-align:center; cursor:pointer; user-select:none;" title="点击切换">${peLabel}</th>
+            <th data-toggle="turnover" style="text-align:center; cursor:pointer; user-select:none;" title="点击切换">${turnoverLabel}</th>
         </tr>
     `;
+            tableHead.querySelectorAll('th[data-toggle]').forEach(th => {
+                th.addEventListener('click', function (e) {
+                    e.stopPropagation();
+                    const type = this.dataset.toggle;
+                    if (type === 'pe') {
+                        priceTablePeMode = priceTablePeMode === 'vs' ? 'abs' : 'vs';
+                    } else if (type === 'turnover') {
+                        priceTableTurnoverMode = priceTableTurnoverMode === 'vs' ? 'abs' : 'vs';
+                    }
+                    saveState();
+                    // 复用现有数据（不重新请求接口）
+                    renderPriceTable(items, targetDate);
+                });
+            });
+
             const targetIdx = dates.indexOf(targetDate);
             const shSeries = getSeries('上证');
             const shPe = (shSeries && shSeries.peData && targetIdx >= 0) ? (shSeries.peData[targetIdx] || 0) : 0;
@@ -6125,24 +6220,37 @@
                 const pe = (s && s.peData && targetIdx >= 0) ? (s.peData[targetIdx] || 0) : 0;
                 const turnover = (s && s.turnoverData && targetIdx >= 0) ? (s.turnoverData[targetIdx] || 0) : 0;
 
-                let peVsSH, turnoverVsSH;
+                let peCell, turnoverCell;
                 let peColor = 'var(--text-secondary)', turnoverColor = 'var(--text-secondary)';
                 if (item.name === '飘小仙') {
-                    // ★ 飘小仙使用默认值 1
-                    peVsSH = '1';
-                    turnoverVsSH = '1';
+                    // ★ 飘小仙固定显示 1（无论哪种模式）
+                    peCell = '1';
+                    turnoverCell = '1';
                 } else {
-                    if (shPe > 0 && pe > 0) {
-                        const v = (pe - shPe) / shPe * 100;
-                        peVsSH = (v >= 0 ? '+' : '') + v.toFixed(2) + '%';
-                        peColor = v > 0 ? '#e64340' : (v < 0 ? '#07c160' : 'var(--text-secondary)');
-                    } else peVsSH = '--';
-                    if (shTurnover > 0 && turnover > 0) {
-                        const v = (turnover - shTurnover) / shTurnover * 100;
-                        turnoverVsSH = (v >= 0 ? '+' : '') + v.toFixed(2) + '%';
-                        turnoverColor = v > 0 ? '#e64340' : (v < 0 ? '#07c160' : 'var(--text-secondary)');
-                    } else turnoverVsSH = '--';
+                    // PE 单元格
+                    if (priceTablePeMode === 'vs') {
+                        if (shPe > 0 && pe > 0) {
+                            const v = (pe - shPe) / shPe * 100;
+                            peCell = (v >= 0 ? '+' : '') + v.toFixed(2) + '%';
+                            peColor = v > 0 ? '#e64340' : (v < 0 ? '#07c160' : 'var(--text-secondary)');
+                        } else peCell = '--';
+                    } else {
+                        if (pe > 0) peCell = pe.toFixed(2);
+                        else peCell = '--';
+                    }
+                    // 换手率单元格
+                    if (priceTableTurnoverMode === 'vs') {
+                        if (shTurnover > 0 && turnover > 0) {
+                            const v = (turnover - shTurnover) / shTurnover * 100;
+                            turnoverCell = (v >= 0 ? '+' : '') + v.toFixed(2) + '%';
+                            turnoverColor = v > 0 ? '#e64340' : (v < 0 ? '#07c160' : 'var(--text-secondary)');
+                        } else turnoverCell = '--';
+                    } else {
+                        if (turnover > 0) turnoverCell = turnover.toFixed(2) + '%';
+                        else turnoverCell = '--';
+                    }
                 }
+
                 html += `
             <tr>
                 <td style="text-align:left; padding-left:8px; font-weight:600;">
@@ -6151,8 +6259,8 @@
                 <td style="text-align:center; font-weight:500;">${priceStr}</td>
                 <td style="text-align:center; font-weight:500; color:#e64340;">${highStr}</td>
                 <td style="text-align:center; font-weight:500; color:#07c160;">${lowStr}</td>
-                <td style="text-align:center; font-weight:600; color:${peColor}; font-variant-numeric:tabular-nums;">${peVsSH}</td>
-                <td style="text-align:center; font-weight:600; color:${turnoverColor}; font-variant-numeric:tabular-nums;">${turnoverVsSH}</td>
+                <td style="text-align:center; font-weight:600; color:${peColor}; font-variant-numeric:tabular-nums;">${peCell}</td>
+                <td style="text-align:center; font-weight:600; color:${turnoverColor}; font-variant-numeric:tabular-nums;">${turnoverCell}</td>
             </tr>
         `;
             });
@@ -6604,7 +6712,14 @@
                         const h52Changes = [];
                         const l52Changes = [];
                         for (let i = 0; i < n; i++) {
-                            const start = Math.max(0, i - (RANGE_N - 1));
+                            // ★ 修正：满 250 个交易日后才计算（前 249 天不显示）
+                            //   因为窗口固定，高低点大多保持不变 → 曲线呈现阶梯状水平线
+                            if (i < RANGE_N - 1) {
+                                h52Changes.push(null);
+                                l52Changes.push(null);
+                                continue;
+                            }
+                            const start = i - (RANGE_N - 1);
                             let hi = -Infinity, lo = Infinity;
                             for (let j = start; j <= i; j++) {
                                 const h = ts.highData[j] || 0;
@@ -7110,19 +7225,19 @@
             trendLegendSelected = new Set();
             baseDate = dates[0] || '';
             _lastBaseDateSig = '';
-            try {localStorage.removeItem('trendState');} catch (e) {}
+            try {localStorage.removeItem('trendState');} catch (e) { }
             userThemeOverride = false;
         }
 
         setTimeout(function () {
-            try {myChart.resize();} catch (e) {}
+            try {myChart.resize();} catch (e) { }
         }, 150);
 
         // ================================================================
         //  移动端布局
         // ================================================================
         const MOBILE_QUERY = window.matchMedia ? window.matchMedia('(max-width: 820px)') : {
-            matches: false, addEventListener: function () {}, addListener: function () {}
+            matches: false, addEventListener: function () { }, addListener: function () { }
         };
         const rankingListEl = document.getElementById('rankingList');
         const rankingDateSubEl = document.getElementById('rankingDateSub');
@@ -7149,7 +7264,7 @@
                     document.getElementById('panelDataContainer').style.display = 'block';
                 }
             }
-            if (view === 'chart') setTimeout(function () {try {myChart.resize();} catch (e) {}}, 30);
+            if (view === 'chart') setTimeout(function () {try {myChart.resize();} catch (e) { } }, 30);
         }
 
         function renderRanking() {
@@ -7226,7 +7341,7 @@
             if (e.matches) {switchMobileView(currentMobileView || 'chart'); renderRanking();}
             else {
                 document.body.classList.remove('m-view-chart', 'm-view-series', 'm-view-data');
-                try {myChart.resize();} catch (err) {}
+                try {myChart.resize();} catch (err) { }
             }
         }
         if (MOBILE_QUERY.addEventListener) MOBILE_QUERY.addEventListener('change', handleMobileBreakpointChange);
@@ -7249,7 +7364,7 @@
                 if (rafId) return;
                 rafId = requestAnimationFrame(function () {
                     rafId = null;
-                    try {myChart.resize();} catch (e) {}
+                    try {myChart.resize();} catch (e) { }
                 });
             }
             let dragging = false, startY = 0, startRatio = 0;
@@ -7274,7 +7389,7 @@
                 if (!dragging) return;
                 dragging = false;
                 document.body.style.userSelect = '';
-                try {localStorage.setItem('m_chart_ratio', String(ratio));} catch (e) {}
+                try {localStorage.setItem('m_chart_ratio', String(ratio));} catch (e) { }
                 scheduleResize();
             }
             spl.addEventListener('mousedown', onStart);
@@ -7309,9 +7424,12 @@
             </div>
             <div style="font-size:15px; color:var(--text-muted); margin-top:10px; font-weight:400;">从腾讯接口同步实时行情</div>
             <div style="margin-top:20px; display:flex; justify-content:center; gap:6px;">
-                <span style="display:inline-block; width:10px; height:10px; border-radius:50%; background:#3b82f6; animation:pulse-dot 1.2s infinite;"></span>
-                <span style="display:inline-block; width:10px; height:10px; border-radius:50%; background:#3b82f6; animation:pulse-dot 1.2s infinite 0.2s;"></span>
-                <span style="display:inline-block; width:10px; height:10px; border-radius:50%; background:#3b82f6; animation:pulse-dot 1.2s infinite 0.4s;"></span>
+                <span
+                    style="display:inline-block; width:10px; height:10px; border-radius:50%; background:#3b82f6; animation:pulse-dot 1.2s infinite;"></span>
+                <span
+                    style="display:inline-block; width:10px; height:10px; border-radius:50%; background:#3b82f6; animation:pulse-dot 1.2s infinite 0.2s;"></span>
+                <span
+                    style="display:inline-block; width:10px; height:10px; border-radius:50%; background:#3b82f6; animation:pulse-dot 1.2s infinite 0.4s;"></span>
             </div>
         </div>
     </div>
