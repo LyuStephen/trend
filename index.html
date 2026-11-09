@@ -3400,8 +3400,14 @@
                     volumeData: s.volumeData || new Array(len).fill(0),
                     amountData: s.amountData || new Array(len).fill(0),
                     turnoverData: s.turnoverData || new Array(len).fill(0),
-                    latest52High: (typeof s.latest52High === 'number') ? s.latest52High : null,
-                    latest52Low: (typeof s.latest52Low === 'number') ? s.latest52Low : null,
+                    latest52High: (function (v) {
+                        var n = (typeof v === 'number') ? v : parseFloat(v);
+                        return (isFinite(n) && n > 0) ? n : null;
+                    })(s.latest52High),
+                    latest52Low: (function (v) {
+                        var n = (typeof v === 'number') ? v : parseFloat(v);
+                        return (isFinite(n) && n > 0) ? n : null;
+                    })(s.latest52Low),
                     // ★ 旧版全量数组不再进入内存主数据；需要时重新点“校验历史数据”生成 latest52High/low
                     high52Data: [],
                     low52Data: []
