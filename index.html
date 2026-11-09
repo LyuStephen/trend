@@ -1978,6 +1978,24 @@
             border-color: #3b82f6;
         }
 
+        /* ★ 新增：成交量图显示模式切换 */
+        .volume-mode-selector {
+            display: none;
+            align-items: center;
+            gap: 4px;
+            font-size: var(--font-size-tag);
+            color: var(--text-secondary);
+        }
+
+        .volume-mode-selector.show {
+            display: inline-flex;
+        }
+
+        .volume-mode-selector .panel-tab-btn {
+            padding: 2px 10px;
+            font-size: var(--font-size-btn-sm);
+        }
+
         .series-item .code-dropdown {
             display: none;
             position: absolute;
@@ -2085,6 +2103,10 @@
                     <span class="waterfall-selector" id="waterfallSelector">
                         <span>系列</span>
                         <select id="waterfallSeriesSelect"></select>
+                    </span>
+                    <span class="volume-mode-selector" id="volumeModeSelector">
+                        <button class="panel-tab-btn active" data-vmode="volume">📊 成交量</button>
+                        <button class="panel-tab-btn" data-vmode="amount">💵 成交额</button>
                     </span>
                     <button class="grid-toggle" id="gridToggle">📏</button>
                     <button class="theme-toggle" id="themeToggle">🌙</button>
@@ -2652,6 +2674,8 @@
         // ★ 新增：最新股价表中 PE / 换手率 显示模式（'vs'=相对上证, 'abs'=绝对值）
         let priceTablePeMode = 'vs';
         let priceTableTurnoverMode = 'vs';
+        // ★ 新增：成交量图显示模式（'volume'=成交量, 'amount'=成交额）
+        let volumeDisplayMode = 'volume';
 
         let shiftPressed = false;
         document.addEventListener('keydown', function (e) {
@@ -3242,6 +3266,7 @@
                 waterfallSelectedSet: Array.from(waterfallSelectedSet),
                 priceTablePeMode: priceTablePeMode,
                 priceTableTurnoverMode: priceTableTurnoverMode,
+                volumeDisplayMode: volumeDisplayMode,
             };
         }
 
@@ -3307,6 +3332,7 @@
             statsDisplayMode = state.statsDisplayMode || 'count';
             priceTablePeMode = state.priceTablePeMode || 'vs';
             priceTableTurnoverMode = state.priceTableTurnoverMode || 'vs';
+            volumeDisplayMode = state.volumeDisplayMode || 'volume';
             if (state.detailsOpen) {
                 rawDetails.open = state.detailsOpen.raw !== undefined ? state.detailsOpen.raw : false;
                 dailyDetails.open = state.detailsOpen.daily !== undefined ? state.detailsOpen.daily : false;
@@ -3386,6 +3412,12 @@
                 btn.classList.toggle('active', v === viewMode);
             });
             waterfallSelector.classList.toggle('show', viewMode === 'waterfall');
+            const volumeModeSel = document.getElementById('volumeModeSelector');
+            if (volumeModeSel) volumeModeSel.classList.toggle('show', viewMode === 'volume');
+            // 同步按钮激活态
+            document.querySelectorAll('#volumeModeSelector .panel-tab-btn').forEach(b => {
+                b.classList.toggle('active', b.dataset.vmode === volumeDisplayMode);
+            });
             updateWaterfallSelect();
             if (viewMode === 'trend') {
                 mainTitleInput.value = mainTitle.replace(/🪨.*$/, '').trim() || '🌈 总变化率趋势';
@@ -3395,7 +3427,7 @@
             } else if (viewMode === 'ranking') {
                 mainTitleInput.value = `🌫️ 日涨跌排行 · ${rankingDate || '请选择日期'}`;
             } else if (viewMode === 'volume') {
-                mainTitleInput.value = `📊 成交量 · 趋势`;
+                mainTitleInput.value = volumeDisplayMode === 'volume' ? `📊 成交量 · 趋势` : `💵 成交额 · 趋势`;
             }
             renderChart();
             const axisButtons = document.getElementById('axisCornerButtons');
@@ -3448,6 +3480,22 @@
             waterfallSeriesName = this.value;
             updateViewUI();
             resetDanmaku();
+        });
+
+        // ★ 成交量 / 成交额 模式切换
+        document.addEventListener('click', function (e) {
+            const btn = e.target.closest('#volumeModeSelector .panel-tab-btn');
+            if (!btn) return;
+            if (btn.classList.contains('active')) return;
+            volumeDisplayMode = btn.dataset.vmode;
+            document.querySelectorAll('#volumeModeSelector .panel-tab-btn').forEach(b => {
+                b.classList.toggle('active', b === btn);
+            });
+            if (viewMode === 'volume') {
+                updateViewUI();
+                resetDanmaku();
+            }
+            saveState();
         });
 
         rankingDateInput.addEventListener('change', function () {
@@ -5047,6 +5095,19 @@
                 } else if (updateTime.match(/^\d{4}-\d{2}-\d{2}/)) {
                     datePart = updateTime.slice(0, 10);
                 }
+                // ★ 修复：按市场类型统一 amount 单位为"万元"
+                //   A股（sh/sz）：fields[37] 单位已是万元，直接使用
+                //   港股（hk）/美股（us）：fields[37] 单位是"元"，除以 10000 转为万元
+                const mkt = code.substring(0, 2).toLowerCase();
+                const rawAmount = parseFloat(fields[37]) || 0;
+                let amountInWan;
+                if (mkt === 'sh' || mkt === 'sz') {
+                    amountInWan = rawAmount;
+                } else if (mkt === 'hk' || mkt === 'us') {
+                    amountInWan = rawAmount / 10000;
+                } else {
+                    amountInWan = rawAmount;
+                }
                 result[code] = {
                     name: fields[1] || code,
                     price: price,
@@ -5055,7 +5116,7 @@
                     high: parseFloat(fields[33]) || 0,
                     low: parseFloat(fields[34]) || 0,
                     volume: parseInt(fields[36]) || 0,
-                    amount: parseFloat(fields[37]) || 0,
+                    amount: amountInWan,
                     change: parseFloat(fields[31]) || 0,
                     changePercent: parseFloat(fields[32]) || 0,
                     updateTime: datePart || updateTime,
@@ -5711,11 +5772,16 @@
             return v.toFixed(0);
         }
 
-        // ★ 计算值：成交量(手) × 收盘价(元) / 100 = 万元
-        //   A股 1手=100股 → 手*100股/手 * 元/股 / 10000 = 手*元/100 (万元)
-        function calcAmountFromVolume(vol, price) {
+        // ★ 计算值：统一输出"万元"
+        //   A股：volume 单位是"手"（1手=100股）→ vol×100股 × price元 / 10000 = vol×price/100（万元）
+        //   港股/美股：volume 单位是"股" → vol×price/10000（万元）
+        function calcAmountFromVolume(vol, price, code) {
             if (!vol || !price || vol <= 0 || price <= 0) return null;
-            return vol * price / 100;
+            const market = getMarketType(code);
+            if (market === 'a') {
+                return vol * price / 100;
+            }
+            return vol * price / 10000;
         }
 
         function renderVolumeChart() {
@@ -5727,115 +5793,79 @@
             const sortedKeys = [...seriesKeys].sort((a, b) => {
                 const sa = getSeries(a), sb = getSeries(b);
                 if (!sa || !sb) return 0;
-                return (sb.volumeData?.[latestIdx] || 0) - (sa.volumeData?.[latestIdx] || 0);
+                if (volumeDisplayMode === 'volume') {
+                    return (sb.volumeData?.[latestIdx] || 0) - (sa.volumeData?.[latestIdx] || 0);
+                }
+                const getAmt = (s) => {
+                    const actual = (s.amountData || [])[latestIdx] || 0;
+                    if (actual > 0) return actual;
+                    const vol = (s.volumeData || [])[latestIdx] || 0;
+                    const price = (s.data || [])[latestIdx] || 0;
+                    return calcAmountFromVolume(vol, price, s.code) || 0;
+                };
+                return getAmt(sb) - getAmt(sa);
             });
 
             const legendSelected = {};
             if (trendLegendSelected.size === 0) sortedKeys.forEach(k => legendSelected[k] = true);
             else sortedKeys.forEach(k => legendSelected[k] = trendLegendSelected.has(k));
 
-            // 判断是否有真实成交额数据
-            let hasActualAmount = false;
-            seriesList.forEach(s => {
-                if (Array.isArray(s.amountData) && s.amountData.some(v => v > 0)) hasActualAmount = true;
-            });
-
-            // 成交量折线（左轴）—— 进入 legend，可单独开关
-            const volSeries = sortedKeys.map(key => {
-                const s = getSeries(key);
-                if (!s) return null;
-                return {
-                    name: key, type: 'line', yAxisIndex: 0,
-                    data: s.volumeData || emptyArr(dates.length),
-                    smooth: true, symbol: 'circle', symbolSize: 5,
-                    lineStyle: {color: s.color, width: 2.5},
-                    itemStyle: {color: s.color}
-                };
-            }).filter(Boolean);
-
-            // ★ 成交额系列（右轴）：实际值 + 计算值
-            //   由于它们不在 legend.data 中，ECharts 不会自动跟随显隐，
-            //   因此这里根据 trendLegendSelected 状态直接决定是否加入 series 数组。
             const isKeyVisible = (key) => {
                 if (trendLegendSelected.size === 0) return true;
                 return trendLegendSelected.has(key);
             };
-            const amountActualSeries = [];
-            const amountCalcSeries = [];
-            sortedKeys.forEach(key => {
-                const s = getSeries(key);
-                if (!s) return;
-                if (!isKeyVisible(key)) return;   // ★ 图例隐藏的指标，成交额也不显示
 
-                // 实际值（万元）
-                const actualData = (s.amountData || emptyArr(dates.length)).map(v => (v > 0 ? v : null));
-                if (hasActualAmount && actualData.some(v => v !== null)) {
-                    amountActualSeries.push({
-                        name: key + '_AMT',
-                        type: 'line', yAxisIndex: 1,
-                        data: actualData,
-                        smooth: true, symbol: 'none',
-                        lineStyle: {color: s.color, width: 1.5, type: 'dashed', opacity: 0.85},
-                        itemStyle: {color: s.color},
-                        connectNulls: false, z: 1,
-                        // 初始显隐与对应成交量一致
-                        dataZoomIndex: 0
+            const series = [];
+            let yAxisName = '';
+
+            if (volumeDisplayMode === 'volume') {
+                yAxisName = '成交量';
+                sortedKeys.forEach(key => {
+                    const s = getSeries(key);
+                    if (!s) return;
+                    if (!isKeyVisible(key)) return;
+                    series.push({
+                        name: key, type: 'line', yAxisIndex: 0,
+                        data: s.volumeData || emptyArr(dates.length),
+                        smooth: true, symbol: 'circle', symbolSize: 5,
+                        lineStyle: {color: s.color, width: 2.5},
+                        itemStyle: {color: s.color}
                     });
-                }
+                });
+            } else {
+                yAxisName = '成交额 (万元)';
+                sortedKeys.forEach(key => {
+                    const s = getSeries(key);
+                    if (!s) return;
+                    if (!isKeyVisible(key)) return;
 
-                // 计算值（万元）
-                const calcData = (s.volumeData || []).map((v, i) => calcAmountFromVolume(v, s.data[i]));
-                if (calcData.some(v => v !== null)) {
-                    amountCalcSeries.push({
-                        name: key + '_AMT_CALC',
-                        type: 'line', yAxisIndex: 1,
-                        data: calcData,
-                        smooth: true, symbol: 'none',
-                        lineStyle: {color: s.color, width: 1.5, type: 'dotted', opacity: 0.55},
-                        itemStyle: {color: s.color},
-                        connectNulls: false, z: 1,
-                        dataZoomIndex: 0
-                    });
-                }
-            });
-
-            const hasAnyAmount = amountActualSeries.length > 0 || amountCalcSeries.length > 0;
-
-            const yAxis = [{
-                type: 'value',
-                name: '成交量 (手)',
-                nameTextStyle: {fontSize: font('tag'), color: isDark ? '#94a3b8' : '#475569'},
-                axisLabel: {
-                    color: isDark ? '#94a3b8' : '#475569',
-                    fontSize: font('axis'),
-                    formatter: v => {
-                        if (v >= 1e8) return (v / 1e8).toFixed(1) + '亿';
-                        if (v >= 1e4) return (v / 1e4).toFixed(1) + '万';
-                        return v;
+                    const actualData = (s.amountData || emptyArr(dates.length)).map(v => (v > 0 ? v : null));
+                    if (actualData.some(v => v !== null)) {
+                        series.push({
+                            name: key + '_AMT',
+                            type: 'line', yAxisIndex: 0,
+                            data: actualData,
+                            smooth: true, symbol: 'none',
+                            lineStyle: {color: s.color, width: 2, type: 'solid', opacity: 0.9},
+                            itemStyle: {color: s.color},
+                            connectNulls: false, z: 2
+                        });
                     }
-                },
-                splitLine: {show: showGrid, lineStyle: {color: isDark ? '#334155' : '#eef2f6', opacity: 0.6}},
-                axisLine: {lineStyle: {color: isDark ? '#334155' : '#eef2f6'}}
-            }];
-            if (hasAnyAmount) {
-                yAxis.push({
-                    type: 'value',
-                    name: '成交额 (万元)',
-                    nameTextStyle: {fontSize: font('tag'), color: isDark ? '#94a3b8' : '#475569'},
-                    axisLabel: {
-                        color: isDark ? '#94a3b8' : '#475569',
-                        fontSize: font('axis'),
-                        formatter: v => {
-                            if (v >= 1e4) return (v / 1e4).toFixed(1) + '亿';
-                            return v;
-                        }
-                    },
-                    splitLine: {show: false}
+
+                    const calcData = (s.volumeData || []).map((v, i) => calcAmountFromVolume(v, s.data[i], s.code));
+                    if (calcData.some(v => v !== null)) {
+                        series.push({
+                            name: key + '_AMT_CALC',
+                            type: 'line', yAxisIndex: 0,
+                            data: calcData,
+                            smooth: true, symbol: 'none',
+                            lineStyle: {color: s.color, width: 1.5, type: 'dashed', opacity: 0.6},
+                            itemStyle: {color: s.color},
+                            connectNulls: false, z: 1
+                        });
+                    }
                 });
             }
-
-            // 图例中只出现成交量系列，成交额系列不进入图例
-            const legendData = [...sortedKeys];
 
             const option = {
                 tooltip: {
@@ -5846,47 +5876,54 @@
                     formatter: function (params) {
                         if (!params || params.length === 0) return '';
                         let out = `<strong>${params[0].axisValue}</strong><br/>`;
-                        // 按指标分组：成交量、实际成交额、计算成交额
-                        const grouped = {};
-                        params.forEach(p => {
-                            let key = p.seriesName;
-                            let kind = 'vol';
-                            if (key.endsWith('_AMT_CALC')) {key = key.replace('_AMT_CALC', ''); kind = 'calc';}
-                            else if (key.endsWith('_AMT')) {key = key.replace('_AMT', ''); kind = 'actual';}
-                            if (!grouped[key]) grouped[key] = {};
-                            grouped[key][kind] = p.value;
-                        });
-                        sortedKeys.forEach(key => {
-                            const g = grouped[key];
-                            if (!g) return;
-                            const s = getSeries(key);
-                            if (!s) return;
-                            const hasAny = (g.vol !== undefined && g.vol !== null) ||
-                                (g.actual !== undefined && g.actual !== null) ||
-                                (g.calc !== undefined && g.calc !== null);
-                            if (!hasAny) return;
-                            out += `<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${s.color};margin-right:4px;"></span>`;
-                            out += `<strong>${key}</strong><br/>`;
-                            if (g.vol !== undefined && g.vol !== null) {
-                                out += `&nbsp;&nbsp;量: ${formatBigNum(g.vol)} 手<br/>`;
-                            }
-                            if (g.actual !== undefined && g.actual !== null && g.actual > 0) {
-                                out += `&nbsp;&nbsp;<span style="color:#94a3b8;">额(实际):</span> ${formatBigNum(g.actual)} 万元<br/>`;
-                            }
-                            if (g.calc !== undefined && g.calc !== null && g.calc > 0) {
-                                out += `&nbsp;&nbsp;<span style="color:#94a3b8;">额(计算):</span> ${formatBigNum(g.calc)} 万元<br/>`;
-                            }
-                        });
+                        if (volumeDisplayMode === 'volume') {
+                            const volMap = {};
+                            params.forEach(p => {volMap[p.seriesName] = p.value;});
+                            sortedKeys.forEach(key => {
+                                if (volMap[key] === undefined) return;
+                                const s = getSeries(key);
+                                if (!s) return;
+                                const unit = getMarketType(s.code) === 'a' ? '手' : '股';
+                                out += `<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${s.color};margin-right:4px;"></span>`;
+                                out += `${key}: <strong>${formatBigNum(volMap[key])}</strong> ${unit}<br/>`;
+                            });
+                        } else {
+                            const grouped = {};
+                            params.forEach(p => {
+                                let key = p.seriesName;
+                                let kind = 'actual';
+                                if (key.endsWith('_AMT_CALC')) {key = key.replace('_AMT_CALC', ''); kind = 'calc';}
+                                else if (key.endsWith('_AMT')) {key = key.replace('_AMT', ''); kind = 'actual';}
+                                if (!grouped[key]) grouped[key] = {};
+                                grouped[key][kind] = p.value;
+                            });
+                            sortedKeys.forEach(key => {
+                                const g = grouped[key];
+                                if (!g) return;
+                                const s = getSeries(key);
+                                if (!s) return;
+                                const hasAny = (g.actual != null) || (g.calc != null);
+                                if (!hasAny) return;
+                                out += `<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${s.color};margin-right:4px;"></span>`;
+                                out += `<strong>${key}</strong><br/>`;
+                                if (g.actual != null && g.actual > 0) {
+                                    out += `&nbsp;&nbsp;<span style="color:#94a3b8;">额(实际):</span> ${formatBigNum(g.actual)} 万元<br/>`;
+                                }
+                                if (g.calc != null && g.calc > 0) {
+                                    out += `&nbsp;&nbsp;<span style="color:#94a3b8;">额(计算):</span> ${formatBigNum(g.calc)} 万元<br/>`;
+                                }
+                            });
+                        }
                         return out;
                     }
                 },
                 legend: {
-                    data: legendData, selected: legendSelected,
+                    data: sortedKeys, selected: legendSelected,
                     icon: 'circle', top: 0, left: 'center',
                     itemWidth: 10, itemHeight: 10,
                     textStyle: {fontSize: font('legend'), color: isDark ? '#94a3b8' : '#475569'}
                 },
-                grid: {left: 70, right: hasAnyAmount ? 70 : 30, top: 45, bottom: isMobile ? 55 : 50},
+                grid: {left: 70, right: 30, top: 45, bottom: isMobile ? 55 : 50},
                 xAxis: {
                     type: 'category', data: dates, boundaryGap: false,
                     axisLine: {lineStyle: {color: isDark ? '#334155' : '#eef2f6'}},
@@ -5896,7 +5933,22 @@
                         formatter: v => v.split('-').slice(1).join('-')
                     }
                 },
-                yAxis: yAxis,
+                yAxis: {
+                    type: 'value',
+                    name: yAxisName,
+                    nameTextStyle: {fontSize: font('tag'), color: isDark ? '#94a3b8' : '#475569'},
+                    axisLabel: {
+                        color: isDark ? '#94a3b8' : '#475569',
+                        fontSize: font('axis'),
+                        formatter: v => {
+                            if (v >= 1e8) return (v / 1e8).toFixed(1) + '亿';
+                            if (v >= 1e4) return (v / 1e4).toFixed(1) + '万';
+                            return v;
+                        }
+                    },
+                    splitLine: {show: showGrid, lineStyle: {color: isDark ? '#334155' : '#eef2f6', opacity: 0.6}},
+                    axisLine: {lineStyle: {color: isDark ? '#334155' : '#eef2f6'}}
+                },
                 dataZoom: [{
                     type: 'slider',
                     startValue: getZoomStartDate(),
@@ -5910,22 +5962,17 @@
                     textStyle: {color: isDark ? '#94a3b8' : '#475569', fontSize: font('tag')},
                     minSpan: 1, maxSpan: 100
                 }],
-                series: [...volSeries, ...amountActualSeries, ...amountCalcSeries]
+                series: series
             };
 
             myChart.setOption(option, true);
 
-            // ★ 关键：成交额系列不进 legend，但仍需跟随对应指标的显隐
-            //   ECharts 默认非 legend.data 中 series 也不受 legend 控制（始终显示），
-            //   这里通过 legendselectchanged 手动 dispatchAction，保持同步。
             myChart.off('legendselectchanged');
             myChart.on('legendselectchanged', function (params) {
                 if (legendChanging) return;
                 if (viewMode !== 'volume') return;
                 const name = params.name;
                 if (!name || !seriesKeys.includes(name)) return;
-
-                // 1) 更新 selected 状态（沿用与趋势图一致的交互）
                 if (shiftPressed && sortedKeys.length > 1) {
                     if (trendLegendSelected.size === 0) {
                         sortedKeys.forEach(k => {if (k !== name) trendLegendSelected.add(k);});
@@ -5942,9 +5989,6 @@
                     if (onlyThis) trendLegendSelected.clear();
                     else {trendLegendSelected.clear(); trendLegendSelected.add(name);}
                 }
-
-                // 注意：成交额 series 的显隐已在 renderVolumeChart 内部
-                // 通过 isKeyVisible 判断，无需在这里 dispatchAction
                 legendChanging = true;
                 renderVolumeChart();
                 legendChanging = false;
