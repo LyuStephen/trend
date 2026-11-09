@@ -1978,22 +1978,33 @@
             border-color: #3b82f6;
         }
 
-        /* ★ 新增：成交量图显示模式切换 */
-        .volume-mode-selector {
+        
+
+        /* ★ 新增：成交量/成交额 单按钮切换样式 */
+        .volume-mode-toggle {
             display: none;
+            background: var(--btn-bg);
+            color: var(--btn-text);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 4px 14px;
+            font-size: var(--font-size-btn-sm);
+            font-weight: 500;
+            cursor: pointer;
+            transition: 0.2s;
+            white-space: nowrap;
+            font-family: inherit;
+        }
+
+        .volume-mode-toggle.show {
+            display: inline-flex;
             align-items: center;
             gap: 4px;
-            font-size: var(--font-size-tag);
-            color: var(--text-secondary);
         }
 
-        .volume-mode-selector.show {
-            display: inline-flex;
-        }
-
-        .volume-mode-selector .panel-tab-btn {
-            padding: 2px 10px;
-            font-size: var(--font-size-btn-sm);
+        .volume-mode-toggle:hover {
+            background: var(--hover-bg);
+            transform: scale(1.02);
         }
 
         .series-item .code-dropdown {
@@ -2104,10 +2115,7 @@
                         <span>系列</span>
                         <select id="waterfallSeriesSelect"></select>
                     </span>
-                    <span class="volume-mode-selector" id="volumeModeSelector">
-                        <button class="panel-tab-btn active" data-vmode="volume">📊 成交量</button>
-                        <button class="panel-tab-btn" data-vmode="amount">💵 成交额</button>
-                    </span>
+                    <button class="volume-mode-toggle" id="volumeModeToggle" title="点击切换成交量/成交额">📊 成交量</button>
                     <button class="grid-toggle" id="gridToggle">📏</button>
                     <button class="theme-toggle" id="themeToggle">🌙</button>
                     <button class="danmaku-toggle" id="danmakuToggle" title="弹幕开关">💬</button>
@@ -3412,12 +3420,12 @@
                 btn.classList.toggle('active', v === viewMode);
             });
             waterfallSelector.classList.toggle('show', viewMode === 'waterfall');
-            const volumeModeSel = document.getElementById('volumeModeSelector');
-            if (volumeModeSel) volumeModeSel.classList.toggle('show', viewMode === 'volume');
-            // 同步按钮激活态
-            document.querySelectorAll('#volumeModeSelector .panel-tab-btn').forEach(b => {
-                b.classList.toggle('active', b.dataset.vmode === volumeDisplayMode);
-            });
+            const volumeModeToggle = document.getElementById('volumeModeToggle');
+            if (volumeModeToggle) {
+                volumeModeToggle.classList.toggle('show', viewMode === 'volume');
+                volumeModeToggle.textContent = volumeDisplayMode === 'volume' ? '📊 成交量' : '💵 成交额';
+                volumeModeToggle.title = volumeDisplayMode === 'volume' ? '点击切换到成交额' : '点击切换到成交量';
+            }
             updateWaterfallSelect();
             if (viewMode === 'trend') {
                 mainTitleInput.value = mainTitle.replace(/🪨.*$/, '').trim() || '🌈 总变化率趋势';
@@ -3482,15 +3490,11 @@
             resetDanmaku();
         });
 
-        // ★ 成交量 / 成交额 模式切换
+        // ★ 成交量 / 成交额 模式切换（单按钮循环）
         document.addEventListener('click', function (e) {
-            const btn = e.target.closest('#volumeModeSelector .panel-tab-btn');
+            const btn = e.target.closest('#volumeModeToggle');
             if (!btn) return;
-            if (btn.classList.contains('active')) return;
-            volumeDisplayMode = btn.dataset.vmode;
-            document.querySelectorAll('#volumeModeSelector .panel-tab-btn').forEach(b => {
-                b.classList.toggle('active', b === btn);
-            });
+            volumeDisplayMode = volumeDisplayMode === 'volume' ? 'amount' : 'volume';
             if (viewMode === 'volume') {
                 updateViewUI();
                 resetDanmaku();
