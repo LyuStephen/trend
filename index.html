@@ -2114,6 +2114,7 @@
                         <span>系列</span>
                         <select id="waterfallSeriesSelect"></select>
                     </span>
+                    <button class="volume-mode-toggle" id="axisDisplayToggle" title="切换显示：仅主轴 / 主轴+次轴 / 仅次轴">🎯 主轴+次轴</button>
                     <button class="volume-mode-toggle" id="volumeModeToggle" title="切换趋势图次坐标轴：成交量 / 成交额">📊
                         次轴:成交量</button>
                     <button class="grid-toggle" id="gridToggle">📏</button>
@@ -2149,7 +2150,7 @@
                     <button class="btn-refresh-icon" id="refreshPriceIconBtn" title="刷新股价">🔄</button>
                     <button class="btn-refresh-icon" id="verifyHistoryBtn" title="校验历史数据">📜</button>
                     <button class="btn-reset" id="resetYBtnChart" title="重置Y轴">↕</button>
-                    <button class="btn-reset" id="resetZoomBtnChart" title="重置X轴缩放">⟲</button>
+                    <button class="btn-reset" id="resetZoomBtnChart" title="重置次轴">⟲</button>
                 </div>
                 <button id="fullscreenBtn" title="全屏图表" style="position:absolute; bottom:16px; right:16px;">⛶</button>
             </div>
@@ -2666,6 +2667,11 @@
         let seriesKeys = seriesList.map(s => s.name);
         let legendChanging = false;
         let yMin = -50, yMax = 150;
+        // ★ 新增：次轴缩放范围（null 表示 ECharts 自动）
+        let secondaryYMin = null;
+        let secondaryYMax = null;
+        // ★ 新增：主轴/次轴显示模式
+        let axisDisplayMode = 'both'; // 'main' | 'both' | 'secondary'
         let mainTitle = '📈 总变化率趋势';
         let showGrid = true;
         let userThemeOverride = false;
@@ -3025,6 +3031,53 @@
         function calcTotalChange(base, value) {if (base === 0) return 0; return ((value - base) / base) * 100;}
         function calcDailyChange(prev, curr) {if (prev === 0) return 0; return ((curr - prev) / prev) * 100;}
 
+        // ★ 新增：获取某个系列最新的 52 周最高/最低价（单一值，非滚动曲线）
+        function getLatest52WeekHL(series) {
+            if (!series || !Array.isArray(series.high52Data) || !Array.isArray(series.low52Data)) {
+                return {high: null, low: null};
+            }
+            const n = series.high52Data.length;
+            let hi = null, lo = null;
+            for (let i = n - 1; i >= 0; i--) {
+                if (hi === null && series.high52Data[i] > 0) hi = series.high52Data[i];
+                if (lo === null && series.low52Data[i] > 0) lo = series.low52Data[i];
+                if (hi !== null && lo !== null) break;
+            }
+            return {high: hi, low: lo};
+        }
+
+        // ★ 新增：计算当前次轴数据的合理范围（用于 Shift+滚轮缩放次轴的基线）
+        function getCurrentSecondaryRange() {
+            let min = Infinity, max = -Infinity;
+            const keys = trendLegendSelected.size === 0
+                ? seriesKeys
+                : seriesKeys.filter(k => trendLegendSelected.has(k));
+            if (keys.length === 0) return {min: 0, max: 100};
+            keys.forEach(key => {
+                const s = getSeries(key);
+                if (!s) return;
+                if (volumeDisplayMode === 'volume') {
+                    (s.volumeData || []).forEach(v => {
+                        if (v != null && v > 0) {min = Math.min(min, v); max = Math.max(max, v);}
+                    });
+                } else {
+                    const isIdx = isIndexCode(s.code);
+                    (s.amountData || []).forEach(v => {
+                        if (v != null && v > 0) {min = Math.min(min, v); max = Math.max(max, v);}
+                    });
+                    if (!isIdx) {
+                        (s.volumeData || []).forEach((v, i) => {
+                            const a = calcAmountFromVolume(v, s.data[i], s.code);
+                            if (a != null && a > 0) {min = Math.min(min, a); max = Math.max(max, a);}
+                        });
+                    }
+                }
+            });
+            if (min === Infinity || max === -Infinity) return {min: 0, max: 100};
+            const pad = (max - min) * 0.1 || 100;
+            return {min: Math.max(0, min - pad), max: max + pad};
+        }
+
         function getBaseIdx() {
             if (!dates.length) return 0;
             const i = dates.indexOf(baseDate);
@@ -3243,6 +3296,9 @@
                 baseDate: baseDate,
                 yMin: yMin,
                 yMax: yMax,
+                secondaryYMin: secondaryYMin,
+                secondaryYMax: secondaryYMax,
+                axisDisplayMode: axisDisplayMode,
                 mainTitle: mainTitle,
                 darkMode: document.body.classList.contains('dark'),
                 showGrid: showGrid,
@@ -3304,6 +3360,9 @@
             seriesKeys = seriesList.map(s => s.name);
             yMin = state.yMin !== undefined ? state.yMin : -50;
             yMax = state.yMax !== undefined ? state.yMax : 150;
+            secondaryYMin = (typeof state.secondaryYMin === 'number') ? state.secondaryYMin : null;
+            secondaryYMax = (typeof state.secondaryYMax === 'number') ? state.secondaryYMax : null;
+            axisDisplayMode = state.axisDisplayMode || 'both';
             mainTitle = state.mainTitle || '📈 总变化率趋势';
             if (state.darkMode) {
                 document.body.classList.add('dark');
@@ -3422,10 +3481,17 @@
             waterfallSelector.classList.toggle('show', viewMode === 'waterfall');
             const volumeModeToggle = document.getElementById('volumeModeToggle');
             if (volumeModeToggle) {
-                // 成交量/成交额切换：仅在趋势图/瀑布图显示，作为次轴开关
                 volumeModeToggle.classList.toggle('show', viewMode === 'trend' || viewMode === 'waterfall');
                 volumeModeToggle.textContent = volumeDisplayMode === 'volume' ? '📊 次轴:成交量' : '💵 次轴:成交额';
                 volumeModeToggle.title = '切换趋势图次坐标轴：成交量 / 成交额';
+            }
+            // ★ 主轴/次轴 三态按钮
+            const axisDisplayToggle = document.getElementById('axisDisplayToggle');
+            if (axisDisplayToggle) {
+                axisDisplayToggle.classList.toggle('show', viewMode === 'trend' || viewMode === 'waterfall');
+                const labels = {'main': '🎯 仅主轴', 'both': '🎯 主轴+次轴', 'secondary': '🎯 仅次轴'};
+                axisDisplayToggle.textContent = labels[axisDisplayMode] || '🎯 主轴+次轴';
+                axisDisplayToggle.title = '切换显示：仅主轴 / 主轴+次轴 / 仅次轴';
             }
             updateWaterfallSelect();
             if (viewMode === 'trend') {
@@ -3485,6 +3551,15 @@
 
         waterfallSeriesSelect.addEventListener('change', function () {
             waterfallSeriesName = this.value;
+            updateViewUI();
+            resetDanmaku();
+        });
+
+        // ★ 主轴/次轴 三态切换
+        document.getElementById('axisDisplayToggle').addEventListener('click', function () {
+            const modes = ['main', 'both', 'secondary'];
+            const idx = modes.indexOf(axisDisplayMode);
+            axisDisplayMode = modes[(idx + 1) % 3];
             updateViewUI();
             resetDanmaku();
         });
@@ -5547,7 +5622,7 @@
             let addedDateCount = 0;
             let addedListStr = '';
             if (missingDates.length > 0) {
-                const oldFirstDate = dates[0];   // ★ 保存原首日，扩展后判断是否需要跟随
+                const oldFirstDate = dates[0];
                 const oldDataBySeries = {};
                 seriesList.forEach(s => {
                     const oldMap = {};
@@ -5610,11 +5685,14 @@
                     });
                 });
                 dates = newDates;
-                // ★ 若 baseDate 原本就是原首日（用户未手动调整），自动跟随到新首日
-                //   否则保留用户手动设置的起点不变
-                if (baseDate === oldFirstDate) {
+                // ★ 需求：更新历史数据后不改变起点值
+                //   - 保留用户设置的 baseDate 不变（不再自动跟随 dates[0]）
+                //   - 仅当 baseDate 在新 dates 中不存在时，才回退到最新首日，避免失效
+                if (!dates.includes(baseDate)) {
                     baseDate = dates[0];
                 }
+                // oldFirstDate 保留（用于阅读上下文，此处未使用）
+                void oldFirstDate;
             }
 
             // 阶段三：用 K 线刷新历史价格
@@ -5650,7 +5728,9 @@
             }
 
             // 阶段四：滚动计算 52 周高低（250 个交易日）
-            //   ★ 修正：满 250 日后才填充（0 表示"未满窗口"，趋势图据此不绘制）
+            //   ★ 说明：high52Data / low52Data 保留每个日期的滚动 52 周高低（用于历史追踪）
+            //   ★ 趋势图上会使用 getLatest52WeekHL() 取"最新值"绘制水平参考线，
+            //     从而符合"52周高低是某一时刻的单一值"的金融学定义
             const RANGE_N = 250;
             for (const name of names) {
                 const s = getSeries(name);
@@ -5701,7 +5781,7 @@
             let msg = `📊 历史校验完成\n\n`;
             if (addedDateCount > 0) msg += `🆕 补充交易日: ${addedDateCount} 个\n  ${addedListStr}\n\n`;
             msg += `✅ 更新: ${updatedCount} 只股票，共 ${totalMatched} 条数据\n`;
-            msg += `📈 已计算 ${names.length} 只股票的 52 周高低（趋势图单独选中该指标时显示虚线）\n`;
+            msg += `📈 已计算 ${names.length} 只股票的 52 周高低（趋势图单独选中该指标时显示最新水平参考线）\n`;
             if (errors.length > 0) msg += `\n⚠️ 失败详情:\n${errors.map(e => `  • ${e}`).join('\n')}`;
             if (updatedCount === 0 && addedDateCount === 0) {
                 msg += `\n\n💡 建议:\n`;
@@ -6364,6 +6444,8 @@
         // ================================================================
         function renderWaterfall() {
             myChart.clear();
+            const showMain = axisDisplayMode !== 'secondary';
+            const showSecondary = axisDisplayMode !== 'main';
             const isMobile = isMobileView();
             const cardWidth = isMobile ? 160 : 180;
             const cardHeight = isMobile ? 68 : 78;
@@ -6478,74 +6560,89 @@
                 return rect;
             }
             const allSeries = [];
-            waterfallSortedKeys.forEach(key => {
-                const data = allSeriesData[key];
-                if (!data) return;
-                const color = totalSelected === 1 ? '#e64340'
-                    : (colorPairsMap[key] ? colorPairsMap[key].up : '#3b82f6');
-                allSeries.push({
-                    name: key, type: 'custom', data: data.chartData,
-                    renderItem: renderItem, encode: {x: 0, y: [1, 2]},
-                    label: {show: false}, z: 2,
-                    itemStyle: {color: getSeries(key).color}
+            if (showMain) {
+                waterfallSortedKeys.forEach(key => {
+                    const data = allSeriesData[key];
+                    if (!data) return;
+                    const color = totalSelected === 1 ? '#e64340'
+                        : (colorPairsMap[key] ? colorPairsMap[key].up : '#3b82f6');
+                    allSeries.push({
+                        name: key, type: 'custom', data: data.chartData,
+                        renderItem: renderItem, encode: {x: 0, y: [1, 2]},
+                        label: {show: false}, z: 2,
+                        itemStyle: {color: getSeries(key).color}
+                    });
+                    allSeries.push({
+                        name: key, type: 'line', data: data.totalChanges,
+                        smooth: true, symbol: 'circle', symbolSize: 8,
+                        lineStyle: {color: color, width: 2.5},
+                        itemStyle: {color: color}, z: 3,
+                        label: {
+                            show: waterfallShowLabels,
+                            formatter: p => p.value.toFixed(2) + '%',
+                            position: 'top', fontSize: font('label'),
+                            color: '#83a0d2', fontWeight: 'bold'
+                        }
+                    });
+                    allSeries.push({
+                        name: key, type: 'line', data: data.cumDailyChanges,
+                        smooth: true, symbol: 'diamond', symbolSize: 6,
+                        showSymbol: false, connectNulls: false,
+                        lineStyle: {color: color, width: 1.5, type: 'dashed', opacity: 0.8},
+                        itemStyle: {color: color, opacity: 0.8}, z: 2,
+                        label: {show: false}
+                    });
                 });
-                allSeries.push({
-                    name: key, type: 'line', data: data.totalChanges,
-                    smooth: true, symbol: 'circle', symbolSize: 8,
-                    lineStyle: {color: color, width: 2.5},
-                    itemStyle: {color: color}, z: 3,
-                    label: {
-                        show: waterfallShowLabels,
-                        formatter: p => p.value.toFixed(2) + '%',
-                        position: 'top', fontSize: font('label'),
-                        color: '#83a0d2', fontWeight: 'bold'
-                    }
-                });
-                allSeries.push({
-                    name: key, type: 'line', data: data.cumDailyChanges,
-                    smooth: true, symbol: 'diamond', symbolSize: 6,
-                    showSymbol: false, connectNulls: false,
-                    lineStyle: {color: color, width: 1.5, type: 'dashed', opacity: 0.8},
-                    itemStyle: {color: color, opacity: 0.8}, z: 2,
-                    label: {show: false}
-                });
-            });
+            }
 
             // ★ 次轴曲线：成交量 / 成交额（跟随 waterfallSelectedSet 可见性）
-            selectedKeys.forEach(key => {
-                const s = getSeries(key);
-                if (!s) return;
-                if (volumeDisplayMode === 'volume') {
-                    allSeries.push({
-                        name: key + '_VOL',
-                        type: 'line',
-                        yAxisIndex: 1,
-                        data: s.volumeData || emptyArr(dates.length),
-                        smooth: true, symbol: 'none',
-                        lineStyle: {color: s.color, width: 1.2, opacity: 0.45, type: 'dashed'},
-                        itemStyle: {color: s.color, opacity: 0.45},
-                        z: 1, silent: true
-                    });
-                } else {
-                    const isIdx = isIndexCode(s.code);
-                    const actual = (s.amountData || []).map(v => (v > 0 ? v : null));
-                    const est = (s.volumeData || []).map((v, i) => calcAmountFromVolume(v, s.data[i], s.code));
-                    const dataArr = actual.map((a, i) => (a !== null ? a : (isIdx ? null : est[i])));
-                    if (dataArr.some(v => v !== null)) {
+            if (showSecondary) {
+                selectedKeys.forEach(key => {
+                    const s = getSeries(key);
+                    if (!s) return;
+                    if (volumeDisplayMode === 'volume') {
                         allSeries.push({
-                            name: key + '_AMT',
+                            name: key + '_VOL',
                             type: 'line',
                             yAxisIndex: 1,
-                            data: dataArr,
+                            data: s.volumeData || emptyArr(dates.length),
                             smooth: true, symbol: 'none',
-                            connectNulls: false,
                             lineStyle: {color: s.color, width: 1.2, opacity: 0.45, type: 'dashed'},
                             itemStyle: {color: s.color, opacity: 0.45},
                             z: 1, silent: true
                         });
+                    } else {
+                        // ★ 需求2：实际值与计算值同时显示
+                        const isIdx = isIndexCode(s.code);
+                        const actual = (s.amountData || []).map(v => (v > 0 ? v : null));
+                        const est = (s.volumeData || []).map((v, i) => calcAmountFromVolume(v, s.data[i], s.code));
+                        if (actual.some(v => v !== null)) {
+                            allSeries.push({
+                                name: key + '_AMT',
+                                type: 'line', yAxisIndex: 1,
+                                data: actual,
+                                smooth: true, symbol: 'none',
+                                connectNulls: false,
+                                lineStyle: {color: s.color, width: 1.5, opacity: 0.5, type: 'solid'},
+                                itemStyle: {color: s.color, opacity: 0.5},
+                                z: 1, silent: true
+                            });
+                        }
+                        if (!isIdx && est.some(v => v !== null)) {
+                            allSeries.push({
+                                name: key + '_AMT_CALC',
+                                type: 'line', yAxisIndex: 1,
+                                data: est,
+                                smooth: true, symbol: 'none',
+                                connectNulls: false,
+                                lineStyle: {color: s.color, width: 1.2, opacity: 0.35, type: 'dashed'},
+                                itemStyle: {color: s.color, opacity: 0.35},
+                                z: 1, silent: true
+                            });
+                        }
                     }
-                }
-            });
+                });
+            }
 
             const latestIdx2 = dates.length - 1;
             const firstPlaceDaysMap = {};
@@ -6568,63 +6665,65 @@
             else displayKeys = waterfallSortedKeys.slice(0, 2);
 
             const graphic = [];
-            displayKeys.forEach((displayKey, index) => {
-                const displaySeries = getSeries(displayKey);
-                if (!displaySeries) return;
-                const latestChange = calcTotalChange(getBaseValue(displaySeries), displaySeries.data[latestIdx2]);
-                const firstPlaceDays = firstPlaceDaysMap[displayKey] || 0;
-                let diffToSH = '--';
-                let diff = 0;
-                if (shSeries) {
-                    diff = latestChange - shChange;
-                    diffToSH = (diff >= 0 ? '+' : '') + diff.toFixed(2) + '%';
-                }
-                const avatarSrc = getAvatarSrc(displaySeries);
-                const cardTop = 50 + index * (cardHeight + 8);
+            if (showMain) {
+                displayKeys.forEach((displayKey, index) => {
+                    const displaySeries = getSeries(displayKey);
+                    if (!displaySeries) return;
+                    const latestChange = calcTotalChange(getBaseValue(displaySeries), displaySeries.data[latestIdx2]);
+                    const firstPlaceDays = firstPlaceDaysMap[displayKey] || 0;
+                    let diffToSH = '--';
+                    let diff = 0;
+                    if (shSeries) {
+                        diff = latestChange - shChange;
+                        diffToSH = (diff >= 0 ? '+' : '') + diff.toFixed(2) + '%';
+                    }
+                    const avatarSrc = getAvatarSrc(displaySeries);
+                    const cardTop = 50 + index * (cardHeight + 8);
 
-                graphic.push({
-                    type: 'group', left: isMobile ? 65 : 75, top: cardTop,
-                    children: [
-                        {
-                            type: 'rect',
-                            shape: {width: cardWidth, height: cardHeight},
-                            style: {
-                                fill: isDark ? 'rgba(30,41,59,0.85)' : 'rgba(255,255,255,0.85)',
-                                stroke: isDark ? '#334155' : '#eef2f6', lineWidth: 1, cornerRadius: 6
+                    graphic.push({
+                        type: 'group', left: isMobile ? 65 : 75, top: cardTop,
+                        children: [
+                            {
+                                type: 'rect',
+                                shape: {width: cardWidth, height: cardHeight},
+                                style: {
+                                    fill: isDark ? 'rgba(30,41,59,0.85)' : 'rgba(255,255,255,0.85)',
+                                    stroke: isDark ? '#334155' : '#eef2f6', lineWidth: 1, cornerRadius: 6
+                                }
+                            },
+                            {
+                                type: 'image',
+                                style: {image: avatarSrc, x: 8, y: 8, width: avatarSize, height: avatarSize, borderRadius: avatarSize / 2},
+                                z: 10
+                            },
+                            {
+                                type: 'text', left: leftOffset, top: isMobile ? 10 : 12,
+                                style: {text: `🏆 登顶 ${firstPlaceDays} 天`, fontSize, fill: isDark ? '#e2e8f0' : '#1e293b', fontWeight: 'bold'}
+                            },
+                            {
+                                type: 'text', left: leftOffset, top: isMobile ? 28 : 32,
+                                style: {text: '📈 总变化率 ', fontSize, fill: isDark ? '#e2e8f0' : '#1e293b', textBaseline: 'top'}
+                            },
+                            {
+                                type: 'text', left: valueLeft, top: isMobile ? 28 : 32,
+                                style: {
+                                    text: `${latestChange >= 0 ? '+' : ''}${latestChange.toFixed(2)}%`,
+                                    fontSize, fill: latestChange >= 0 ? '#e64340' : '#07c160',
+                                    fontWeight: 'bold', textBaseline: 'top'
+                                }
+                            },
+                            {
+                                type: 'text', left: leftOffset, top: isMobile ? 46 : 52,
+                                style: {text: '📊 跑赢上证 ', fontSize, fill: isDark ? '#e2e8f0' : '#1e293b', textBaseline: 'top'}
+                            },
+                            {
+                                type: 'text', left: valueLeft, top: isMobile ? 46 : 52,
+                                style: {text: diffToSH, fontSize, fill: diff >= 0 ? '#e64340' : '#07c160', fontWeight: 'bold', textBaseline: 'top'}
                             }
-                        },
-                        {
-                            type: 'image',
-                            style: {image: avatarSrc, x: 8, y: 8, width: avatarSize, height: avatarSize, borderRadius: avatarSize / 2},
-                            z: 10
-                        },
-                        {
-                            type: 'text', left: leftOffset, top: isMobile ? 10 : 12,
-                            style: {text: `🏆 登顶 ${firstPlaceDays} 天`, fontSize, fill: isDark ? '#e2e8f0' : '#1e293b', fontWeight: 'bold'}
-                        },
-                        {
-                            type: 'text', left: leftOffset, top: isMobile ? 28 : 32,
-                            style: {text: '📈 总变化率 ', fontSize, fill: isDark ? '#e2e8f0' : '#1e293b', textBaseline: 'top'}
-                        },
-                        {
-                            type: 'text', left: valueLeft, top: isMobile ? 28 : 32,
-                            style: {
-                                text: `${latestChange >= 0 ? '+' : ''}${latestChange.toFixed(2)}%`,
-                                fontSize, fill: latestChange >= 0 ? '#e64340' : '#07c160',
-                                fontWeight: 'bold', textBaseline: 'top'
-                            }
-                        },
-                        {
-                            type: 'text', left: leftOffset, top: isMobile ? 46 : 52,
-                            style: {text: '📊 跑赢上证 ', fontSize, fill: isDark ? '#e2e8f0' : '#1e293b', textBaseline: 'top'}
-                        },
-                        {
-                            type: 'text', left: valueLeft, top: isMobile ? 46 : 52,
-                            style: {text: diffToSH, fontSize, fill: diff >= 0 ? '#e64340' : '#07c160', fontWeight: 'bold', textBaseline: 'top'}
-                        }
-                    ]
+                        ]
+                    });
                 });
-            });
+            }
 
             const option = {
                 tooltip: {
@@ -6634,46 +6733,51 @@
                         const idx = params[0].dataIndex;
                         const date = dates[idx];
                         let html = `<strong>${date}</strong><br/>`;
-                        selectedKeys.forEach(key => {
-                            const s = getSeries(key);
-                            if (!s) return;
-                            const data = allSeriesData[key];
-                            if (!data) return;
-                            let usNote = '';
-                            if (isUSSeries(s)) {
-                                if (idx === 0) usNote = ` <span style="color:#94a3b8;font-size:11px;">（美股首日无前值）</span>`;
-                                else usNote = ` <span style="color:#94a3b8;font-size:11px;">（美股数据日：${dates[idx - 1]}）</span>`;
-                            }
-                            const totalChange = data.totalChanges[idx];
-                            const dayChange = data.dayChanges[idx];
-                            let actualDayChange = 0;
-                            if (idx > 0) actualDayChange = calcDailyChange(s.data[idx - 1], s.data[idx]);
-                            else actualDayChange = totalChange;
-                            const color = s.color || '#3b82f6';
-                            const totalColor = totalChange >= 0 ? '#e64340' : '#07c160';
-                            const dayColor = dayChange >= 0 ? '#e64340' : '#07c160';
-                            const actualColor = actualDayChange >= 0 ? '#e64340' : '#07c160';
-                            html += `<div style="margin-bottom: 6px;">`;
-                            html += `<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${color};margin-right:4px;"></span>`;
-                            html += `<strong>${key}</strong>${usNote}<br/>`;
-                            html += `<span style="padding-left: 14px;">累计: <span style="color:${totalColor};font-weight:bold;">${totalChange > 0 ? '+' : ''}${totalChange.toFixed(2)}%</span></span><br/>`;
-                            html += `<span style="padding-left: 14px;">当日涨跌: <span style="color:${actualColor};font-weight:bold;">${actualDayChange > 0 ? '+' : ''}${actualDayChange.toFixed(2)}%</span></span><br/>`;
-                            html += `<span style="padding-left: 14px;">当日实际: <span style="color:${dayColor};font-weight:bold;">${dayChange > 0 ? '+' : ''}${dayChange.toFixed(2)}%</span></span>`;
-                            const cumDaily = (data.cumDailyChanges && data.cumDailyChanges[idx] !== null && data.cumDailyChanges[idx] !== undefined)
-                                ? data.cumDailyChanges[idx] : null;
-                            if (cumDaily !== null) {
-                                const cumColor = cumDaily >= 0 ? '#e64340' : '#07c160';
-                                html += `<br/><span style="padding-left: 14px;">数学堆叠: <span style="color:${cumColor};font-weight:bold;">${cumDaily > 0 ? '+' : ''}${cumDaily.toFixed(2)}%</span></span>`;
-                            }
-                            html += `</div>`;
-                        });
-                        // ★ 次轴量/额附加信息
+                        if (showMain) {
+                            selectedKeys.forEach(key => {
+                                const s = getSeries(key);
+                                if (!s) return;
+                                const data = allSeriesData[key];
+                                if (!data) return;
+                                let usNote = '';
+                                if (isUSSeries(s)) {
+                                    if (idx === 0) usNote = ` <span style="color:#94a3b8;font-size:11px;">（美股首日无前值）</span>`;
+                                    else usNote = ` <span style="color:#94a3b8;font-size:11px;">（美股数据日：${dates[idx - 1]}）</span>`;
+                                }
+                                const totalChange = data.totalChanges[idx];
+                                const dayChange = data.dayChanges[idx];
+                                let actualDayChange = 0;
+                                if (idx > 0) actualDayChange = calcDailyChange(s.data[idx - 1], s.data[idx]);
+                                else actualDayChange = totalChange;
+                                const color = s.color || '#3b82f6';
+                                const totalColor = totalChange >= 0 ? '#e64340' : '#07c160';
+                                const dayColor = dayChange >= 0 ? '#e64340' : '#07c160';
+                                const actualColor = actualDayChange >= 0 ? '#e64340' : '#07c160';
+                                html += `<div style="margin-bottom: 6px;">`;
+                                html += `<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${color};margin-right:4px;"></span>`;
+                                html += `<strong>${key}</strong>${usNote}<br/>`;
+                                html += `<span style="padding-left: 14px;">累计: <span style="color:${totalColor};font-weight:bold;">${totalChange > 0 ? '+' : ''}${totalChange.toFixed(2)}%</span></span><br/>`;
+                                html += `<span style="padding-left: 14px;">当日涨跌: <span style="color:${actualColor};font-weight:bold;">${actualDayChange > 0 ? '+' : ''}${actualDayChange.toFixed(2)}%</span></span><br/>`;
+                                html += `<span style="padding-left: 14px;">当日实际: <span style="color:${dayColor};font-weight:bold;">${dayChange > 0 ? '+' : ''}${dayChange.toFixed(2)}%</span></span>`;
+                                const cumDaily = (data.cumDailyChanges && data.cumDailyChanges[idx] !== null && data.cumDailyChanges[idx] !== undefined)
+                                    ? data.cumDailyChanges[idx] : null;
+                                if (cumDaily !== null) {
+                                    const cumColor = cumDaily >= 0 ? '#e64340' : '#07c160';
+                                    html += `<br/><span style="padding-left: 14px;">数学堆叠: <span style="color:${cumColor};font-weight:bold;">${cumDaily > 0 ? '+' : ''}${cumDaily.toFixed(2)}%</span></span>`;
+                                }
+                                html += `</div>`;
+                            });
+                        }
+                        // ★ 次轴量/额附加信息（同时显示实际+计算）
                         params.forEach(p => {
                             if (p.seriesName.endsWith('_VOL')) {
                                 const key = p.seriesName.replace('_VOL', '');
                                 const s2 = getSeries(key);
                                 const unit = (s2 && getMarketType(s2.code) === 'a') ? '手' : '股';
                                 if (p.value != null) html += `<span style="color:#94a3b8;">┈ ${key} 量: ${formatBigNum(p.value)} ${unit}</span><br/>`;
+                            } else if (p.seriesName.endsWith('_AMT_CALC')) {
+                                const key = p.seriesName.replace('_AMT_CALC', '');
+                                if (p.value != null) html += `<span style="color:#94a3b8;">┈ ${key} 额(算): ${formatBigNum(p.value)} 万元</span><br/>`;
                             } else if (p.seriesName.endsWith('_AMT')) {
                                 const key = p.seriesName.replace('_AMT', '');
                                 if (p.value != null) html += `<span style="color:#94a3b8;">┈ ${key} 额: ${formatBigNum(p.value)} 万元</span><br/>`;
@@ -6691,7 +6795,12 @@
                     itemWidth: 10, itemHeight: 10,
                     textStyle: {fontSize: font('legend'), color: 'var(--text-secondary)'}
                 },
-                grid: {left: 70, right: 70, top: 45, bottom: isMobileView() ? 55 : 50},
+                grid: {
+                    left: showMain ? 70 : 20,
+                    right: showSecondary ? 70 : 20,
+                    top: 45,
+                    bottom: isMobileView() ? 55 : 50
+                },
                 xAxis: {
                     type: 'category', data: dates, axisTick: {alignWithLabel: true}, splitLine: {show: false},
                     axisLabel: {
@@ -6703,16 +6812,19 @@
                 yAxis: [
                     {
                         type: 'value', min: yMin, max: yMax,
+                        show: showMain,
                         axisLabel: {color: isDark ? '#94a3b8' : '#475569', fontSize: font('axis'), formatter: value => value.toFixed(1) + '%'},
                         splitLine: {show: showGrid, lineStyle: {color: isDark ? '#334155' : '#eef2f6', type: 'solid', opacity: 0.6}},
                         axisLine: {show: false}, axisTick: {show: false}
                     },
                     {
-                        // ★ 次轴：成交量 / 成交额（与趋势图一致）
                         type: 'value',
                         name: volumeDisplayMode === 'volume' ? '成交量' : '成交额',
                         nameTextStyle: {fontSize: font('tag'), color: isDark ? '#94a3b8' : '#475569'},
                         position: 'right',
+                        show: showSecondary,
+                        min: secondaryYMin,
+                        max: secondaryYMax,
                         axisLabel: {
                             color: isDark ? '#94a3b8' : '#475569',
                             fontSize: font('axis'),
@@ -6793,11 +6905,13 @@
         }
 
         // ================================================================
-        //  趋势图（含 52 周高低曲线：单选中时显示）
+        //  趋势图（含 52 周高低参考线：单选中时显示最新水平虚线）
         // ================================================================
         function renderTrendChart() {
             const latestIdx = getLatestIdx();
             const latestDate = dates[latestIdx];
+            const showMain = axisDisplayMode !== 'secondary';
+            const showSecondary = axisDisplayMode !== 'main';
 
             function getAvatarSrcForChart(series) {
                 if (series.avatarData) return series.avatarData;
@@ -6819,152 +6933,102 @@
                 return bChange - aChange;
             });
 
-            const series = sortedKeys.map(key => {
-                const s = getSeries(key);
-                if (!s) return null;
-                const data = s.data;
-                const base = getBaseValue(s);
-                const changeData = data.map(v => calcTotalChange(base, v));
-                const latestChange = changeData[latestIdx];
-                const avatarSize = isMobileView() ? 20 : 42;
-                return {
-                    name: s.name, type: 'line', data: changeData,
-                    smooth: true, symbol: 'circle', symbolSize: 8,
-                    lineStyle: {color: s.color, width: 2.5},
-                    itemStyle: {color: s.color},
-                    areaStyle: {
-                        color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-                            {offset: 0, color: s.color + '30'},
-                            {offset: 1, color: s.color + '05'}
-                        ])
-                    },
-                    markPoint: {
-                        symbol: 'image://' + getAvatarSrcForChart(s),
-                        symbolSize: avatarSize,
-                        label: {show: false}, tooltip: {show: false},
-                        data: [{
-                            name: s.name + '_latest',
-                            coord: [latestDate, latestChange],
+            const series = [];
+            // ★ 主曲线（总变化率）仅 main/both 模式显示
+            if (showMain) {
+                sortedKeys.forEach(key => {
+                    const s = getSeries(key);
+                    if (!s) return;
+                    const data = s.data;
+                    const base = getBaseValue(s);
+                    const changeData = data.map(v => calcTotalChange(base, v));
+                    const latestChange = changeData[latestIdx];
+                    const avatarSize = isMobileView() ? 20 : 42;
+                    series.push({
+                        name: s.name, type: 'line', data: changeData,
+                        smooth: true, symbol: 'circle', symbolSize: 8,
+                        lineStyle: {color: s.color, width: 2.5},
+                        itemStyle: {color: s.color},
+                        areaStyle: {
+                            color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                                {offset: 0, color: s.color + '30'},
+                                {offset: 1, color: s.color + '05'}
+                            ])
+                        },
+                        markPoint: {
                             symbol: 'image://' + getAvatarSrcForChart(s),
-                            symbolSize: avatarSize
-                        }],
-                        itemStyle: {
-                            borderColor: '#fff', borderWidth: 2,
-                            shadowBlur: 10, shadowColor: 'rgba(0,0,0,0.15)'
+                            symbolSize: avatarSize,
+                            label: {show: false}, tooltip: {show: false},
+                            data: [{
+                                name: s.name + '_latest',
+                                coord: [latestDate, latestChange],
+                                symbol: 'image://' + getAvatarSrcForChart(s),
+                                symbolSize: avatarSize
+                            }],
+                            itemStyle: {
+                                borderColor: '#fff', borderWidth: 2,
+                                shadowBlur: 10, shadowColor: 'rgba(0,0,0,0.15)'
+                            }
                         }
-                    }
-                };
-            }).filter(s => s !== null);
+                    });
+                });
+            }
 
-            // ★ 52周高低曲线 + 最新点数值标注（单选中某个指标时显示）
+            // ★ 需求3：52 周高低改为"当前值单一水平参考线"
             const visibleKeys = trendLegendSelected.size === 0
                 ? sortedKeys
                 : sortedKeys.filter(k => trendLegendSelected.has(k));
-            if (visibleKeys.length === 1) {
+            if (showMain && visibleKeys.length === 1) {
                 const tKey = visibleKeys[0];
                 const ts = getSeries(tKey);
-                if (ts && Array.isArray(ts.highData) && Array.isArray(ts.lowData)) {
+                if (ts) {
                     const base = getBaseValue(ts);
                     if (base !== 0) {
-                        const n = dates.length;
-                        const RANGE_N = 250;
-                        const h52Changes = [];
-                        const l52Changes = [];
-                        // ★ 记录最近一个有值的 52 周高低（便于末端标注）
-                        let lastValidHi = null;
-                        let lastValidLo = null;
-                        for (let i = 0; i < n; i++) {
-                            if (i < RANGE_N - 1) {
-                                h52Changes.push(null);
-                                l52Changes.push(null);
-                                continue;
-                            }
-                            const start = i - (RANGE_N - 1);
-                            let hi = -Infinity, lo = Infinity;
-                            for (let j = start; j <= i; j++) {
-                                const h = ts.highData[j] || 0;
-                                const l = ts.lowData[j] || 0;
-                                if (h > 0) hi = Math.max(hi, h);
-                                if (l > 0) lo = Math.min(lo, l);
-                            }
-                            if (hi !== -Infinity) {
-                                const v = calcTotalChange(base, hi);
-                                h52Changes.push(v);
-                                lastValidHi = v;
-                            } else h52Changes.push(null);
-                            if (lo !== Infinity) {
-                                const v = calcTotalChange(base, lo);
-                                l52Changes.push(v);
-                                lastValidLo = v;
-                            } else l52Changes.push(null);
-                        }
-                        const c = ts.color || '#3b82f6';
-                        if (lastValidHi !== null || lastValidLo !== null) {
-                            series.push({
-                                name: tKey + '_52H',
-                                type: 'line', data: h52Changes,
-                                smooth: true, symbol: 'none',
-                                lineStyle: {color: c, width: 2, type: 'dashed'},
-                                itemStyle: {color: c},
-                                connectNulls: false, z: 1,
-                                tooltip: {show: true, formatter: p => `${tKey} 52周最高: ${p.value == null ? '--' : p.value.toFixed(2) + '%'}`}
-                            });
-                            series.push({
-                                name: tKey + '_52L',
-                                type: 'line', data: l52Changes,
-                                smooth: true, symbol: 'none',
-                                lineStyle: {color: c, width: 2, type: 'dotted'},
-                                itemStyle: {color: c},
-                                connectNulls: false, z: 1,
-                                tooltip: {show: true, formatter: p => `${tKey} 52周最低: ${p.value == null ? '--' : p.value.toFixed(2) + '%'}`}
-                            });
-
-                            // ★ 新增：在最新点标注当前 52 周高低数值
+                        const {high, low} = getLatest52WeekHL(ts);
+                        if (high !== null || low !== null) {
+                            const c = ts.color || '#3b82f6';
                             const mainSeries = series.find(s => s.name === tKey);
                             if (mainSeries) {
-                                if (!mainSeries.markPoint) mainSeries.markPoint = {data: []};
-                                if (!Array.isArray(mainSeries.markPoint.data)) mainSeries.markPoint.data = [];
-                                if (lastValidHi !== null) {
-                                    mainSeries.markPoint.data.push({
+                                const markLineData = [];
+                                if (high !== null) {
+                                    const v = calcTotalChange(base, high);
+                                    markLineData.push({
                                         name: '52周高',
-                                        coord: [latestDate, lastValidHi],
-                                        symbol: 'circle',
-                                        symbolSize: 8,
-                                        itemStyle: {color: c},
+                                        yAxis: v,
+                                        lineStyle: {color: c, type: 'dashed', width: 2, opacity: 0.7},
                                         label: {
                                             show: true,
-                                            position: 'top',
-                                            formatter: `52周高\n${lastValidHi.toFixed(2)}%`,
+                                            position: 'insideEndTop',
+                                            formatter: `52周高 ${v.toFixed(2)}%`,
                                             fontSize: font('tag'),
-                                            color: '#fff',
-                                            backgroundColor: c,
-                                            padding: [3, 6],
-                                            borderRadius: 4,
-                                            fontWeight: 'bold',
-                                            lineHeight: 14
+                                            color: c,
+                                            fontWeight: 'bold'
                                         }
                                     });
                                 }
-                                if (lastValidLo !== null) {
-                                    mainSeries.markPoint.data.push({
+                                if (low !== null) {
+                                    const v = calcTotalChange(base, low);
+                                    markLineData.push({
                                         name: '52周低',
-                                        coord: [latestDate, lastValidLo],
-                                        symbol: 'circle',
-                                        symbolSize: 8,
-                                        itemStyle: {color: c},
+                                        yAxis: v,
+                                        lineStyle: {color: c, type: 'dotted', width: 2, opacity: 0.7},
                                         label: {
                                             show: true,
-                                            position: 'bottom',
-                                            formatter: `52周低\n${lastValidLo.toFixed(2)}%`,
+                                            position: 'insideEndBottom',
+                                            formatter: `52周低 ${v.toFixed(2)}%`,
                                             fontSize: font('tag'),
-                                            color: '#fff',
-                                            backgroundColor: c,
-                                            padding: [3, 6],
-                                            borderRadius: 4,
-                                            fontWeight: 'bold',
-                                            lineHeight: 14
+                                            color: c,
+                                            fontWeight: 'bold'
                                         }
                                     });
+                                }
+                                if (markLineData.length > 0) {
+                                    mainSeries.markLine = {
+                                        symbol: 'none',
+                                        silent: true,
+                                        animation: false,
+                                        data: markLineData
+                                    };
                                 }
                             }
                         }
@@ -6972,45 +7036,57 @@
                 }
             }
 
-            // ★ 次轴曲线：成交量 / 成交额（随图例可见性联动）
-            sortedKeys.forEach(key => {
-                const s = getSeries(key);
-                if (!s) return;
-                if (!(trendLegendSelected.size === 0 || trendLegendSelected.has(key))) return;
+            // ★ 次轴曲线（成交量/成交额）仅 both/secondary 模式显示；实际+计算同时显示
+            if (showSecondary) {
+                sortedKeys.forEach(key => {
+                    const s = getSeries(key);
+                    if (!s) return;
+                    if (!(trendLegendSelected.size === 0 || trendLegendSelected.has(key))) return;
 
-                if (volumeDisplayMode === 'volume') {
-                    // 成交量（A股单位:手；港/美单位:股）
-                    series.push({
-                        name: key + '_VOL',
-                        type: 'line',
-                        yAxisIndex: 1,
-                        data: s.volumeData || emptyArr(dates.length),
-                        smooth: true, symbol: 'none',
-                        lineStyle: {color: s.color, width: 1.2, opacity: 0.45, type: 'dashed'},
-                        itemStyle: {color: s.color, opacity: 0.45},
-                        z: 1, silent: true
-                    });
-                } else {
-                    // 成交额（万元）：实际值优先；指数只使用实际值，不估算；个股缺失时用估算兜底
-                    const isIdx = isIndexCode(s.code);
-                    const actual = (s.amountData || []).map(v => (v > 0 ? v : null));
-                    const est = (s.volumeData || []).map((v, i) => calcAmountFromVolume(v, s.data[i], s.code));
-                    const dataArr = actual.map((a, i) => (a !== null ? a : (isIdx ? null : est[i])));
-                    if (dataArr.some(v => v !== null)) {
+                    if (volumeDisplayMode === 'volume') {
                         series.push({
-                            name: key + '_AMT',
+                            name: key + '_VOL',
                             type: 'line',
                             yAxisIndex: 1,
-                            data: dataArr,
+                            data: s.volumeData || emptyArr(dates.length),
                             smooth: true, symbol: 'none',
-                            connectNulls: false,
                             lineStyle: {color: s.color, width: 1.2, opacity: 0.45, type: 'dashed'},
                             itemStyle: {color: s.color, opacity: 0.45},
                             z: 1, silent: true
                         });
+                    } else {
+                        const isIdx = isIndexCode(s.code);
+                        const actual = (s.amountData || []).map(v => (v > 0 ? v : null));
+                        const est = (s.volumeData || []).map((v, i) => calcAmountFromVolume(v, s.data[i], s.code));
+                        // 实际值
+                        if (actual.some(v => v !== null)) {
+                            series.push({
+                                name: key + '_AMT',
+                                type: 'line', yAxisIndex: 1,
+                                data: actual,
+                                smooth: true, symbol: 'none',
+                                connectNulls: false,
+                                lineStyle: {color: s.color, width: 1.5, type: 'solid', opacity: 0.5},
+                                itemStyle: {color: s.color, opacity: 0.5},
+                                z: 1, silent: true
+                            });
+                        }
+                        // 计算值（指数不估算）
+                        if (!isIdx && est.some(v => v !== null)) {
+                            series.push({
+                                name: key + '_AMT_CALC',
+                                type: 'line', yAxisIndex: 1,
+                                data: est,
+                                smooth: true, symbol: 'none',
+                                connectNulls: false,
+                                lineStyle: {color: s.color, width: 1.2, type: 'dashed', opacity: 0.35},
+                                itemStyle: {color: s.color, opacity: 0.35},
+                                z: 1, silent: true
+                            });
+                        }
                     }
-                }
-            });
+                });
+            }
 
             const legendSelected = {};
             if (trendLegendSelected.size === 0) sortedKeys.forEach(key => legendSelected[key] = true);
@@ -7027,38 +7103,91 @@
                     textStyle: {color: isDark ? '#e2e8f0' : '#1e293b', fontSize: font('tooltip')},
                     formatter: function (params) {
                         if (!params || params.length === 0) return '';
-                        const normalParams = params.filter(p =>
-                            !p.seriesName.endsWith('_52H') &&
-                            !p.seriesName.endsWith('_52L') &&
-                            !p.seriesName.endsWith('_VOL') &&
-                            !p.seriesName.endsWith('_AMT')
-                        );
-                        const sorted = normalParams.slice().sort((a, b) => b.value - a.value);
-                        let s = `<strong>${sorted[0] ? sorted[0].axisValue : params[0].axisValue}</strong><br/>`;
-                        sorted.forEach(p => {
-                            if (p.seriesName) {
-                                const val = p.value;
-                                s += `${p.marker} ${p.seriesName}: <strong>${val.toFixed(2)}%</strong><br/>`;
-                            }
-                        });
-                        // ★ 52周高低附加信息
-                        const h52 = params.find(p => p.seriesName.endsWith('_52H'));
-                        const l52 = params.find(p => p.seriesName.endsWith('_52L'));
-                        if (h52 && h52.value != null) s += `<span style="color:#94a3b8;">┈ 52周高: ${h52.value.toFixed(2)}%</span><br/>`;
-                        if (l52 && l52.value != null) s += `<span style="color:#94a3b8;">┈ 52周低: ${l52.value.toFixed(2)}%</span><br/>`;
-                        // ★ 次轴量/额附加信息
+                        const date = params[0].axisValue;
+                        // 收集三类数据
+                        const mainMap = {};
+                        const volMap = {};
+                        const amtActualMap = {};
+                        const amtCalcMap = {};
                         params.forEach(p => {
-                            if (p.seriesName.endsWith('_VOL')) {
-                                const key = p.seriesName.replace('_VOL', '');
-                                const s2 = getSeries(key);
-                                const unit = (s2 && getMarketType(s2.code) === 'a') ? '手' : '股';
-                                if (p.value != null) s += `<span style="color:#94a3b8;">┈ ${key} 量: ${formatBigNum(p.value)} ${unit}</span><br/>`;
-                            } else if (p.seriesName.endsWith('_AMT')) {
-                                const key = p.seriesName.replace('_AMT', '');
-                                if (p.value != null) s += `<span style="color:#94a3b8;">┈ ${key} 额: ${formatBigNum(p.value)} 万元</span><br/>`;
+                            const sn = p.seriesName;
+                            if (sn.endsWith('_VOL')) {
+                                volMap[sn.slice(0, -4)] = p.value;
+                            } else if (sn.endsWith('_AMT_CALC')) {
+                                amtCalcMap[sn.slice(0, -9)] = p.value;
+                            } else if (sn.endsWith('_AMT')) {
+                                amtActualMap[sn.slice(0, -4)] = p.value;
+                            } else if (!sn.endsWith('_52H') && !sn.endsWith('_52L')) {
+                                mainMap[sn] = p.value;
                             }
                         });
-                        return s;
+                        const keysInParams = new Set([
+                            ...Object.keys(mainMap),
+                            ...Object.keys(volMap),
+                            ...Object.keys(amtActualMap),
+                            ...Object.keys(amtCalcMap)
+                        ]);
+                        const orderedKeys = seriesKeys.filter(k => keysInParams.has(k));
+                        // 按总变化率降序（若有主轴数据）
+                        if (showMain) {
+                            orderedKeys.sort((a, b) => {
+                                const va = mainMap[a] !== undefined ? mainMap[a] : -Infinity;
+                                const vb = mainMap[b] !== undefined ? mainMap[b] : -Infinity;
+                                return vb - va;
+                            });
+                        }
+                        let out = `<strong>${date}</strong><br/>`;
+                        orderedKeys.forEach(key => {
+                            const sk = getSeries(key);
+                            if (!sk) return;
+                            let line = `<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${sk.color};margin-right:4px;vertical-align:middle;"></span>`;
+                            line += `<strong>${key}</strong>`;
+                            const parts = [];
+                            if (showMain && mainMap[key] !== undefined) {
+                                const v = mainMap[key];
+                                const c = v >= 0 ? '#e64340' : '#07c160';
+                                parts.push(`<span style="color:${c};font-weight:700;">${v > 0 ? '+' : ''}${v.toFixed(2)}%</span>`);
+                            }
+                            if (showSecondary) {
+                                if (volumeDisplayMode === 'volume') {
+                                    if (volMap[key] != null && volMap[key] > 0) {
+                                        const unit = getMarketType(sk.code) === 'a' ? '手' : '股';
+                                        parts.push(`<span style="color:#64748b;">量 ${formatBigNum(volMap[key])}${unit}</span>`);
+                                    }
+                                } else {
+                                    const av = amtActualMap[key];
+                                    const cv = amtCalcMap[key];
+                                    if (av != null && av > 0 && cv != null && cv > 0) {
+                                        parts.push(`<span style="color:#64748b;">额 实${formatBigNum(av)}/算${formatBigNum(cv)}万</span>`);
+                                    } else if (av != null && av > 0) {
+                                        parts.push(`<span style="color:#64748b;">额 ${formatBigNum(av)}万</span>`);
+                                    } else if (cv != null && cv > 0) {
+                                        parts.push(`<span style="color:#94a3b8;">额 ${formatBigNum(cv)}万(算)</span>`);
+                                    }
+                                }
+                            }
+                            if (parts.length > 0) line += ' ' + parts.join(' | ');
+                            out += line + '<br/>';
+                        });
+                        // 52 周高低（单指标 + 主显示）
+                        if (showMain) {
+                            const visibleFor52 = trendLegendSelected.size === 0
+                                ? seriesKeys
+                                : seriesKeys.filter(k => trendLegendSelected.has(k));
+                            if (visibleFor52.length === 1) {
+                                const tk = visibleFor52[0];
+                                const ts = getSeries(tk);
+                                if (ts) {
+                                    const base = getBaseValue(ts);
+                                    if (base !== 0) {
+                                        const {high, low} = getLatest52WeekHL(ts);
+                                        if (high !== null) out += `<span style="color:#94a3b8;">┈ 52周高 ${calcTotalChange(base, high).toFixed(2)}%</span><br/>`;
+                                        if (low !== null) out += `<span style="color:#94a3b8;">┈ 52周低 ${calcTotalChange(base, low).toFixed(2)}%</span><br/>`;
+                                    }
+                                }
+                            }
+                        }
+                        return out;
                     }
                 },
                 legend: {
@@ -7067,7 +7196,12 @@
                     itemWidth: 10, itemHeight: 10,
                     textStyle: {fontSize: font('legend'), color: isDark ? '#94a3b8' : '#475569'}
                 },
-                grid: {left: 70, right: 70, top: 45, bottom: isMobileView() ? 55 : 50},
+                grid: {
+                    left: showMain ? 70 : 20,
+                    right: showSecondary ? 70 : 20,
+                    top: 45,
+                    bottom: isMobileView() ? 55 : 50
+                },
                 xAxis: {
                     type: 'category', data: dates, boundaryGap: false,
                     axisLine: {lineStyle: {color: isDark ? '#334155' : '#eef2f6'}},
@@ -7081,6 +7215,7 @@
                 yAxis: [
                     {
                         type: 'value', min: yMin, max: yMax,
+                        show: showMain,
                         axisLabel: {
                             color: isDark ? '#94a3b8' : '#475569',
                             fontSize: font('axis'),
@@ -7093,11 +7228,13 @@
                         axisLine: {show: false}, axisTick: {show: false}
                     },
                     {
-                        // ★ 次轴：成交量 / 成交额
                         type: 'value',
                         name: volumeDisplayMode === 'volume' ? '成交量' : '成交额',
                         nameTextStyle: {fontSize: font('tag'), color: isDark ? '#94a3b8' : '#475569'},
                         position: 'right',
+                        show: showSecondary,
+                        min: secondaryYMin,
+                        max: secondaryYMax,
                         axisLabel: {
                             color: isDark ? '#94a3b8' : '#475569',
                             fontSize: font('axis'),
@@ -7246,14 +7383,41 @@
         resetYBtnChart.addEventListener('click', resetYAxis);
         chartDom.addEventListener('dblclick', resetYAxis);
 
+        // ★ 重置次轴（清空自定义范围并重新渲染）
         resetZoomBtnChart.addEventListener('click', function () {
             if (viewMode === 'ranking') {renderChart(); return;}
-            focusChartToBaseDate();
+            secondaryYMin = null;
+            secondaryYMax = null;
+            renderChart();
+            saveState();
         });
 
         chartContainer.addEventListener('wheel', function (e) {
             e.preventDefault();
             const delta = e.deltaY > 0 ? 1 : -1;
+
+            if (e.shiftKey && axisDisplayMode !== 'main') {
+                // ★ Shift + 滚轮：缩放次轴
+                let baseMin = secondaryYMin, baseMax = secondaryYMax;
+                if (baseMin === null || baseMax === null) {
+                    const r = getCurrentSecondaryRange();
+                    baseMin = r.min;
+                    baseMax = r.max;
+                }
+                const range = baseMax - baseMin;
+                const step = range * 0.1;
+                let newMin = baseMin + delta * step;
+                let newMax = baseMax - delta * step;
+                if (newMin < newMax) {
+                    secondaryYMin = newMin;
+                    secondaryYMax = newMax;
+                    renderChart();
+                    saveState();
+                }
+                return;
+            }
+
+            // 主轴缩放
             const step = 5;
             let newMin = yMin + delta * step;
             let newMax = yMax - delta * step;
@@ -7519,6 +7683,8 @@
             });
             seriesKeys = seriesList.map(s => s.name);
             yMin = -50; yMax = 150;
+            secondaryYMin = null; secondaryYMax = null;
+            axisDisplayMode = 'both';
             mainTitle = '🌈 总变化率趋势';
             mainTitleInput.value = mainTitle;
             showGrid = true;
