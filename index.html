@@ -5438,12 +5438,24 @@
                 alert('⚠️ 请先为指标输入股票代码\n\n格式示例：\n• A股：sh000001、sz000625\n• 港股：hk01810\n• 美股：usNVDA');
                 return;
             }
-            const startDate = dates[0];
+            // ★ 默认至少拉取 250 个交易日的历史（约 400 个自然日），确保能计算 52 周高低
             const todayStr0 = getTodayStr();
             const lastLocal = dates[dates.length - 1];
             const endDate = (lastLocal && lastLocal > todayStr0) ? lastLocal : todayStr0;
+            const MIN_CALENDAR_DAYS = 400;   // 250 交易日 ≈ 350~380 自然日，留足余量
+            const currentFirst = dates[0];
+            const currentSpanDays = Math.ceil((new Date(endDate) - new Date(currentFirst)) / (1000 * 60 * 60 * 24));
+            let startDate;
+            if (currentSpanDays >= MIN_CALENDAR_DAYS) {
+                startDate = currentFirst;   // 已有跨度足够，不回溯
+            } else {
+                const d = new Date(endDate);
+                d.setDate(d.getDate() - MIN_CALENDAR_DAYS);
+                startDate = d.toISOString().slice(0, 10);   // 回溯到 400 天前
+            }
             const dayDiff = Math.ceil((new Date(endDate) - new Date(startDate)) / (1000 * 60 * 60 * 24)) + 20;
-            const count = Math.min(Math.max(dayDiff, 50), 500);
+            // ★ count 至少 400，最多 500（腾讯接口上限）
+            const count = Math.min(Math.max(dayDiff, 400), 500);
             const errors = [];
             setStatus('loading', `历史校验中 (${names.length} 只)...`);
 
@@ -5535,6 +5547,7 @@
             let addedDateCount = 0;
             let addedListStr = '';
             if (missingDates.length > 0) {
+                const oldFirstDate = dates[0];   // ★ 保存原首日，扩展后判断是否需要跟随
                 const oldDataBySeries = {};
                 seriesList.forEach(s => {
                     const oldMap = {};
@@ -5597,6 +5610,11 @@
                     });
                 });
                 dates = newDates;
+                // ★ 若 baseDate 原本就是原首日（用户未手动调整），自动跟随到新首日
+                //   否则保留用户手动设置的起点不变
+                if (baseDate === oldFirstDate) {
+                    baseDate = dates[0];
+                }
             }
 
             // 阶段三：用 K 线刷新历史价格
@@ -5666,6 +5684,20 @@
             resetDanmaku();
             saveState();
 
+            // ★ 若本次扩展了历史，自动把 X 轴显示范围拉到全范围，让用户立即看到新补充的交易日
+            if (addedDateCount > 0) {
+                setTimeout(() => {
+                    try {
+                        myChart.dispatchAction({
+                            type: 'dataZoom',
+                            startValue: dates[0],
+                            endValue: dates[dates.length - 1],
+                            dataZoomIndex: 0
+                        });
+                    } catch (e) { }
+                }, 100);
+            }
+
             let msg = `📊 历史校验完成\n\n`;
             if (addedDateCount > 0) msg += `🆕 补充交易日: ${addedDateCount} 个\n  ${addedListStr}\n\n`;
             msg += `✅ 更新: ${updatedCount} 只股票，共 ${totalMatched} 条数据\n`;
@@ -5674,6 +5706,7 @@
             if (updatedCount === 0 && addedDateCount === 0) {
                 msg += `\n\n💡 建议:\n`;
                 msg += `1. 检查股票代码是否正确（如 sh000001、usNVDA）\n`;
+                msg += `   （本功能默认尝试拉取至少 250 个交易日历史，用于 52 周高低计算）\n`;
                 msg += `2. 检查日期是否为交易日（周末/节假日无数据）\n`;
                 msg += `3. 打开控制台查看详细日志 (F12)`;
             }
@@ -6823,7 +6856,7 @@
                 };
             }).filter(s => s !== null);
 
-            // ★ 新增：单选中某个指标时，动态计算并叠加 52 周高低曲线
+            // ★ 52周高低曲线 + 最新点数值标注（单选中某个指标时显示）
             const visibleKeys = trendLegendSelected.size === 0
                 ? sortedKeys
                 : sortedKeys.filter(k => trendLegendSelected.has(k));
@@ -6837,9 +6870,10 @@
                         const RANGE_N = 250;
                         const h52Changes = [];
                         const l52Changes = [];
+                        // ★ 记录最近一个有值的 52 周高低（便于末端标注）
+                        let lastValidHi = null;
+                        let lastValidLo = null;
                         for (let i = 0; i < n; i++) {
-                            // ★ 修正：满 250 个交易日后才计算（前 249 天不显示）
-                            //   因为窗口固定，高低点大多保持不变 → 曲线呈现阶梯状水平线
                             if (i < RANGE_N - 1) {
                                 h52Changes.push(null);
                                 l52Changes.push(null);
@@ -6853,28 +6887,87 @@
                                 if (h > 0) hi = Math.max(hi, h);
                                 if (l > 0) lo = Math.min(lo, l);
                             }
-                            h52Changes.push(hi === -Infinity ? null : calcTotalChange(base, hi));
-                            l52Changes.push(lo === Infinity ? null : calcTotalChange(base, lo));
+                            if (hi !== -Infinity) {
+                                const v = calcTotalChange(base, hi);
+                                h52Changes.push(v);
+                                lastValidHi = v;
+                            } else h52Changes.push(null);
+                            if (lo !== Infinity) {
+                                const v = calcTotalChange(base, lo);
+                                l52Changes.push(v);
+                                lastValidLo = v;
+                            } else l52Changes.push(null);
                         }
                         const c = ts.color || '#3b82f6';
-                        series.push({
-                            name: tKey + '_52H',
-                            type: 'line', data: h52Changes,
-                            smooth: true, symbol: 'none',
-                            lineStyle: {color: c, width: 2, type: 'dashed'},
-                            itemStyle: {color: c},
-                            connectNulls: false, z: 1,
-                            tooltip: {show: true, formatter: p => `${tKey} 52周最高: ${p.value == null ? '--' : p.value.toFixed(2) + '%'}`}
-                        });
-                        series.push({
-                            name: tKey + '_52L',
-                            type: 'line', data: l52Changes,
-                            smooth: true, symbol: 'none',
-                            lineStyle: {color: c, width: 2, type: 'dotted'},
-                            itemStyle: {color: c},
-                            connectNulls: false, z: 1,
-                            tooltip: {show: true, formatter: p => `${tKey} 52周最低: ${p.value == null ? '--' : p.value.toFixed(2) + '%'}`}
-                        });
+                        if (lastValidHi !== null || lastValidLo !== null) {
+                            series.push({
+                                name: tKey + '_52H',
+                                type: 'line', data: h52Changes,
+                                smooth: true, symbol: 'none',
+                                lineStyle: {color: c, width: 2, type: 'dashed'},
+                                itemStyle: {color: c},
+                                connectNulls: false, z: 1,
+                                tooltip: {show: true, formatter: p => `${tKey} 52周最高: ${p.value == null ? '--' : p.value.toFixed(2) + '%'}`}
+                            });
+                            series.push({
+                                name: tKey + '_52L',
+                                type: 'line', data: l52Changes,
+                                smooth: true, symbol: 'none',
+                                lineStyle: {color: c, width: 2, type: 'dotted'},
+                                itemStyle: {color: c},
+                                connectNulls: false, z: 1,
+                                tooltip: {show: true, formatter: p => `${tKey} 52周最低: ${p.value == null ? '--' : p.value.toFixed(2) + '%'}`}
+                            });
+
+                            // ★ 新增：在最新点标注当前 52 周高低数值
+                            const mainSeries = series.find(s => s.name === tKey);
+                            if (mainSeries) {
+                                if (!mainSeries.markPoint) mainSeries.markPoint = {data: []};
+                                if (!Array.isArray(mainSeries.markPoint.data)) mainSeries.markPoint.data = [];
+                                if (lastValidHi !== null) {
+                                    mainSeries.markPoint.data.push({
+                                        name: '52周高',
+                                        coord: [latestDate, lastValidHi],
+                                        symbol: 'circle',
+                                        symbolSize: 8,
+                                        itemStyle: {color: c},
+                                        label: {
+                                            show: true,
+                                            position: 'top',
+                                            formatter: `52周高\n${lastValidHi.toFixed(2)}%`,
+                                            fontSize: font('tag'),
+                                            color: '#fff',
+                                            backgroundColor: c,
+                                            padding: [3, 6],
+                                            borderRadius: 4,
+                                            fontWeight: 'bold',
+                                            lineHeight: 14
+                                        }
+                                    });
+                                }
+                                if (lastValidLo !== null) {
+                                    mainSeries.markPoint.data.push({
+                                        name: '52周低',
+                                        coord: [latestDate, lastValidLo],
+                                        symbol: 'circle',
+                                        symbolSize: 8,
+                                        itemStyle: {color: c},
+                                        label: {
+                                            show: true,
+                                            position: 'bottom',
+                                            formatter: `52周低\n${lastValidLo.toFixed(2)}%`,
+                                            fontSize: font('tag'),
+                                            color: '#fff',
+                                            backgroundColor: c,
+                                            padding: [3, 6],
+                                            borderRadius: 4,
+                                            fontWeight: 'bold',
+                                            lineHeight: 14
+                                        }
+                                    });
+                                }
+                            }
+                        }
                     }
                 }
             }
