@@ -2675,6 +2675,9 @@
         // ★ 新增空数组工具
         function emptyArr(n) {return new Array(n || 0).fill(0);}
 
+        // ★ 需要跟随日期扩展的数组字段（high52Data/low52Data 已废弃，不再扩展）
+        const TIME_SERIES_ARR_KEYS = ['peData', 'volumeData', 'amountData', 'turnoverData'];
+
         let dates = [...initialDates];
         let seriesList = Object.keys(initialSeriesData).map(name => ({
             name: name,
@@ -2691,8 +2694,10 @@
             volumeData: emptyArr(initialDates.length),
             amountData: emptyArr(initialDates.length),
             turnoverData: emptyArr(initialDates.length),
-            high52Data: emptyArr(initialDates.length),
-            low52Data: emptyArr(initialDates.length)
+            latest52High: null,
+            latest52Low: null,
+            high52Data: [],
+            low52Data: []
         }));
         let seriesKeys = seriesList.map(s => s.name);
         let legendChanging = false;
@@ -3061,7 +3066,18 @@
 
         // ★ 新增：获取某个系列最新的 52 周最高/最低价（单一值，非滚动曲线）
         function getLatest52WeekHL(series) {
-            if (!series || !Array.isArray(series.high52Data) || !Array.isArray(series.low52Data)) {
+            if (!series) return {high: null, low: null};
+
+            // ★ 优先使用“最新 52 周高低”单一值，避免保存/扫描整段 high52Data/low52Data
+            if (typeof series.latest52High === 'number' || typeof series.latest52Low === 'number') {
+                return {
+                    high: (typeof series.latest52High === 'number' && series.latest52High > 0) ? series.latest52High : null,
+                    low: (typeof series.latest52Low === 'number' && series.latest52Low > 0) ? series.latest52Low : null
+                };
+            }
+
+            // 兼容旧数据：仅当没有 latest52High/low 时才回退扫描旧数组
+            if (!Array.isArray(series.high52Data) || !Array.isArray(series.low52Data)) {
                 return {high: null, low: null};
             }
             const n = series.high52Data.length;
@@ -3181,8 +3197,8 @@
                     const firstLow = s.lowData[0] || 0;
                     s.lowData = [...new Array(prefixLen).fill(firstLow), ...s.lowData];
                 }
-                // ★ 新数组同步扩展
-                ['peData', 'volumeData', 'amountData', 'turnoverData', 'high52Data', 'low52Data'].forEach(k => {
+                // ★ 新数组同步扩展（不含已废弃的 high52Data/low52Data）
+                TIME_SERIES_ARR_KEYS.forEach(k => {
                     if (Array.isArray(s[k])) {
                         s[k] = [...new Array(prefixLen).fill(0), ...s[k]];
                     }
@@ -3213,7 +3229,7 @@
 
         function alignDataLengths() {
             const len = dates.length;
-            const newArrKeys = ['peData', 'volumeData', 'amountData', 'turnoverData', 'high52Data', 'low52Data'];
+            const newArrKeys = TIME_SERIES_ARR_KEYS;
             seriesList.forEach(s => {
                 while (s.data.length < len) s.data.push(s.data[0] || 1);
                 while (s.data.length > len) s.data.pop();
@@ -3244,8 +3260,8 @@
                     const oldLow = s.lowData.slice();
                     s.lowData = combined.map(item => oldLow[item.index]);
                 }
-                // ★ 新增数组同步
-                ['peData', 'volumeData', 'amountData', 'turnoverData', 'high52Data', 'low52Data'].forEach(k => {
+                // ★ 新增数组同步（不含已废弃的 high52Data/low52Data）
+                TIME_SERIES_ARR_KEYS.forEach(k => {
                     if (Array.isArray(s[k])) {
                         const old = s[k].slice();
                         s[k] = combined.map(item => old[item.index] !== undefined ? old[item.index] : 0);
@@ -3317,8 +3333,11 @@
                         volumeData: s.volumeData || [],
                         amountData: s.amountData || [],
                         turnoverData: s.turnoverData || [],
-                        high52Data: s.high52Data || [],
-                        low52Data: s.low52Data || []
+                        latest52High: (typeof s.latest52High === 'number') ? s.latest52High : null,
+                        latest52Low: (typeof s.latest52Low === 'number') ? s.latest52Low : null,
+                        // ★ 不再持久化滚动 52 周全量数组，只保留最新单一值
+                        high52Data: [],
+                        low52Data: []
                     };
                 }),
                 baseDate: baseDate,
@@ -3381,8 +3400,11 @@
                     volumeData: s.volumeData || new Array(len).fill(0),
                     amountData: s.amountData || new Array(len).fill(0),
                     turnoverData: s.turnoverData || new Array(len).fill(0),
-                    high52Data: s.high52Data || new Array(len).fill(0),
-                    low52Data: s.low52Data || new Array(len).fill(0)
+                    latest52High: (typeof s.latest52High === 'number') ? s.latest52High : null,
+                    latest52Low: (typeof s.latest52Low === 'number') ? s.latest52Low : null,
+                    // ★ 旧版全量数组不再进入内存主数据；需要时重新点“校验历史数据”生成 latest52High/low
+                    high52Data: [],
+                    low52Data: []
                 };
             });
             seriesKeys = seriesList.map(s => s.name);
@@ -3467,18 +3489,35 @@
             return true;
         }
 
-        function saveState() {
-            try {
-                const state = getCurrentState();
-                localStorage.setItem('trendState', JSON.stringify(state));
-            } catch (e) {
-                try {
-                    const stateNoAvatar = getCurrentState();
-                    stateNoAvatar.seriesList.forEach(s => s.avatarUrl = '');
-                    localStorage.setItem('trendState', JSON.stringify(stateNoAvatar));
-                } catch (e2) {console.warn('二次保存失败', e2);}
+        let _saveStateTimer = null;
+        function saveState(immediate) {
+            if (typeof immediate !== 'boolean') immediate = false;  // ★ 过滤 Event 等非布尔入参
+            if (_saveStateTimer) {
+                clearTimeout(_saveStateTimer);
+                _saveStateTimer = null;
             }
+
+            const doSave = function () {
+                _saveStateTimer = null;
+                try {
+                    const state = getCurrentState();
+                    localStorage.setItem('trendState', JSON.stringify(state));
+                } catch (e) {
+                    try {
+                        const stateNoAvatar = getCurrentState();
+                        stateNoAvatar.seriesList.forEach(s => s.avatarUrl = '');
+                        localStorage.setItem('trendState', JSON.stringify(stateNoAvatar));
+                    } catch (e2) {console.warn('二次保存失败', e2);}
+                }
+            };
+
+            if (immediate) doSave();
+            else _saveStateTimer = setTimeout(doSave, 300);
         }
+
+        window.addEventListener('beforeunload', function () {
+            if (_saveStateTimer) saveState(true);
+        });
 
         function loadState() {
             const saved = localStorage.getItem('trendState');
@@ -3868,8 +3907,10 @@
                                 volumeData: emptyArr(newDates.length),
                                 amountData: emptyArr(newDates.length),
                                 turnoverData: emptyArr(newDates.length),
-                                high52Data: emptyArr(newDates.length),
-                                low52Data: emptyArr(newDates.length)
+                                latest52High: null,
+                                latest52Low: null,
+                                high52Data: [],
+                                low52Data: []
                             };
                             seriesList.push(newSeries);
                         }
@@ -5068,7 +5109,7 @@
                     dates.splice(idx, 1);
                     seriesList.forEach(s => {
                         s.data.splice(idx, 1);
-                        ['highData', 'lowData', 'peData', 'volumeData', 'amountData', 'turnoverData', 'high52Data', 'low52Data'].forEach(k => {
+                        ['highData', 'lowData', ...TIME_SERIES_ARR_KEYS].forEach(k => {
                             if (Array.isArray(s[k])) s[k].splice(idx, 1);
                         });
                     });
@@ -5097,7 +5138,7 @@
             seriesList.forEach(s => {
                 const prevVal = s.data[insertIndex - 1] || s.data[0] || 1;
                 s.data.splice(insertIndex, 0, prevVal);
-                ['highData', 'lowData', 'peData', 'volumeData', 'amountData', 'turnoverData', 'high52Data', 'low52Data'].forEach(k => {
+                ['highData', 'lowData', ...TIME_SERIES_ARR_KEYS].forEach(k => {
                     if (!Array.isArray(s[k])) s[k] = emptyArr(dates.length - 1);
                     const prev = s[k][insertIndex - 1] || 0;
                     s[k].splice(insertIndex, 0, prev);
@@ -5121,7 +5162,9 @@
                 highData: emptyArr(dates.length), lowData: emptyArr(dates.length),
                 peData: emptyArr(dates.length), volumeData: emptyArr(dates.length),
                 amountData: emptyArr(dates.length), turnoverData: emptyArr(dates.length),
-                high52Data: emptyArr(dates.length), low52Data: emptyArr(dates.length),
+                latest52High: null,
+                latest52Low: null,
+                high52Data: [], low52Data: [],
                 avatarUrl: '', avatarData: null, remark: '新指标', code: '', danmaku: []
             };
             makeCircularImage(DEFAULT_AVATAR_SVG, (circularUrl) => {
@@ -5348,7 +5391,7 @@
                         const prevIdx = oldLen - 1;
                         const prevVal = (prevIdx >= 0 && prevIdx < s.data.length) ? s.data[prevIdx] : (s.data[0] || 1);
                         s.data.push(prevVal);
-                        ['highData', 'lowData', 'peData', 'volumeData', 'amountData', 'turnoverData', 'high52Data', 'low52Data'].forEach(k => {
+                        ['highData', 'lowData', ...TIME_SERIES_ARR_KEYS].forEach(k => {
                             if (!Array.isArray(s[k])) s[k] = emptyArr(oldLen);
                             s[k].push(0);
                         });
@@ -5630,7 +5673,10 @@
             allKlineDates.forEach(d => {if (!existingSet.has(d)) missingDates.push(d);});
             let addedDateCount = 0;
             let addedListStr = '';
-            if (missingDates.length > 0) {
+            // ★ 未改起点时，只补充 baseDate 及之后的缺失交易日；
+            //   baseDate 之前的历史只用于临时计算 52 周高低，不并入 dates/seriesList
+            const needDates = missingDates.filter(d => d >= baseDate);
+            if (needDates.length > 0) {
                 const oldFirstDate = dates[0];
                 const oldDataBySeries = {};
                 seriesList.forEach(s => {
@@ -5645,9 +5691,9 @@
                     });
                     oldDataBySeries[s.name] = oldMap;
                 });
-                const newDates = [...dates, ...missingDates].sort();
-                addedDateCount = missingDates.length;
-                addedListStr = missingDates.slice().sort().join(', ');
+                const newDates = [...dates, ...needDates].sort();
+                addedDateCount = needDates.length;
+                addedListStr = needDates.slice().sort().join(', ');
 
                 seriesList.forEach(s => {
                     const oldMap = oldDataBySeries[s.name] || {};
@@ -5686,8 +5732,8 @@
                     s.highData = newHigh;
                     s.lowData = newLow;
                     s.volumeData = newVol;
-                    // 其他新增数组占位补 0（长度对齐）
-                    ['peData', 'amountData', 'turnoverData', 'high52Data', 'low52Data'].forEach(k => {
+                    // 其他新增数组占位补 0（长度对齐；不含已废弃的 high52Data/low52Data）
+                    ['peData', 'amountData', 'turnoverData'].forEach(k => {
                         if (!Array.isArray(s[k])) s[k] = emptyArr(newDates.length);
                         while (s[k].length < newDates.length) s[k].push(0);
                         while (s[k].length > newDates.length) s[k].pop();
@@ -5735,34 +5781,39 @@
                 else {s.updateStatus = 'error'; errors.push(`${name}: 无匹配数据`);}
             }
 
-            // 阶段四：滚动计算 52 周高低（250 个交易日）
-            //   ★ 说明：high52Data / low52Data 保留每个日期的滚动 52 周高低（用于历史追踪）
-            //   ★ 趋势图上会使用 getLatest52WeekHL() 取"最新值"绘制水平参考线，
-            //     从而符合"52周高低是某一时刻的单一值"的金融学定义
+            // 阶段四：只计算“最新 52 周高低”单一值，不再生成/保存滚动全量数组
             const RANGE_N = 250;
             for (const name of names) {
                 const s = getSeries(name);
-                if (!s) continue;
-                if (!Array.isArray(s.highData) || !Array.isArray(s.lowData)) continue;
-                const n = dates.length;
-                const h52 = new Array(n).fill(0);
-                const l52 = new Array(n).fill(0);
-                for (let i = 0; i < n; i++) {
-                    if (i < RANGE_N - 1) {h52[i] = 0; l52[i] = 0; continue;}
-                    const start = i - (RANGE_N - 1);
-                    let hi = -Infinity, lo = Infinity;
-                    for (let j = start; j <= i; j++) {
-                        const h = s.highData[j] || 0;
-                        const l = s.lowData[j] || 0;
-                        if (h > 0) hi = Math.max(hi, h);
-                        if (l > 0) lo = Math.min(lo, l);
-                    }
-                    h52[i] = hi === -Infinity ? 0 : hi;
-                    l52[i] = lo === Infinity ? 0 : lo;
+                const dataMap = klineMap[name];
+                if (!s || !dataMap) continue;
+
+                const kDates = Object.keys(dataMap).sort();
+                const recentDates = kDates.slice(-RANGE_N);
+
+                let hi = 0;
+                let lo = Infinity;
+                for (let i = 0; i < recentDates.length; i++) {
+                    const row = dataMap[recentDates[i]];
+                    if (!row) continue;
+                    if (row.high > 0) hi = Math.max(hi, row.high);
+                    if (row.low > 0) lo = Math.min(lo, row.low);
                 }
-                s.high52Data = h52;
-                s.low52Data = l52;
+
+                s.latest52High = hi > 0 ? hi : null;
+                s.latest52Low = (lo !== Infinity) ? lo : null;
+
+                // ★ 清空旧全量数组，释放引用
+                s.high52Data = [];
+                s.low52Data = [];
             }
+
+            // ★ 关键：计算完成后立即释放临时 K 线缓存
+            Object.keys(klineMap).forEach(k => {
+                klineMap[k] = null;
+                delete klineMap[k];
+            });
+            allKlineDates.clear();
 
             const px = getSeries('飘小仙');
             if (px) px.data = px.data.map(() => 1);
@@ -7613,6 +7664,10 @@
                 setTimeout(() => {refreshPrices(true);}, 2500);
                 const expandBtn = document.querySelector('#priceInfoDetails .expand-table-btn');
                 if (expandBtn) expandBtn.click();
+                // ★ 升级后提示：若存在有股票代码但 52 周高低为空的指标，提示用户手动校验
+                if (seriesList.some(s => s.code && (s.latest52High === null || s.latest52Low === null))) {
+                    console.info('📌 52 周高低数据尚未生成，可点击📜「校验历史数据」重新计算（趋势图单选中指标时显示参考线）');
+                }
             }
 
             fetch('data.json?t=' + Date.now())
@@ -7695,7 +7750,9 @@
                     highData: emptyArr(len), lowData: emptyArr(len),
                     peData: emptyArr(len), volumeData: emptyArr(len),
                     amountData: emptyArr(len), turnoverData: emptyArr(len),
-                    high52Data: emptyArr(len), low52Data: emptyArr(len),
+                    latest52High: null,
+                    latest52Low: null,
+                    high52Data: [], low52Data: [],
                     avatarUrl: '', avatarData: null, remark: remark,
                     code: defaultCodes[name] || '',
                     danmaku: remark ? [remark] : ['默认弹幕']
