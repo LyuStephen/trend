@@ -3286,6 +3286,9 @@
                     ? {n: 7, type: 'dotted', width: 1.1, opacity: 0.40, z: 1}
                     : {n: 250, type: 'solid', width: 1.5, opacity: 0.75, z: 3});
             const addedIndices = [];
+            // ★ 单指标时叠加均值参考线
+            const visibleKeys = sortedKeys.filter(k => !keyVisibilityFn || keyVisibilityFn(k));
+            const singleVisible = visibleKeys.length === 1;
             sortedKeys.forEach(key => {
                 const s = getSeries(key);
                 if (!s) return;
@@ -3309,13 +3312,47 @@
                 });
                 if (!pct.some(v => v !== null)) return;
                 const idx = seriesArr.length;
-                seriesArr.push({
+                const seriesObj = {
                     name: key + prefix + p.n,
                     type: 'line', yAxisIndex: 1, data: pct, smooth: true,
                     symbol: 'circle', symbolSize: 2, showSymbol: false, connectNulls: false,
                     lineStyle: {width: p.width, type: p.type, opacity: p.opacity},
                     itemStyle: {opacity: p.opacity}, z: p.z, silent: true
-                });
+                };
+                // ★ 单指标时叠加 52周/30日/7日 均值参考线（换算到当前百分比坐标）
+                if (singleVisible) {
+                    const rs = ensureRefStats(s);
+                    const stats = isVolPct ? (rs && rs.volume) : (rs && rs.amount);
+                    const avgOfPeriod = stats ? stats['avg' + p.n] : null;
+                    if (stats && avgOfPeriod != null && avgOfPeriod > 0) {
+                        const avgDefs = [
+                            {key: 'avg250', label: '52周均', color: '#f59e0b', type: 'solid'},
+                            {key: 'avg30', label: '30日均', color: '#8b5cf6', type: 'dashed'},
+                            {key: 'avg7', label: '7日均', color: '#06b6d4', type: 'dotted'}
+                        ];
+                        const markLineData = [];
+                        avgDefs.forEach(a => {
+                            const v = stats[a.key];
+                            if (v != null && v > 0) {
+                                const pctVal = v / avgOfPeriod * 100;
+                                markLineData.push({
+                                    name: a.label,
+                                    yAxis: pctVal,
+                                    lineStyle: {color: a.color, type: a.type, width: 1.5, opacity: 0.75},
+                                    label: {
+                                        show: true, position: 'insideStartTop',
+                                        formatter: `${a.label} ${pctVal.toFixed(1)}%`,
+                                        fontSize: font('tag'), color: a.color, fontWeight: 'bold'
+                                    }
+                                });
+                            }
+                        });
+                        if (markLineData.length > 0) {
+                            seriesObj.markLine = {symbol: 'none', silent: true, animation: false, data: markLineData};
+                        }
+                    }
+                }
+                seriesArr.push(seriesObj);
                 addedIndices.push(idx);
             });
             return addedIndices;
