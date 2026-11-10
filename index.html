@@ -3496,15 +3496,14 @@
             if (!newDates.length) return false;
             const prefixLen = newDates.length;
             seriesList.forEach(s => {
-                const firstVal = (s.data && s.data[0] !== undefined) ? s.data[0] : 1;
-                s.data = [...new Array(prefixLen).fill(firstVal), ...s.data];
+                // ★ 用 0 填充前缀占位（首次 verify 会替换为真实值）
+                //   0 会被 calcRefStats 的 v>0 判断过滤，不污染 52 周窗口 / validDays
+                s.data = [...new Array(prefixLen).fill(0), ...s.data];
                 if (Array.isArray(s.highData)) {
-                    const firstHigh = s.highData[0] || 0;
-                    s.highData = [...new Array(prefixLen).fill(firstHigh), ...s.highData];
+                    s.highData = [...new Array(prefixLen).fill(0), ...s.highData];
                 }
                 if (Array.isArray(s.lowData)) {
-                    const firstLow = s.lowData[0] || 0;
-                    s.lowData = [...new Array(prefixLen).fill(firstLow), ...s.lowData];
+                    s.lowData = [...new Array(prefixLen).fill(0), ...s.lowData];
                 }
                 TIME_SERIES_ARR_KEYS.forEach(k => {
                     if (Array.isArray(s[k])) {
@@ -3706,8 +3705,11 @@
                         var n = (typeof v === 'number') ? v : parseFloat(v);
                         return (isFinite(n) && n > 0) ? n : null;
                     })(s.latest52Low),
-                    refStats: s.refStats && s.refStats.price && s.refStats.volume && s.refStats.amount
-                        ? s.refStats : null,   // ★ 保持 null 让懒计算补齐
+                    refStats: (s.refStats && s.refStats.price && s.refStats.volume && s.refStats.amount
+                        && typeof s.refStats.price.validDays === 'number'
+                        && typeof s.refStats.volume.validDays === 'number'
+                        && typeof s.refStats.amount.validDays === 'number')
+                        ? s.refStats : null,   // ★ 旧 JSON（无 validDays）丢弃，懒计算重算
                     high52Data: [], low52Data: [],
                     _changeCache: null
                 };
