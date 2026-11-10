@@ -3111,21 +3111,78 @@
             return result;
         }
 
+        // ★ 需求2：为单选中指标构建参考统计数据（52周高低、52周/30日/7日均值）
+        function buildRefStats(s, isVol) {
+            if (!s) return null;
+            let arr;
+            if (isVol) {
+                arr = Array.isArray(s.volumeData) ? s.volumeData.slice() : [];
+            } else {
+                const actualAmt = Array.isArray(s.amountData) ? s.amountData.slice() : [];
+                arr = actualAmt.map((v, i) => {
+                    if (v != null && v > 0) return v;
+                    const calc = calcAmountFromVolume((s.volumeData || [])[i], s.data[i], s.code);
+                    return calc != null ? calc : null;
+                });
+            }
+            if (!arr.some(v => v != null && v > 0)) return null;
+            const n = arr.length;
+            const start = Math.max(0, n - 250);
+            let hi = null, lo = null;
+            for (let i = start; i < n; i++) {
+                const v = arr[i];
+                if (v != null && v > 0 && isFinite(v)) {
+                    if (hi === null || v > hi) hi = v;
+                    if (lo === null || v < lo) lo = v;
+                }
+            }
+            const avgOf = (k) => {
+                const from = Math.max(0, n - k);
+                let sum = 0, cnt = 0;
+                for (let i = from; i < n; i++) {
+                    const v = arr[i];
+                    if (v != null && v > 0 && isFinite(v)) { sum += v; cnt++; }
+                }
+                return cnt > 0 ? sum / cnt : null;
+            };
+            return {
+                high: hi,
+                low: lo,
+                avg250: avgOf(250),
+                avg30: avgOf(30),
+                avg7: avgOf(7)
+            };
+        }
+
         // ★ 新增：为次轴添加 pct 曲线（52周 / 30日 / 7日）
+        //   返回：新增 series 在 seriesArr 里的索引数组（供 visualMap 着色使用）
         function addSecondaryPctSeriesToTrend(seriesArr, sortedKeys, isVolPct, keyVisibilityFn) {
-            const arrKey = isVolPct ? 'volumeData' : 'amountData';
             const prefix = isVolPct ? '_VOL_PCT' : '_AMT_PCT';
             const periods = [
                 {n: 250, type: 'solid',  width: 1.5, opacity: 0.75, z: 3},
                 {n: 30,  type: 'dashed', width: 1.3, opacity: 0.55, z: 2},
                 {n: 7,   type: 'dotted', width: 1.1, opacity: 0.40, z: 1}
             ];
+            const addedIndices = [];
             sortedKeys.forEach(key => {
                 const s = getSeries(key);
                 if (!s) return;
                 if (keyVisibilityFn && !keyVisibilityFn(key)) return;
-                const arr = Array.isArray(s[arrKey]) ? s[arrKey] : [];
+
+                // ★ 需求1：成交额% 时，优先用 amountData，缺失的点用 calcAmountFromVolume 补齐
+                let arr;
+                if (isVolPct) {
+                    arr = Array.isArray(s.volumeData) ? s.volumeData.slice() : [];
+                } else {
+                    const actualAmt = Array.isArray(s.amountData) ? s.amountData.slice() : [];
+                    arr = actualAmt.map((v, i) => {
+                        if (v != null && v > 0) return v;
+                        const calc = calcAmountFromVolume((s.volumeData || [])[i], s.data[i], s.code);
+                        return calc != null ? calc : null;
+                    });
+                }
                 if (!arr.some(v => v != null && v > 0)) return;
+
                 periods.forEach(p => {
                     const avg = buildMovingAverage(arr, p.n);
                     const pct = arr.map((v, i) => {
@@ -3133,6 +3190,7 @@
                         return v / avg[i] * 100;
                     });
                     if (!pct.some(v => v !== null)) return;
+                    const idx = seriesArr.length;
                     seriesArr.push({
                         name: key + prefix + p.n,
                         type: 'line',
@@ -3143,13 +3201,16 @@
                         symbolSize: 2,
                         showSymbol: false,
                         connectNulls: false,
-                        lineStyle: {color: s.color, width: p.width, type: p.type, opacity: p.opacity},
-                        itemStyle: {color: s.color, opacity: p.opacity},
+                        // ★ 需求3：颜色交由 visualMap 按值着色（>=100红，<100绿）
+                        lineStyle: {width: p.width, type: p.type, opacity: p.opacity},
+                        itemStyle: {opacity: p.opacity},
                         z: p.z,
                         silent: true
                     });
+                    addedIndices.push(idx);
                 });
             });
+            return addedIndices;
         }
 
         // ★ 新增：计算当前次轴数据的合理范围（用于 Shift+滚轮缩放次轴的基线）
@@ -6778,12 +6839,13 @@
             }
 
             // ★ 次轴曲线：成交量 / 成交额 / 成交量% / 成交额%
+            let pctSeriesIndices = [];
             if (showSecondary) {
                 if (volumeDisplayMode === 'volumePct' || volumeDisplayMode === 'amountPct') {
                     const isVolPct = (volumeDisplayMode === 'volumePct');
                     const selectedSet = new Set(selectedKeys);
                     const keyVis = (k) => selectedSet.has(k);
-                    addSecondaryPctSeriesToTrend(allSeries, waterfallSortedKeys, isVolPct, keyVis);
+                    pctSeriesIndices = addSecondaryPctSeriesToTrend(allSeries, waterfallSortedKeys, isVolPct, keyVis);
                 } else {
                     selectedKeys.forEach(key => {
                         const s = getSeries(key);
@@ -6956,7 +7018,7 @@
                                 html += `</div>`;
                             });
                         }
-                        // ★ 次轴量/额附加信息
+                        // ★ 次轴量/额附加信息（包含 pct 段 + 单选中参考统计）
                         const pctGrouped = {};
                         params.forEach(p => {
                             const sn = p.seriesName;
@@ -6988,6 +7050,39 @@
                             if (g['7']   != null) ps.push(`7日 ${g['7'].toFixed(1)}%`);
                             if (ps.length > 0) html += `<span style="color:#94a3b8;">┈ ${key} ${ps.join(' | ')}</span><br/>`;
                         });
+                        // ★ 需求2：单选中瀑布图系列时，展示 52 周高低 + 成交量/成交额参考
+                        if (showMain && selectedKeys.length === 1) {
+                            const tk = selectedKeys[0];
+                            const ts = getSeries(tk);
+                            if (ts) {
+                                const base = getBaseValue(ts);
+                                if (base !== 0) {
+                                    const {high, low} = getLatest52WeekHL(ts);
+                                    if (high !== null) html += `<span style="color:#94a3b8;">┈ 52周高 ${calcTotalChange(base, high).toFixed(2)}%</span><br/>`;
+                                    if (low !== null) html += `<span style="color:#94a3b8;">┈ 52周低 ${calcTotalChange(base, low).toFixed(2)}%</span><br/>`;
+                                }
+                                const volStats = buildRefStats(ts, true);
+                                const amtStats = buildRefStats(ts, false);
+                                const unit = getMarketType(ts.code) === 'a' ? '手' : '股';
+                                if (volStats) {
+                                    html += `<hr style="margin:6px 0; border:none; border-top:1px dashed #cbd5e1;"/>`;
+                                    html += `<strong>📊 成交量参考</strong><br/>`;
+                                    html += `<span style="color:#94a3b8; padding-left:8px;">52周高 ${formatBigNum(volStats.high)} ${unit}</span><br/>`;
+                                    html += `<span style="color:#94a3b8; padding-left:8px;">52周低 ${formatBigNum(volStats.low)} ${unit}</span><br/>`;
+                                    html += `<span style="color:#94a3b8; padding-left:8px;">52周均 ${formatBigNum(volStats.avg250)} ${unit}</span><br/>`;
+                                    html += `<span style="color:#94a3b8; padding-left:8px;">30日均 ${formatBigNum(volStats.avg30)} ${unit}</span><br/>`;
+                                    html += `<span style="color:#94a3b8; padding-left:8px;">7日均 ${formatBigNum(volStats.avg7)} ${unit}</span><br/>`;
+                                }
+                                if (amtStats) {
+                                    html += `<strong>💵 成交额参考</strong><br/>`;
+                                    html += `<span style="color:#94a3b8; padding-left:8px;">52周高 ${formatBigNum(amtStats.high)} 万元</span><br/>`;
+                                    html += `<span style="color:#94a3b8; padding-left:8px;">52周低 ${formatBigNum(amtStats.low)} 万元</span><br/>`;
+                                    html += `<span style="color:#94a3b8; padding-left:8px;">52周均 ${formatBigNum(amtStats.avg250)} 万元</span><br/>`;
+                                    html += `<span style="color:#94a3b8; padding-left:8px;">30日均 ${formatBigNum(amtStats.avg30)} 万元</span><br/>`;
+                                    html += `<span style="color:#94a3b8; padding-left:8px;">7日均 ${formatBigNum(amtStats.avg7)} 万元</span><br/>`;
+                                }
+                            }
+                        }
                         return html;
                     },
                     backgroundColor: isDark ? '#2d3748' : '#ffffff',
@@ -7060,6 +7155,17 @@
                     textStyle: {color: isDark ? '#94a3b8' : '#475569', fontSize: font('tag')},
                     minSpan: 1, maxSpan: 100
                 }],
+                // ★ 需求3：pct 曲线按值分段着色（>=100红，<100绿）
+                visualMap: pctSeriesIndices.length > 0 ? [{
+                    show: false,
+                    seriesIndex: pctSeriesIndices,
+                    dimension: 1,
+                    pieces: [
+                        {max: 99.999, color: '#07c160'},
+                        {min: 100, color: '#e64340'}
+                    ],
+                    outOfRange: {color: '#94a3b8'}
+                }] : [],
                 series: allSeries, graphic
             };
 
@@ -7244,11 +7350,12 @@
             }
 
             // ★ 次轴曲线（成交量/成交额/成交量%/成交额%）
+            let pctSeriesIndices = [];
             if (showSecondary) {
                 if (volumeDisplayMode === 'volumePct' || volumeDisplayMode === 'amountPct') {
                     const isVolPct = (volumeDisplayMode === 'volumePct');
                     const keyVis = (k) => trendLegendSelected.size === 0 || trendLegendSelected.has(k);
-                    addSecondaryPctSeriesToTrend(series, sortedKeys, isVolPct, keyVis);
+                    pctSeriesIndices = addSecondaryPctSeriesToTrend(series, sortedKeys, isVolPct, keyVis);
                 } else {
                     sortedKeys.forEach(key => {
                         const s = getSeries(key);
@@ -7355,6 +7462,7 @@
                             });
                         }
                         let out = `<strong>${date}</strong><br/>`;
+                        const dateIdx = dates.indexOf(date);
                         orderedKeys.forEach(key => {
                             const sk = getSeries(key);
                             if (!sk) return;
@@ -7386,10 +7494,19 @@
                                     const pct = pctMap[key];
                                     if (pct) {
                                         const ps = [];
+                                        // ★ 需求1：成交额% 时，若实际数据缺失则用计算值，并加（算）标注
+                                        let calcNote = '';
+                                        if (volumeDisplayMode === 'amountPct' && dateIdx >= 0) {
+                                            const actual = (sk.amountData || [])[dateIdx];
+                                            if (!(actual != null && actual > 0)) {
+                                                const calc = calcAmountFromVolume((sk.volumeData || [])[dateIdx], sk.data[dateIdx], sk.code);
+                                                if (calc != null) calcNote = '（算）';
+                                            }
+                                        }
                                         if (pct['250'] != null && pct['250'] > 0) ps.push(`52周 ${pct['250'].toFixed(1)}%`);
                                         if (pct['30']  != null && pct['30']  > 0) ps.push(`30日 ${pct['30'].toFixed(1)}%`);
                                         if (pct['7']   != null && pct['7']   > 0) ps.push(`7日 ${pct['7'].toFixed(1)}%`);
-                                        if (ps.length > 0) parts.push(`<span style="color:#64748b;">${ps.join(' | ')}</span>`);
+                                        if (ps.length > 0) parts.push(`<span style="color:#64748b;">${ps.join(' | ')}${calcNote}</span>`);
                                     }
                                 }
                             }
@@ -7409,6 +7526,27 @@
                                         const {high, low} = getLatest52WeekHL(ts);
                                         if (high !== null) out += `<span style="color:#94a3b8;">┈ 52周高 ${calcTotalChange(base, high).toFixed(2)}%</span><br/>`;
                                         if (low !== null) out += `<span style="color:#94a3b8;">┈ 52周低 ${calcTotalChange(base, low).toFixed(2)}%</span><br/>`;
+                                    }
+                                    // ★ 需求2：单选中时展示成交量/成交额参考数据
+                                    const volStats = buildRefStats(ts, true);
+                                    const amtStats = buildRefStats(ts, false);
+                                    const unit = getMarketType(ts.code) === 'a' ? '手' : '股';
+                                    if (volStats) {
+                                        out += `<hr style="margin:6px 0; border:none; border-top:1px dashed #cbd5e1;"/>`;
+                                        out += `<strong>📊 成交量参考</strong><br/>`;
+                                        out += `<span style="color:#94a3b8; padding-left:8px;">52周高 ${formatBigNum(volStats.high)} ${unit}</span><br/>`;
+                                        out += `<span style="color:#94a3b8; padding-left:8px;">52周低 ${formatBigNum(volStats.low)} ${unit}</span><br/>`;
+                                        out += `<span style="color:#94a3b8; padding-left:8px;">52周均 ${formatBigNum(volStats.avg250)} ${unit}</span><br/>`;
+                                        out += `<span style="color:#94a3b8; padding-left:8px;">30日均 ${formatBigNum(volStats.avg30)} ${unit}</span><br/>`;
+                                        out += `<span style="color:#94a3b8; padding-left:8px;">7日均 ${formatBigNum(volStats.avg7)} ${unit}</span><br/>`;
+                                    }
+                                    if (amtStats) {
+                                        out += `<strong>💵 成交额参考</strong><br/>`;
+                                        out += `<span style="color:#94a3b8; padding-left:8px;">52周高 ${formatBigNum(amtStats.high)} 万元</span><br/>`;
+                                        out += `<span style="color:#94a3b8; padding-left:8px;">52周低 ${formatBigNum(amtStats.low)} 万元</span><br/>`;
+                                        out += `<span style="color:#94a3b8; padding-left:8px;">52周均 ${formatBigNum(amtStats.avg250)} 万元</span><br/>`;
+                                        out += `<span style="color:#94a3b8; padding-left:8px;">30日均 ${formatBigNum(amtStats.avg30)} 万元</span><br/>`;
+                                        out += `<span style="color:#94a3b8; padding-left:8px;">7日均 ${formatBigNum(amtStats.avg7)} 万元</span><br/>`;
                                     }
                                 }
                             }
@@ -7491,6 +7629,17 @@
                     textStyle: {color: isDark ? '#94a3b8' : '#475569', fontSize: font('tag')},
                     minSpan: 1, maxSpan: 100
                 }],
+                // ★ 需求3：pct 曲线按值分段着色（>=100红，<100绿）
+                visualMap: pctSeriesIndices.length > 0 ? [{
+                    show: false,
+                    seriesIndex: pctSeriesIndices,
+                    dimension: 1,
+                    pieces: [
+                        {max: 99.999, color: '#07c160'},
+                        {min: 100, color: '#e64340'}
+                    ],
+                    outOfRange: {color: '#94a3b8'}
+                }] : [],
                 series
             };
 
