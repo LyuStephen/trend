@@ -4785,7 +4785,9 @@
         }
 
         function getDisplayDates() {
-            return dates.length > MAX_TABLE_COLS ? dates.slice(-MAX_TABLE_COLS) : dates;
+            const baseIdx = getBaseIdx();
+            const available = dates.slice(Math.max(0, baseIdx));   // 只从 baseDate 开始
+            return available.length > MAX_TABLE_COLS ? available.slice(-MAX_TABLE_COLS) : available;
         }
 
         function buildDateHeadHtml() {
@@ -5855,7 +5857,7 @@
             const todayStr0 = getTodayStr();
             const lastLocal = dates[dates.length - 1];
             const endDate = (lastLocal && lastLocal > todayStr0) ? lastLocal : todayStr0;
-            const MIN_CALENDAR_DAYS = 400;
+            const MIN_CALENDAR_DAYS = 600;
             const currentFirst = dates[0];
             const currentSpanDays = Math.ceil((new Date(endDate) - new Date(currentFirst)) / (1000 * 60 * 60 * 24));
             let startDate;
@@ -5866,12 +5868,14 @@
                 startDate = d.toISOString().slice(0, 10);
             }
             const dayDiff = Math.ceil((new Date(endDate) - new Date(startDate)) / (1000 * 60 * 60 * 24)) + 20;
-            const count = Math.min(Math.max(dayDiff, 400), 500);
+            const count = Math.min(Math.max(dayDiff, 600), 800);
             const errors = [];
             setStatus('loading', `历史校验中 (${names.length} 只)...`);
 
             const klineMap = {};
             const allKlineDates = new Set();
+            const allUSKlineDates = new Set();          // ★ 新增：美股日期备用池
+
 
             const historyOverlay = document.getElementById('historyUpdateOverlay');
             const historyStatusEl = document.getElementById('historyUpdateStatus');
@@ -5947,11 +5951,15 @@
                         }
                     });
                     klineMap[name] = dataMap;
-                    if (!formattedCode.startsWith('us')) {
-                        Object.keys(dataMap).forEach(d => {
-                            if (d >= startDate && d <= endDate) allKlineDates.add(d);
-                        });
-                    }
+                    // ★ 修复：美股也参与日期池收集，避免"全美股组合"52周窗口退化。
+                    //   A股/港股交易日历更标准，优先使用；美股日期仅在非美股为空时兜底。
+                    const _isUS = formattedCode.startsWith('us');
+                    Object.keys(dataMap).forEach(d => {
+                        if (d >= startDate && d <= endDate) {
+                            if (_isUS) allUSKlineDates.add(d);
+                            else allKlineDates.add(d);
+                        }
+                    });
                 } catch (err) {
                     errors.push(`${name}: ${err.message || '网络错误'}`);
                     s.updateStatus = 'error';
@@ -5960,10 +5968,19 @@
 
             const existingSet = new Set(dates);
             const missingDates = [];
-            allKlineDates.forEach(d => {if (!existingSet.has(d)) missingDates.push(d);});
+            const _finalDatePool = allKlineDates.size > 0 ? allKlineDates : allUSKlineDates;
+            _finalDatePool.forEach(d => {if (!existingSet.has(d)) missingDates.push(d);});
             let addedDateCount = 0;
             let addedListStr = '';
-            const needDates = missingDates.filter(d => d >= baseDate);
+            // ★ 修复：保留 baseDate 之前最多 250 个交易日，用于 52 周高低/均值的正确计算。
+            // 金融行业标准：52 周高低基于最近 250 个交易日的实际数据。
+            // 图表通过 dataZoom 从 baseDate 开始显示，不影响视觉效果。
+            const _sortedMissing = missingDates.slice().sort();
+            const _beforeBase = _sortedMissing.filter(d => d < baseDate);
+            const _afterBase = _sortedMissing.filter(d => d >= baseDate);
+            const _KEEP_BEFORE = 250;                            // 52 周交易日数
+            const _keepBeforeBase = _beforeBase.slice(-_KEEP_BEFORE);
+            const needDates = [..._keepBeforeBase, ..._afterBase];
             if (needDates.length > 0) {
                 const oldDataBySeries = {};
                 seriesList.forEach(s => {
@@ -5979,8 +5996,8 @@
                     oldDataBySeries[s.name] = oldMap;
                 });
                 const newDates = [...dates, ...needDates].sort();
-                addedDateCount = needDates.length;
-                addedListStr = needDates.slice().sort().join(', ');
+                addedDateCount = _afterBase.length;
+                addedListStr = _afterBase.join(', ');
 
                 seriesList.forEach(s => {
                     const oldMap = oldDataBySeries[s.name] || {};
@@ -6070,6 +6087,7 @@
 
             Object.keys(klineMap).forEach(k => {klineMap[k] = null; delete klineMap[k];});
             allKlineDates.clear();
+            allUSKlineDates.clear();
 
             const px = getSeries('飘小仙');
             if (px) px.data = px.data.map(() => 1);
@@ -6093,7 +6111,10 @@
             }
 
             let msg = `📊 历史校验完成\n\n`;
-            if (addedDateCount > 0) msg += `🆕 补充交易日: ${addedDateCount} 个\n  ${addedListStr}\n\n`;
+            if (_keepBeforeBase.length > 0) {
+                msg += `📚 52周计算补充(幕后): ${_keepBeforeBase.length} 日（${_keepBeforeBase[0]} ~ ${_keepBeforeBase[_keepBeforeBase.length - 1]}）\n`;
+            }
+            if (addedDateCount > 0) msg += `🆕 图表新增: ${addedDateCount} 个\n  ${addedListStr}\n\n`;
             msg += `✅ 更新: ${updatedCount} 只股票，共 ${totalMatched} 条数据\n`;
             msg += `📈 已计算 ${names.length} 只股票的 52 周高低/均值参考\n`;
             if (errors.length > 0) msg += `\n⚠️ 失败详情:\n${errors.map(e => `  • ${e}`).join('\n')}`;
@@ -7865,6 +7886,16 @@
                 if (expandBtnEl) expandBtnEl.click();
                 if (seriesList.some(s => s.code && (s.latest52High === null || s.latest52Low === null))) {
                     console.info('📌 52 周高低数据尚未生成，可点击📜「校验历史数据」重新计算');
+                }
+                const _lastVerifyTs = parseInt(localStorage.getItem('lastVerifyTs') || '0', 10);
+                const _need52W = dates.length < 250 && (Date.now() - _lastVerifyTs > 24 * 3600 * 1000);
+                if (_need52W && seriesList.some(s => s.code && s.code.trim())) {
+                    setTimeout(() => {
+                        try {
+                            localStorage.setItem('lastVerifyTs', String(Date.now()));
+                            verifyHistoricalData();
+                        } catch (e) {console.warn('自动补历史失败', e);}
+                    }, 3000);
                 }
             }
 
