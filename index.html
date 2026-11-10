@@ -3196,8 +3196,16 @@
         }
 
         // ★ 构建次轴 markLine（高/低/52周均/30日均/7日均）
-        function buildSecondaryMarkLine(stats, unitLabel) {
+        //   opts.dualAxis=true 时：均线位置放右端（insideEndTop），加"次·"前缀，且用红/洋红/深青区分主轴（琥珀/紫/青）
+        //   单轴（默认）：位置左端（insideStartTop），无前缀，原色
+        function buildSecondaryMarkLine(stats, unitLabel, opts) {
             if (!stats) return null;
+            const dualAxis = !!(opts && opts.dualAxis);
+            const prefix = dualAxis ? '次·' : '';
+            const posAvg = dualAxis ? 'insideEndTop' : 'insideStartTop';
+            const c250 = dualAxis ? '#dc2626' : '#f59e0b';
+            const c30 = dualAxis ? '#c026d3' : '#8b5cf6';
+            const c7 = dualAxis ? '#0d9488' : '#06b6d4';
             const markLineData = [];
             if (stats.high != null && stats.high > 0) {
                 markLineData.push({
@@ -3206,7 +3214,7 @@
                     lineStyle: {color: '#e64340', type: 'dashed', width: 1.5, opacity: 0.75},
                     label: {
                         show: true, position: 'insideEndTop',
-                        formatter: `${unitLabel}高 ${formatBigNum(stats.high)}`,
+                        formatter: `${prefix}${unitLabel}高 ${formatBigNum(stats.high)}`,
                         fontSize: font('tag'), color: '#e64340', fontWeight: 'bold'
                     }
                 });
@@ -3218,15 +3226,15 @@
                     lineStyle: {color: '#07c160', type: 'dotted', width: 1.5, opacity: 0.75},
                     label: {
                         show: true, position: 'insideEndBottom',
-                        formatter: `${unitLabel}低 ${formatBigNum(stats.low)}`,
+                        formatter: `${prefix}${unitLabel}低 ${formatBigNum(stats.low)}`,
                         fontSize: font('tag'), color: '#07c160', fontWeight: 'bold'
                     }
                 });
             }
             const avgDefs = [
-                {key: 'avg250', label: `${unitLabel}52周均`, color: '#f59e0b', type: 'solid'},
-                {key: 'avg30', label: `${unitLabel}30日均`, color: '#8b5cf6', type: 'dashed'},
-                {key: 'avg7', label: `${unitLabel}7日均`, color: '#06b6d4', type: 'dotted'}
+                {key: 'avg250', label: `${unitLabel}52周均`, color: c250, type: 'solid'},
+                {key: 'avg30', label: `${unitLabel}30日均`, color: c30, type: 'dashed'},
+                {key: 'avg7', label: `${unitLabel}7日均`, color: c7, type: 'dotted'}
             ];
             avgDefs.forEach(a => {
                 const val = stats[a.key];
@@ -3236,8 +3244,8 @@
                         yAxis: val,
                         lineStyle: {color: a.color, type: a.type, width: 1.5, opacity: 0.75},
                         label: {
-                            show: true, position: 'insideStartTop',
-                            formatter: `${a.label} ${formatBigNum(val)}`,
+                            show: true, position: posAvg,
+                            formatter: `${prefix}${a.label} ${formatBigNum(val)}`,
                             fontSize: font('tag'), color: a.color, fontWeight: 'bold'
                         }
                     });
@@ -3374,10 +3382,12 @@
                     const stats = isVolPct ? (rs && rs.volume) : (rs && rs.amount);
                     const avgOfPeriod = stats ? stats['avg' + p.n] : null;
                     if (stats && avgOfPeriod != null && avgOfPeriod > 0) {
+                        // ★ 双轴模式（labelPrefix 非空）用暖冷异色区分主轴（琥珀/紫/青）与次轴（红/洋红/深青）
+                        const _isDualColor = !!labelPrefix;
                         const avgDefs = [
-                            {key: 'avg250', label: '52周均', color: '#f59e0b', type: 'solid'},
-                            {key: 'avg30', label: '30日均', color: '#8b5cf6', type: 'dashed'},
-                            {key: 'avg7', label: '7日均', color: '#06b6d4', type: 'dotted'}
+                            {key: 'avg250', label: '52周均', color: _isDualColor ? '#dc2626' : '#f59e0b', type: 'solid'},
+                            {key: 'avg30', label: '30日均', color: _isDualColor ? '#c026d3' : '#8b5cf6', type: 'dashed'},
+                            {key: 'avg7', label: '7日均', color: _isDualColor ? '#0d9488' : '#06b6d4', type: 'dotted'}
                         ];
                         // ★ 双轴模式（_p 非空）下次轴均线放右端（insideEndTop）+ 前缀；单轴模式保持左端
                         const _p = labelPrefix || '';
@@ -7389,7 +7399,8 @@
                         //   靠 legend.selected 控制可见性（"仅次轴"模式下点击图例后文字全在、非被选项变灰）
                         //   此前跳过创建 → 仅次轴模式下被隐藏的图例项无对应 series → 文字消失
 
-                        const isSingle = (singleSelectedKey === key) && !showMain;
+                        // ★ 双轴模式单指标也挂次轴均线（不仅是次轴模式）
+                        const isSingle = (singleSelectedKey === key);
 
                         if (volumeDisplayMode === 'volume') {
                             // ★ 统一：次轴 series 名字一律用原始 key，与主轴同名，图例一起联动
@@ -7406,7 +7417,8 @@
                             if (isSingle) {
                                 const rs = ensureRefStats(s);
                                 if (rs && rs.volume) {
-                                    const ml = buildSecondaryMarkLine(rs.volume, '量');
+                                    // ★ 双轴时传 dualAxis，让次轴均线用"次·"前缀+右端+异色
+                                    const ml = buildSecondaryMarkLine(rs.volume, '量', {dualAxis: showMain && showSecondary});
                                     if (ml) volSeries.markLine = ml;
                                 }
                             }
@@ -7462,11 +7474,13 @@
                                 }
                             } else {
                                 // 主轴+次轴模式：实际成交额（实线）+ 估算成交额（虚线）
-                                if (actual.some(v => v !== null)) {
+                                const _rs = ensureRefStats(s);   // ★ 双轴：单指标挂次轴均线
+                                const _hasActual2 = actual.some(v => v !== null);
+                                if (_hasActual2) {
                                     // ★ 统一：名字用原始 key，图例一起联动
                                     const seriesName = key;
                                     seriesMeta[series.length] = {key: key, type: 'amt'};
-                                    series.push({
+                                    const amtSeries = {
                                         name: seriesName, type: 'line', yAxisIndex: 1, data: actual,
                                         smooth: true, symbol: 'circle', symbolSize: 3, showSymbol: true,
                                         connectNulls: false,
@@ -7474,20 +7488,32 @@
                                         lineStyle: {color: s.color, width: 1.5, type: 'solid', opacity: 0.6},
                                         itemStyle: {color: s.color, opacity: 0.6},
                                         z: 1, silent: true
-                                    });
+                                    };
+                                    // ★ 双轴：单指标时挂次轴均线（右端 + "次·"前缀 + 异色，与主轴均线区分）
+                                    if (isSingle && _rs && _rs.amount) {
+                                        const ml = buildSecondaryMarkLine(_rs.amount, '额', {dualAxis: true});
+                                        if (ml) amtSeries.markLine = ml;
+                                    }
+                                    series.push(amtSeries);
                                 }
                                 if (!isIdx && est.some(v => v !== null)) {
                                     // ★ 统一：名字用原始 key
                                     const seriesName = key;
                                     seriesMeta[series.length] = {key: key, type: 'amtCalc'};
-                                    series.push({
+                                    const amtCalcSeries = {
                                         name: seriesName, type: 'line', yAxisIndex: 1, data: est,
                                         smooth: true, symbol: 'circle', symbolSize: 3, showSymbol: true,
                                         connectNulls: false,
                                         lineStyle: {color: s.color, width: 1.2, type: 'dashed', opacity: 0.35},
                                         itemStyle: {color: s.color, opacity: 0.35},
                                         z: 1, silent: true
-                                    });
+                                    };
+                                    // ★ 双轴：无实际线时才挂（避免重复）
+                                    if (!_hasActual2 && isSingle && _rs && _rs.amount) {
+                                        const ml = buildSecondaryMarkLine(_rs.amount, '额', {dualAxis: true});
+                                        if (ml) amtCalcSeries.markLine = ml;
+                                    }
+                                    series.push(amtCalcSeries);
                                 }
                             }
                         }
