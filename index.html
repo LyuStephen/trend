@@ -3308,7 +3308,7 @@
             };
         }
 
-        function addSecondaryPctSeriesToTrend(seriesArr, sortedKeys, isVolPct, period, keyVisibilityFn, useOriginalName, seriesMeta, createAllSeries) {
+        function addSecondaryPctSeriesToTrend(seriesArr, sortedKeys, isVolPct, period, keyVisibilityFn, useOriginalName, seriesMeta, createAllSeries, labelPrefix) {
             const prefix = isVolPct ? '_VOL_PCT' : '_AMT_PCT';
             const p = period === 30
                 ? {n: 30, type: 'dashed', width: 1.3, opacity: 0.55, z: 2}
@@ -3379,6 +3379,9 @@
                             {key: 'avg30', label: '30日均', color: '#8b5cf6', type: 'dashed'},
                             {key: 'avg7', label: '7日均', color: '#06b6d4', type: 'dotted'}
                         ];
+                        // ★ 双轴模式（_p 非空）下次轴均线放右端（insideEndTop）+ 前缀；单轴模式保持左端
+                        const _p = labelPrefix || '';
+                        const _pos = _p ? 'insideEndTop' : 'insideStartTop';
                         _markLineData = [];
                         avgDefs.forEach(a => {
                             const v = stats[a.key];
@@ -3389,8 +3392,8 @@
                                     yAxis: pctVal,
                                     lineStyle: {color: a.color, type: a.type, width: 1.5, opacity: 0.75},
                                     label: {
-                                        show: true, position: 'insideStartTop',
-                                        formatter: `${a.label} ${pctVal.toFixed(1)}%`,
+                                        show: true, position: _pos,
+                                        formatter: `${_p}${a.label} ${pctVal.toFixed(1)}%`,
                                         fontSize: font('tag'), color: a.color, fontWeight: 'bold'
                                     }
                                 });
@@ -7302,14 +7305,20 @@
                         if (mainSeries) {
                             const markLineData = [];
                             const c = ts.color || '#3b82f6';
+                            // ★ 双轴模式：主轴均线全部放左端（insideStart*），加"主·"前缀；
+                            //   与次轴均线（右端 insideEnd* + "次·" 前缀）左右分开、显式区分
+                            const _dualAxis = showMain && showSecondary;
+                            const _mainPrefix = _dualAxis ? '主·' : '';
+                            const _highPos = _dualAxis ? 'insideStartTop' : 'insideEndTop';
+                            const _lowPos = _dualAxis ? 'insideStartBottom' : 'insideEndBottom';
                             if (high !== null) {
                                 const v = calcTotalChange(base, high);
                                 markLineData.push({
                                     name: '52周高', yAxis: v,
                                     lineStyle: {color: c, type: 'dashed', width: 2, opacity: 0.7},
                                     label: {
-                                        show: true, position: 'insideEndTop',
-                                        formatter: `52周高 ${v.toFixed(2)}%`,
+                                        show: true, position: _highPos,
+                                        formatter: `${_mainPrefix}52周高 ${v.toFixed(2)}%`,
                                         fontSize: font('tag'), color: c, fontWeight: 'bold'
                                     }
                                 });
@@ -7320,8 +7329,8 @@
                                     name: '52周低', yAxis: v,
                                     lineStyle: {color: c, type: 'dotted', width: 2, opacity: 0.7},
                                     label: {
-                                        show: true, position: 'insideEndBottom',
-                                        formatter: `52周低 ${v.toFixed(2)}%`,
+                                        show: true, position: _lowPos,
+                                        formatter: `${_mainPrefix}52周低 ${v.toFixed(2)}%`,
                                         fontSize: font('tag'), color: c, fontWeight: 'bold'
                                     }
                                 });
@@ -7343,7 +7352,7 @@
                                             lineStyle: {color: a.color, type: a.type, width: 1.5, opacity: 0.75},
                                             label: {
                                                 show: true, position: 'insideStartTop',
-                                                formatter: `${a.label} ${v.toFixed(2)}%`,
+                                                formatter: `${_mainPrefix}${a.label} ${v.toFixed(2)}%`,
                                                 fontSize: font('tag'), color: a.color, fontWeight: 'bold'
                                             }
                                         });
@@ -7366,7 +7375,8 @@
                     const keyVis = (k) => trendLegendSelected.size === 0 || trendLegendSelected.has(k);
                     // ★ 修复：始终创建所有 key 的百分比 series（第 8 参 true），
                     //   使"仅次轴"模式下点击图例后文字全在、非被选项变灰（与主轴一致）
-                    pctSeriesIndices = addSecondaryPctSeriesToTrend(series, sortedKeys, isVolPct, period, keyVis, !showMain, seriesMeta, true);
+                    // ★ 双轴模式下次轴均线加"次·"前缀（第 9 参），与主轴均线的"主·"前缀区分
+                    pctSeriesIndices = addSecondaryPctSeriesToTrend(series, sortedKeys, isVolPct, period, keyVis, !showMain, seriesMeta, true, (showMain && showSecondary) ? '次·' : '');
                 } else {
                     // ★ 仅次轴模式下，将次轴曲线使用"原始指标名"命名，图例项可点击单选多选
                     const visibleForSecondary = visibleKeys;
