@@ -6222,6 +6222,20 @@
             lastUpdateTime.textContent = '校验于 ' + new Date().toLocaleTimeString();
             _verifyHistoricalRunning = false;
         }
+        // ★ 判断数据是否已足够（避免 data.json 已经完整时还重复拉历史）
+        //   标准：所有"有股票代码"的 series，其 52 周窗口内的有效交易日 >= 250
+        //   - 无代码的 series（如"飘小仙"）不参与判断
+        //   - 数据完整的 data.json：立即返回 true → 跳过阶段 1
+        //   - 硬编码默认数据（仅 7 天）：validDays=7 → 返回 false → 触发阶段 1
+        function isHistoryDataSufficient() {
+            const codeSeries = seriesList.filter(s => s.code && s.code.trim());
+            if (codeSeries.length === 0) return true;   // 无代码，无需更新历史
+            for (const s of codeSeries) {
+                const rs = ensureRefStats(s);           // 首次调用会懒计算并缓存
+                if (!rs || !rs.price || (rs.price.validDays || 0) < 250) return false;
+            }
+            return true;
+        }
         // ★ 启动编排：先补历史数据，完成后再刷新实时股价
         //   两个阶段共用一个全屏遮罩（autoRefreshOverlay），阶段切换时只更新文案
         let _bootstrapping = false;
@@ -6248,8 +6262,10 @@
             if (_bootstrapping) return;
             _bootstrapping = true;
             const hasCodes = seriesList.some(s => s.code && s.code.trim());
+            // ★ 数据已足够（data.json 完整 / 本地缓存完整）→ 跳过阶段 1，直接刷股价
+            const needHistory = hasCodes && !isHistoryDataSufficient();
             try {
-                if (hasCodes) {
+                if (needHistory) {
                     // ── 阶段 1：历史数据更新 ──
                     _renderAutoOverlay('📜', '正在更新历史数据...', '从腾讯接口拉取K线，补齐52周窗口');
                     try {
@@ -6260,11 +6276,13 @@
                     }
                     // ── 阶段 1 → 阶段 2 过渡：仅切换文案，不关闭遮罩 ──
                     _renderAutoOverlay('🔄', '正在获取最新数据...', '从腾讯接口同步实时行情');
+                } else if (hasCodes) {
+                    console.info('[启动] 历史数据已充足（52周完整），跳过自动补历史，直接刷新实时股价');
                 }
             } finally {
                 _bootstrapping = false;
             }
-            // ── 阶段 2：刷新实时股价（refreshPrices(true) 会自动接管遮罩，完成后关闭）──
+            // ── 阶段 2：始终刷新实时股价（refreshPrices(true) 会自动接管遮罩，完成后关闭）──
             refreshPrices(true);
         }
 
