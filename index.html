@@ -2110,6 +2110,7 @@
                         <option value="volumePct">📈 次轴:成交量%</option>
                         <option value="amountPct">📈 次轴:成交额%</option>
                     </select>
+                    <button class="btn-outline" id="toggleAvatarBtn" title="切换趋势图末端头像显示">🖼️ 隐藏头像</button>
                     <button class="grid-toggle" id="gridToggle">📏</button>
                     <button class="theme-toggle" id="themeToggle">🌙</button>
                     <button class="danmaku-toggle" id="danmakuToggle" title="弹幕开关">💬</button>
@@ -2675,6 +2676,7 @@
         let priceTablePeMode = 'vs';
         let priceTableTurnoverMode = 'vs';
         let volumeDisplayMode = 'volume';
+        let showTrendAvatars = true; // 新增：控制趋势图末端头像的显示
 
         let shiftPressed = false;
         document.addEventListener('keydown', function (e) {
@@ -2756,6 +2758,7 @@
         const viewToggleGroup = document.getElementById('viewToggleGroup');
         const rankingDatePicker = document.getElementById('rankingDatePicker');
         const rankingDateInput = document.getElementById('rankingDateInput');
+        const toggleAvatarBtn = document.getElementById('toggleAvatarBtn'); // 新增
 
         // ================================================================
         //  弹幕
@@ -3389,6 +3392,7 @@
                 axisDisplayMode: axisDisplayMode, mainTitle: mainTitle,
                 darkMode: document.body.classList.contains('dark'),
                 showGrid: showGrid,
+                showTrendAvatars: showTrendAvatars, // 保存状态
                 trendLegendSelected: Array.from(trendLegendSelected),
                 statsDisplayMode: statsDisplayMode,
                 detailsOpen: {
@@ -3458,6 +3462,7 @@
             userThemeOverride = state.userThemeOverride !== undefined ? state.userThemeOverride : false;
             if (state.showGrid !== undefined) showGrid = state.showGrid;
             gridToggle.textContent = showGrid ? '📏' : '📏';
+            showTrendAvatars = state.showTrendAvatars !== undefined ? state.showTrendAvatars : true;
             viewMode = (state.viewMode === 'volume') ? 'trend' : (state.viewMode || 'trend');
             waterfallSeriesName = state.waterfallSeriesName || (seriesKeys[0] || '');
             if (!seriesKeys.includes(waterfallSeriesName) && seriesKeys.length > 0) waterfallSeriesName = seriesKeys[0];
@@ -3524,7 +3529,6 @@
         let _saveStateTimer = null;
         function trimStateForStorage(state) {
             state.seriesList.forEach(s => {
-                // 保存时不存 base64，避免长字符串占用内存
                 if (typeof s.avatarUrl === 'string' && s.avatarUrl.startsWith('data:image')) {
                     s.avatarUrl = '';
                 }
@@ -3589,6 +3593,10 @@
                 axisDisplayToggle.classList.toggle('show', viewMode === 'trend' || viewMode === 'waterfall');
                 axisDisplayToggle.value = axisDisplayMode;
             }
+            // 同步按钮文字
+            if (toggleAvatarBtn) {
+                toggleAvatarBtn.textContent = showTrendAvatars ? '🖼️ 隐藏头像' : '🖼️ 显示头像';
+            }
             updateWaterfallSelect();
             if (viewMode === 'trend') {
                 mainTitleInput.value = mainTitle.replace(/🪨.*$/, '').trim() || '🌈 总变化率趋势';
@@ -3632,6 +3640,16 @@
             updateViewUI();
             resetDanmaku();
         });
+
+        // 新增头像显隐切换事件
+        if (toggleAvatarBtn) {
+            toggleAvatarBtn.addEventListener('click', function () {
+                showTrendAvatars = !showTrendAvatars;
+                this.textContent = showTrendAvatars ? '🖼️ 隐藏头像' : '🖼️ 显示头像';
+                renderChart();
+                saveState();
+            });
+        }
 
         document.getElementById('axisDisplayToggle').addEventListener('change', function () {
             axisDisplayMode = this.value;
@@ -6754,8 +6772,8 @@
             });
 
             const series = [];
-            // 优化：只在系列较少时显示 markPoint 头像，避免大量 zrender 图片缓存
-            const showAvatars = (seriesKeys.length <= 3);
+            // 通过全局变量 showTrendAvatars 控制是否显示 markPoint 头像
+            const showAvatars = showTrendAvatars;
 
             if (showMain) {
                 sortedKeys.forEach(key => {
@@ -7547,6 +7565,7 @@
             mainTitleInput.value = mainTitle;
             showGrid = true;
             gridToggle.textContent = '📏';
+            showTrendAvatars = true;
             viewMode = 'trend';
             waterfallSeriesName = seriesKeys[0] || '';
             const today = getTodayStr();
