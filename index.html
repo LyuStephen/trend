@@ -2137,6 +2137,7 @@
                     <span class="ranking-date-picker" id="baseDatePicker" style="margin-left:10px;">
                         <span>🚩 起点</span>
                         <input type="date" id="baseDateInput">
+                        <button class="btn-outline" id="resetBaseDateBtn" title="重置到 2026-06-23 并清除更早数据" style="font-size:var(--font-size-btn-xs); padding:1px 6px; margin-left:4px; cursor:pointer;">🔄 重置</button>
                     </span>
                 </div>
                 <div class="header-actions">
@@ -2145,8 +2146,12 @@
                         <option value="both">🎯 主轴+次轴</option>
                         <option value="secondary">🎯 仅次轴</option>
                     </select>
-                    <button class="volume-mode-toggle" id="volumeModeToggle" title="切换趋势图次坐标轴：成交量 / 成交额">📊
-                        次轴:成交量</button>
+                    <select class="axis-mode-select" id="volumeModeSelect" title="切换趋势图次坐标轴">
+                        <option value="volume">📊 次轴:成交量</option>
+                        <option value="amount">💵 次轴:成交额</option>
+                        <option value="volumePct">📈 次轴:成交量%</option>
+                        <option value="amountPct">📈 次轴:成交额%</option>
+                    </select>
                     <button class="grid-toggle" id="gridToggle">📏</button>
                     <button class="theme-toggle" id="themeToggle">🌙</button>
                     <button class="danmaku-toggle" id="danmakuToggle" title="弹幕开关">💬</button>
@@ -2723,7 +2728,7 @@
         // ★ 最新股价表中 PE / 换手率 显示模式（'vs'=相对上证, 'abs'=绝对值）
         let priceTablePeMode = 'vs';
         let priceTableTurnoverMode = 'vs';
-        // ★ 成交量图显示模式（'volume'=成交量, 'amount'=成交额）
+        // ★ 成交量图显示模式（'volume'=成交量, 'amount'=成交额, 'volumePct'=成交量%, 'amountPct'=成交额%）
         let volumeDisplayMode = 'volume';
 
         let shiftPressed = false;
@@ -3090,8 +3095,69 @@
             return {high: hi, low: lo};
         }
 
+        // ★ 新增：滑动窗口平均值（跳过 null / 0 值）
+        function buildMovingAverage(arr, n) {
+            const result = new Array(arr.length).fill(null);
+            let sum = 0, cnt = 0;
+            for (let i = 0; i < arr.length; i++) {
+                const vIn = arr[i];
+                if (vIn != null && vIn > 0 && isFinite(vIn)) { sum += vIn; cnt++; }
+                if (i >= n) {
+                    const vOut = arr[i - n];
+                    if (vOut != null && vOut > 0 && isFinite(vOut)) { sum -= vOut; cnt--; }
+                }
+                if (cnt > 0) result[i] = sum / cnt;
+            }
+            return result;
+        }
+
+        // ★ 新增：为次轴添加 pct 曲线（52周 / 30日 / 7日）
+        function addSecondaryPctSeriesToTrend(seriesArr, sortedKeys, isVolPct, keyVisibilityFn) {
+            const arrKey = isVolPct ? 'volumeData' : 'amountData';
+            const prefix = isVolPct ? '_VOL_PCT' : '_AMT_PCT';
+            const periods = [
+                {n: 250, type: 'solid',  width: 1.5, opacity: 0.75, z: 3},
+                {n: 30,  type: 'dashed', width: 1.3, opacity: 0.55, z: 2},
+                {n: 7,   type: 'dotted', width: 1.1, opacity: 0.40, z: 1}
+            ];
+            sortedKeys.forEach(key => {
+                const s = getSeries(key);
+                if (!s) return;
+                if (keyVisibilityFn && !keyVisibilityFn(key)) return;
+                const arr = Array.isArray(s[arrKey]) ? s[arrKey] : [];
+                if (!arr.some(v => v != null && v > 0)) return;
+                periods.forEach(p => {
+                    const avg = buildMovingAverage(arr, p.n);
+                    const pct = arr.map((v, i) => {
+                        if (v == null || v <= 0 || avg[i] == null || avg[i] <= 0) return null;
+                        return v / avg[i] * 100;
+                    });
+                    if (!pct.some(v => v !== null)) return;
+                    seriesArr.push({
+                        name: key + prefix + p.n,
+                        type: 'line',
+                        yAxisIndex: 1,
+                        data: pct,
+                        smooth: true,
+                        symbol: 'circle',
+                        symbolSize: 2,
+                        showSymbol: false,
+                        connectNulls: false,
+                        lineStyle: {color: s.color, width: p.width, type: p.type, opacity: p.opacity},
+                        itemStyle: {color: s.color, opacity: p.opacity},
+                        z: p.z,
+                        silent: true
+                    });
+                });
+            });
+        }
+
         // ★ 新增：计算当前次轴数据的合理范围（用于 Shift+滚轮缩放次轴的基线）
         function getCurrentSecondaryRange() {
+            // pct 模式固定范围
+            if (volumeDisplayMode === 'volumePct' || volumeDisplayMode === 'amountPct') {
+                return {min: 0, max: 200};
+            }
             let min = Infinity, max = -Infinity;
             const keys = trendLegendSelected.size === 0
                 ? seriesKeys
@@ -3455,7 +3521,9 @@
             statsDisplayMode = state.statsDisplayMode || 'count';
             priceTablePeMode = state.priceTablePeMode || 'vs';
             priceTableTurnoverMode = state.priceTableTurnoverMode || 'vs';
-            volumeDisplayMode = state.volumeDisplayMode || 'volume';
+            volumeDisplayMode = ['volume', 'amount', 'volumePct', 'amountPct'].includes(state.volumeDisplayMode)
+                ? state.volumeDisplayMode
+                : 'volume';
             if (state.detailsOpen) {
                 rawDetails.open = state.detailsOpen.raw !== undefined ? state.detailsOpen.raw : false;
                 dailyDetails.open = state.detailsOpen.daily !== undefined ? state.detailsOpen.daily : false;
@@ -3551,11 +3619,10 @@
                 const v = btn.dataset.view;
                 btn.classList.toggle('active', v === viewMode);
             });
-            const volumeModeToggle = document.getElementById('volumeModeToggle');
-            if (volumeModeToggle) {
-                volumeModeToggle.classList.toggle('show', viewMode === 'trend' || viewMode === 'waterfall');
-                volumeModeToggle.textContent = volumeDisplayMode === 'volume' ? '📊 次轴:成交量' : '💵 次轴:成交额';
-                volumeModeToggle.title = '切换趋势图次坐标轴：成交量 / 成交额';
+            const volumeModeSelect = document.getElementById('volumeModeSelect');
+            if (volumeModeSelect) {
+                volumeModeSelect.classList.toggle('show', viewMode === 'trend' || viewMode === 'waterfall');
+                volumeModeSelect.value = volumeDisplayMode;
             }
             // ★ 主轴/次轴 显示模式下拉菜单
             const axisDisplayToggle = document.getElementById('axisDisplayToggle');
@@ -3618,13 +3685,13 @@
             resetDanmaku();
         });
 
-        // ★ 成交量 / 成交额 次轴模式切换（单按钮循环）
-        document.addEventListener('click', function (e) {
-            const btn = e.target.closest('#volumeModeToggle');
-            if (!btn) return;
-            volumeDisplayMode = volumeDisplayMode === 'volume' ? 'amount' : 'volume';
-            updateViewUI();
-            saveState();
+        // ★ 次轴模式下拉菜单（成交量/成交额/成交量%/成交额%）
+        document.addEventListener('change', function (e) {
+            if (e.target && e.target.id === 'volumeModeSelect') {
+                volumeDisplayMode = e.target.value;
+                updateViewUI();
+                saveState();
+            }
         });
 
         rankingDateInput.addEventListener('change', function () {
@@ -3674,7 +3741,51 @@
                 focusChartToBaseDate();
                 resetDanmaku();
                 saveState();
+                // ★ 需求4：更改起点日期后自动进行一次历史数据更新
+                setTimeout(() => { verifyHistoricalData(); }, 300);
             });
+        }
+
+        // ★ 需求1：起点重置按钮
+        function resetBaseDateToDefault() {
+            const DEFAULT_BASE = '2026-06-23';
+            if (!confirm(`确定要把起点重置为 ${DEFAULT_BASE}，并清除此日期前的所有数据吗？`)) return;
+            if (!dates.includes(DEFAULT_BASE)) {
+                if (!dates.length) { alert('没有数据'); return; }
+                if (DEFAULT_BASE < dates[0]) {
+                    if (!extendDatesToBaseDate(DEFAULT_BASE)) {
+                        alert('扩展日期失败');
+                        return;
+                    }
+                } else {
+                    alert(`默认起点 ${DEFAULT_BASE} 不在数据范围内`);
+                    return;
+                }
+            }
+            const idx = dates.indexOf(DEFAULT_BASE);
+            if (idx > 0) {
+                dates.splice(0, idx);
+                seriesList.forEach(s => {
+                    s.data.splice(0, idx);
+                    ['highData', 'lowData', ...TIME_SERIES_ARR_KEYS].forEach(k => {
+                        if (Array.isArray(s[k])) s[k].splice(0, idx);
+                    });
+                });
+            }
+            baseDate = DEFAULT_BASE;
+            renderSeriesManager();
+            renderTables();
+            renderChart();
+            focusChartToBaseDate();
+            resetDanmaku();
+            saveState();
+            // ★ 需求4：重置起点后自动更新历史数据
+            setTimeout(() => { verifyHistoricalData(); }, 300);
+        }
+
+        const resetBaseDateBtnEl = document.getElementById('resetBaseDateBtn');
+        if (resetBaseDateBtnEl) {
+            resetBaseDateBtnEl.addEventListener('click', resetBaseDateToDefault);
         }
 
         // ================================================================
@@ -5595,7 +5706,15 @@
             const klineMap = {};
             const allKlineDates = new Set();
 
+            // ★ 需求3：历史数据更新时弹窗提示
+            const historyOverlay = document.getElementById('historyUpdateOverlay');
+            const historyStatusEl = document.getElementById('historyUpdateStatus');
+            if (historyOverlay) historyOverlay.style.display = 'flex';
+            let _hup = 0;
+
             for (const name of names) {
+                _hup++;
+                if (historyStatusEl) historyStatusEl.textContent = `拉取K线 (${_hup}/${names.length}) · ${name}`;
                 const code = codeMap[name];
                 const s = getSeries(name);
                 if (!s) continue;
@@ -5855,6 +5974,7 @@
                 msg += `2. 检查日期是否为交易日（周末/节假日无数据）\n`;
                 msg += `3. 打开控制台查看详细日志 (F12)`;
             }
+            if (historyOverlay) historyOverlay.style.display = 'none';
             alert(msg);
             setStatus(updatedCount > 0 ? 'success' : 'error',
                 `校验完成: ${updatedCount} 只更新，${totalMatched} 条匹配${addedDateCount > 0 ? `，新增 ${addedDateCount} 日` : ''}`);
@@ -6657,53 +6777,59 @@
                 });
             }
 
-            // ★ 次轴曲线：成交量 / 成交额（虚线+圆点，跟随 waterfallSelectedSet 可见性）
+            // ★ 次轴曲线：成交量 / 成交额 / 成交量% / 成交额%
             if (showSecondary) {
-                selectedKeys.forEach(key => {
-                    const s = getSeries(key);
-                    if (!s) return;
-                    if (volumeDisplayMode === 'volume') {
-                        allSeries.push({
-                            name: key + '_VOL',
-                            type: 'line',
-                            yAxisIndex: 1,
-                            data: s.volumeData || emptyArr(dates.length),
-                            smooth: true, symbol: 'circle', symbolSize: 3, showSymbol: true,
-                            lineStyle: {color: s.color, width: 1.2, opacity: 0.45, type: 'dashed'},
-                            itemStyle: {color: s.color, opacity: 0.45},
-                            z: 1, silent: true
-                        });
-                    } else {
-                        // ★ 需求2：实际值与计算值同时显示（虚线+圆点）
-                        const isIdx = isIndexCode(s.code);
-                        const actual = (s.amountData || []).map(v => (v > 0 ? v : null));
-                        const est = (s.volumeData || []).map((v, i) => calcAmountFromVolume(v, s.data[i], s.code));
-                        if (actual.some(v => v !== null)) {
+                if (volumeDisplayMode === 'volumePct' || volumeDisplayMode === 'amountPct') {
+                    const isVolPct = (volumeDisplayMode === 'volumePct');
+                    const selectedSet = new Set(selectedKeys);
+                    const keyVis = (k) => selectedSet.has(k);
+                    addSecondaryPctSeriesToTrend(allSeries, waterfallSortedKeys, isVolPct, keyVis);
+                } else {
+                    selectedKeys.forEach(key => {
+                        const s = getSeries(key);
+                        if (!s) return;
+                        if (volumeDisplayMode === 'volume') {
                             allSeries.push({
-                                name: key + '_AMT',
-                                type: 'line', yAxisIndex: 1,
-                                data: actual,
+                                name: key + '_VOL',
+                                type: 'line',
+                                yAxisIndex: 1,
+                                data: s.volumeData || emptyArr(dates.length),
                                 smooth: true, symbol: 'circle', symbolSize: 3, showSymbol: true,
-                                connectNulls: false,
-                                lineStyle: {color: s.color, width: 1.5, opacity: 0.5, type: 'dashed'},
-                                itemStyle: {color: s.color, opacity: 0.5},
+                                lineStyle: {color: s.color, width: 1.2, opacity: 0.45, type: 'dashed'},
+                                itemStyle: {color: s.color, opacity: 0.45},
                                 z: 1, silent: true
                             });
+                        } else {
+                            const isIdx = isIndexCode(s.code);
+                            const actual = (s.amountData || []).map(v => (v > 0 ? v : null));
+                            const est = (s.volumeData || []).map((v, i) => calcAmountFromVolume(v, s.data[i], s.code));
+                            if (actual.some(v => v !== null)) {
+                                allSeries.push({
+                                    name: key + '_AMT',
+                                    type: 'line', yAxisIndex: 1,
+                                    data: actual,
+                                    smooth: true, symbol: 'circle', symbolSize: 3, showSymbol: true,
+                                    connectNulls: false,
+                                    lineStyle: {color: s.color, width: 1.5, opacity: 0.5, type: 'dashed'},
+                                    itemStyle: {color: s.color, opacity: 0.5},
+                                    z: 1, silent: true
+                                });
+                            }
+                            if (!isIdx && est.some(v => v !== null)) {
+                                allSeries.push({
+                                    name: key + '_AMT_CALC',
+                                    type: 'line', yAxisIndex: 1,
+                                    data: est,
+                                    smooth: true, symbol: 'circle', symbolSize: 3, showSymbol: true,
+                                    connectNulls: false,
+                                    lineStyle: {color: s.color, width: 1.2, opacity: 0.35, type: 'dashed'},
+                                    itemStyle: {color: s.color, opacity: 0.35},
+                                    z: 1, silent: true
+                                });
+                            }
                         }
-                        if (!isIdx && est.some(v => v !== null)) {
-                            allSeries.push({
-                                name: key + '_AMT_CALC',
-                                type: 'line', yAxisIndex: 1,
-                                data: est,
-                                smooth: true, symbol: 'circle', symbolSize: 3, showSymbol: true,
-                                connectNulls: false,
-                                lineStyle: {color: s.color, width: 1.2, opacity: 0.35, type: 'dashed'},
-                                itemStyle: {color: s.color, opacity: 0.35},
-                                z: 1, silent: true
-                            });
-                        }
-                    }
-                });
+                    });
+                }
             }
 
             const latestIdx2 = dates.length - 1;
@@ -6830,20 +6956,37 @@
                                 html += `</div>`;
                             });
                         }
-                        // ★ 次轴量/额附加信息（同时显示实际+计算）
+                        // ★ 次轴量/额附加信息
+                        const pctGrouped = {};
                         params.forEach(p => {
-                            if (p.seriesName.endsWith('_VOL')) {
-                                const key = p.seriesName.replace('_VOL', '');
+                            const sn = p.seriesName;
+                            if (sn.endsWith('_VOL')) {
+                                const key = sn.replace('_VOL', '');
                                 const s2 = getSeries(key);
                                 const unit = (s2 && getMarketType(s2.code) === 'a') ? '手' : '股';
                                 if (p.value != null) html += `<span style="color:#94a3b8;">┈ ${key} 量: ${formatBigNum(p.value)} ${unit}</span><br/>`;
-                            } else if (p.seriesName.endsWith('_AMT_CALC')) {
-                                const key = p.seriesName.replace('_AMT_CALC', '');
+                            } else if (sn.endsWith('_AMT_CALC')) {
+                                const key = sn.replace('_AMT_CALC', '');
                                 if (p.value != null) html += `<span style="color:#94a3b8;">┈ ${key} 额(算): ${formatBigNum(p.value)} 万元</span><br/>`;
-                            } else if (p.seriesName.endsWith('_AMT')) {
-                                const key = p.seriesName.replace('_AMT', '');
+                            } else if (sn.endsWith('_AMT')) {
+                                const key = sn.replace('_AMT', '');
                                 if (p.value != null) html += `<span style="color:#94a3b8;">┈ ${key} 额: ${formatBigNum(p.value)} 万元</span><br/>`;
+                            } else {
+                                const pctMatch = sn.match(/^(.+)_(?:VOL|AMT)_PCT(\d+)$/);
+                                if (pctMatch) {
+                                    const pkey = pctMatch[1], period = pctMatch[2];
+                                    if (!pctGrouped[pkey]) pctGrouped[pkey] = {};
+                                    pctGrouped[pkey][period] = p.value;
+                                }
                             }
+                        });
+                        Object.keys(pctGrouped).forEach(key => {
+                            const g = pctGrouped[key];
+                            const ps = [];
+                            if (g['250'] != null) ps.push(`52周 ${g['250'].toFixed(1)}%`);
+                            if (g['30']  != null) ps.push(`30日 ${g['30'].toFixed(1)}%`);
+                            if (g['7']   != null) ps.push(`7日 ${g['7'].toFixed(1)}%`);
+                            if (ps.length > 0) html += `<span style="color:#94a3b8;">┈ ${key} ${ps.join(' | ')}</span><br/>`;
                         });
                         return html;
                     },
@@ -6881,7 +7024,10 @@
                     },
                     {
                         type: 'value',
-                        name: volumeDisplayMode === 'volume' ? '成交量' : '成交额',
+                        name: volumeDisplayMode === 'volume' ? '成交量'
+                            : volumeDisplayMode === 'amount' ? '成交额'
+                            : volumeDisplayMode === 'volumePct' ? '成交量(%)'
+                            : '成交额(%)',
                         nameTextStyle: {fontSize: font('tag'), color: isDark ? '#94a3b8' : '#475569'},
                         position: 'right',
                         show: showSecondary,
@@ -7097,56 +7243,60 @@
                 }
             }
 
-            // ★ 需求3：次轴曲线（成交量/成交额）虚线 + 圆点；实际+计算同时显示
+            // ★ 次轴曲线（成交量/成交额/成交量%/成交额%）
             if (showSecondary) {
-                sortedKeys.forEach(key => {
-                    const s = getSeries(key);
-                    if (!s) return;
-                    if (!(trendLegendSelected.size === 0 || trendLegendSelected.has(key))) return;
+                if (volumeDisplayMode === 'volumePct' || volumeDisplayMode === 'amountPct') {
+                    const isVolPct = (volumeDisplayMode === 'volumePct');
+                    const keyVis = (k) => trendLegendSelected.size === 0 || trendLegendSelected.has(k);
+                    addSecondaryPctSeriesToTrend(series, sortedKeys, isVolPct, keyVis);
+                } else {
+                    sortedKeys.forEach(key => {
+                        const s = getSeries(key);
+                        if (!s) return;
+                        if (!(trendLegendSelected.size === 0 || trendLegendSelected.has(key))) return;
 
-                    if (volumeDisplayMode === 'volume') {
-                        series.push({
-                            name: key + '_VOL',
-                            type: 'line',
-                            yAxisIndex: 1,
-                            data: s.volumeData || emptyArr(dates.length),
-                            smooth: true, symbol: 'circle', symbolSize: 3, showSymbol: true,
-                            lineStyle: {color: s.color, width: 1.2, opacity: 0.45, type: 'dashed'},
-                            itemStyle: {color: s.color, opacity: 0.45},
-                            z: 1, silent: true
-                        });
-                    } else {
-                        const isIdx = isIndexCode(s.code);
-                        const actual = (s.amountData || []).map(v => (v > 0 ? v : null));
-                        const est = (s.volumeData || []).map((v, i) => calcAmountFromVolume(v, s.data[i], s.code));
-                        // 实际值（虚线+圆点）
-                        if (actual.some(v => v !== null)) {
+                        if (volumeDisplayMode === 'volume') {
                             series.push({
-                                name: key + '_AMT',
-                                type: 'line', yAxisIndex: 1,
-                                data: actual,
+                                name: key + '_VOL',
+                                type: 'line',
+                                yAxisIndex: 1,
+                                data: s.volumeData || emptyArr(dates.length),
                                 smooth: true, symbol: 'circle', symbolSize: 3, showSymbol: true,
-                                connectNulls: false,
-                                lineStyle: {color: s.color, width: 1.5, type: 'dashed', opacity: 0.5},
-                                itemStyle: {color: s.color, opacity: 0.5},
+                                lineStyle: {color: s.color, width: 1.2, opacity: 0.45, type: 'dashed'},
+                                itemStyle: {color: s.color, opacity: 0.45},
                                 z: 1, silent: true
                             });
+                        } else {
+                            const isIdx = isIndexCode(s.code);
+                            const actual = (s.amountData || []).map(v => (v > 0 ? v : null));
+                            const est = (s.volumeData || []).map((v, i) => calcAmountFromVolume(v, s.data[i], s.code));
+                            if (actual.some(v => v !== null)) {
+                                series.push({
+                                    name: key + '_AMT',
+                                    type: 'line', yAxisIndex: 1,
+                                    data: actual,
+                                    smooth: true, symbol: 'circle', symbolSize: 3, showSymbol: true,
+                                    connectNulls: false,
+                                    lineStyle: {color: s.color, width: 1.5, type: 'dashed', opacity: 0.5},
+                                    itemStyle: {color: s.color, opacity: 0.5},
+                                    z: 1, silent: true
+                                });
+                            }
+                            if (!isIdx && est.some(v => v !== null)) {
+                                series.push({
+                                    name: key + '_AMT_CALC',
+                                    type: 'line', yAxisIndex: 1,
+                                    data: est,
+                                    smooth: true, symbol: 'circle', symbolSize: 3, showSymbol: true,
+                                    connectNulls: false,
+                                    lineStyle: {color: s.color, width: 1.2, type: 'dashed', opacity: 0.35},
+                                    itemStyle: {color: s.color, opacity: 0.35},
+                                    z: 1, silent: true
+                                });
+                            }
                         }
-                        // 计算值（虚线+圆点，指数不估算）
-                        if (!isIdx && est.some(v => v !== null)) {
-                            series.push({
-                                name: key + '_AMT_CALC',
-                                type: 'line', yAxisIndex: 1,
-                                data: est,
-                                smooth: true, symbol: 'circle', symbolSize: 3, showSymbol: true,
-                                connectNulls: false,
-                                lineStyle: {color: s.color, width: 1.2, type: 'dashed', opacity: 0.35},
-                                itemStyle: {color: s.color, opacity: 0.35},
-                                z: 1, silent: true
-                            });
-                        }
-                    }
-                });
+                    });
+                }
             }
 
             const legendSelected = {};
@@ -7169,6 +7319,7 @@
                         const volMap = {};
                         const amtActualMap = {};
                         const amtCalcMap = {};
+                        const pctMap = {};
                         params.forEach(p => {
                             const sn = p.seriesName;
                             if (sn.endsWith('_VOL')) {
@@ -7177,15 +7328,23 @@
                                 amtCalcMap[sn.slice(0, -9)] = p.value;
                             } else if (sn.endsWith('_AMT')) {
                                 amtActualMap[sn.slice(0, -4)] = p.value;
-                            } else if (!sn.endsWith('_52H') && !sn.endsWith('_52L')) {
-                                mainMap[sn] = p.value;
+                            } else {
+                                const pctMatch = sn.match(/^(.+)_(?:VOL|AMT)_PCT(\d+)$/);
+                                if (pctMatch) {
+                                    const pkey = pctMatch[1], period = pctMatch[2];
+                                    if (!pctMap[pkey]) pctMap[pkey] = {};
+                                    pctMap[pkey][period] = p.value;
+                                } else if (!sn.endsWith('_52H') && !sn.endsWith('_52L')) {
+                                    mainMap[sn] = p.value;
+                                }
                             }
                         });
                         const keysInParams = new Set([
                             ...Object.keys(mainMap),
                             ...Object.keys(volMap),
                             ...Object.keys(amtActualMap),
-                            ...Object.keys(amtCalcMap)
+                            ...Object.keys(amtCalcMap),
+                            ...Object.keys(pctMap)
                         ]);
                         const orderedKeys = seriesKeys.filter(k => keysInParams.has(k));
                         if (showMain) {
@@ -7213,7 +7372,7 @@
                                         const unit = getMarketType(sk.code) === 'a' ? '手' : '股';
                                         parts.push(`<span style="color:#64748b;">量 ${formatBigNum(volMap[key])}${unit}</span>`);
                                     }
-                                } else {
+                                } else if (volumeDisplayMode === 'amount') {
                                     const av = amtActualMap[key];
                                     const cv = amtCalcMap[key];
                                     if (av != null && av > 0 && cv != null && cv > 0) {
@@ -7222,6 +7381,15 @@
                                         parts.push(`<span style="color:#64748b;">额 ${formatBigNum(av)}万</span>`);
                                     } else if (cv != null && cv > 0) {
                                         parts.push(`<span style="color:#94a3b8;">额 ${formatBigNum(cv)}万(算)</span>`);
+                                    }
+                                } else {
+                                    const pct = pctMap[key];
+                                    if (pct) {
+                                        const ps = [];
+                                        if (pct['250'] != null && pct['250'] > 0) ps.push(`52周 ${pct['250'].toFixed(1)}%`);
+                                        if (pct['30']  != null && pct['30']  > 0) ps.push(`30日 ${pct['30'].toFixed(1)}%`);
+                                        if (pct['7']   != null && pct['7']   > 0) ps.push(`7日 ${pct['7'].toFixed(1)}%`);
+                                        if (ps.length > 0) parts.push(`<span style="color:#64748b;">${ps.join(' | ')}</span>`);
                                     }
                                 }
                             }
@@ -7287,7 +7455,10 @@
                     },
                     {
                         type: 'value',
-                        name: volumeDisplayMode === 'volume' ? '成交量' : '成交额',
+                        name: volumeDisplayMode === 'volume' ? '成交量'
+                            : volumeDisplayMode === 'amount' ? '成交额'
+                            : volumeDisplayMode === 'volumePct' ? '成交量(%)'
+                            : '成交额(%)',
                         nameTextStyle: {fontSize: font('tag'), color: isDark ? '#94a3b8' : '#475569'},
                         position: 'right',
                         show: showSecondary,
@@ -7978,6 +8149,23 @@
             <div style="font-size:24px; font-weight:700; color:var(--text-primary); letter-spacing:0.5px;">正在获取最新数据...
             </div>
             <div style="font-size:15px; color:var(--text-muted); margin-top:10px; font-weight:400;">从腾讯接口同步实时行情</div>
+            <div style="margin-top:20px; display:flex; justify-content:center; gap:6px;">
+                <span
+                    style="display:inline-block; width:10px; height:10px; border-radius:50%; background:#3b82f6; animation:pulse-dot 1.2s infinite;"></span>
+                <span
+                    style="display:inline-block; width:10px; height:10px; border-radius:50%; background:#3b82f6; animation:pulse-dot 1.2s infinite 0.2s;"></span>
+                <span
+                    style="display:inline-block; width:10px; height:10px; border-radius:50%; background:#3b82f6; animation:pulse-dot 1.2s infinite 0.4s;"></span>
+            </div>
+        </div>
+    </div>
+    <div id="historyUpdateOverlay"
+        style="display:none; position:fixed; inset:0; z-index:99998; background:rgba(0,0,0,0.55); backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px); align-items:center; justify-content:center; flex-direction:column;">
+        <div
+            style="background:var(--bg-app); border-radius:28px; padding:48px 64px; text-align:center; box-shadow:0 30px 80px rgba(0,0,0,0.4); max-width:480px; width:90%;">
+            <div style="font-size:56px; margin-bottom:16px; line-height:1.2;">📜</div>
+            <div style="font-size:24px; font-weight:700; color:var(--text-primary); letter-spacing:0.5px;">正在更新历史数据...</div>
+            <div id="historyUpdateStatus" style="font-size:15px; color:var(--text-muted); margin-top:10px; font-weight:400;">准备中</div>
             <div style="margin-top:20px; display:flex; justify-content:center; gap:6px;">
                 <span
                     style="display:inline-block; width:10px; height:10px; border-radius:50%; background:#3b82f6; animation:pulse-dot 1.2s infinite;"></span>
