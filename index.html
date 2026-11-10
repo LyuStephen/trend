@@ -5901,14 +5901,22 @@
         // ================================================================
         //  历史数据校验
         // ================================================================
-        async function verifyHistoricalData() {
+        let _verifyHistoricalRunning = false;
+        async function verifyHistoricalData(opts) {
+            const silent = !!(opts && opts.silent);
+            if (_verifyHistoricalRunning) {
+                if (!silent) alert('历史数据校验正在进行中，请稍候');
+                return;
+            }
             const codeMap = {};
             seriesList.forEach(s => {if (s.code && s.code.trim()) codeMap[s.name] = s.code.trim();});
             const names = Object.keys(codeMap);
             if (names.length === 0) {
+                if (silent) {console.info('[自动历史校验] 跳过：没有股票代码'); return;}
                 alert('⚠️ 请先为指标输入股票代码\n\n格式示例：\n• A股：sh000001、sz000625\n• 港股：hk01810\n• 美股：usNVDA');
                 return;
             }
+            _verifyHistoricalRunning = true;
             const todayStr0 = getTodayStr();
             const lastLocal = dates[dates.length - 1];
             const endDate = (lastLocal && lastLocal > todayStr0) ? lastLocal : todayStr0;
@@ -5934,7 +5942,8 @@
 
             const historyOverlay = document.getElementById('historyUpdateOverlay');
             const historyStatusEl = document.getElementById('historyUpdateStatus');
-            if (historyOverlay) historyOverlay.style.display = 'flex';
+            // ★ 静默模式（页面加载自动执行）不显示全屏遮罩，只在状态栏显示进度
+            if (historyOverlay && !silent) historyOverlay.style.display = 'flex';
             let _hup = 0;
 
             for (const name of names) {
@@ -6199,10 +6208,36 @@
                 msg += `3. 打开控制台查看详细日志 (F12)`;
             }
             if (historyOverlay) historyOverlay.style.display = 'none';
-            alert(msg);
+            if (silent) {
+                console.info('[自动历史校验] ' + msg);
+            } else {
+                alert(msg);
+            }
             setStatus(updatedCount > 0 ? 'success' : 'error',
                 `校验完成: ${updatedCount} 只更新，${totalMatched} 条匹配${addedDateCount > 0 ? `，新增 ${addedDateCount} 日` : ''}`);
             lastUpdateTime.textContent = '校验于 ' + new Date().toLocaleTimeString();
+            _verifyHistoricalRunning = false;
+        }
+        // ★ 启动编排：先静默补历史数据，完成后再刷新实时股价
+        let _bootstrapping = false;
+        async function bootstrapAutoUpdate() {
+            if (_bootstrapping) return;
+            _bootstrapping = true;
+            try {
+                const hasCodes = seriesList.some(s => s.code && s.code.trim());
+                if (hasCodes) {
+                    try {
+                        await verifyHistoricalData({silent: true});
+                    } catch (e) {
+                        console.warn('[自动历史校验] 失败，继续刷新实时股价', e);
+                        _verifyHistoricalRunning = false;   // 兜底复位
+                    }
+                }
+            } finally {
+                _bootstrapping = false;
+            }
+            // ★ 历史更新完成（或失败）后再刷新实时股价
+            refreshPrices(true);
         }
 
         function setStatus(type, msg) {
@@ -8048,22 +8083,13 @@
                     });
                 }
                 setTimeout(buildAndRenderPriceInfo, 300);
-                setTimeout(() => {refreshPrices(true);}, 2500);
                 const expandBtnEl = document.querySelector('#priceInfoDetails .expand-table-btn');
                 if (expandBtnEl) expandBtnEl.click();
                 if (seriesList.some(s => s.code && (s.latest52High === null || s.latest52Low === null))) {
-                    console.info('📌 52 周高低数据尚未生成，可点击📜「校验历史数据」重新计算');
+                    console.info('📌 52 周高低数据尚未生成，自动校验会在首次启动时补齐');
                 }
-                const _lastVerifyTs = parseInt(localStorage.getItem('lastVerifyTs') || '0', 10);
-                const _need52W = dates.length < 250 && (Date.now() - _lastVerifyTs > 24 * 3600 * 1000);
-                if (_need52W && seriesList.some(s => s.code && s.code.trim())) {
-                    setTimeout(() => {
-                        try {
-                            localStorage.setItem('lastVerifyTs', String(Date.now()));
-                            verifyHistoricalData();
-                        } catch (e) {console.warn('自动补历史失败', e);}
-                    }, 3000);
-                }
+                // ★ 启动顺序：先补历史数据 → 完成后再刷新实时股价（不再用固定定时器赛跑）
+                setTimeout(() => {bootstrapAutoUpdate();}, 1200);
             }
 
             fetch('data.json?t=' + Date.now())
@@ -8092,7 +8118,7 @@
                             setStatus('info', '已从本地缓存恢复（远程不可用）');
                             updateViewUI();
                             saveState();
-                            setTimeout(() => {refreshPrices(true);}, 2500);
+                            setTimeout(() => {bootstrapAutoUpdate();}, 1200);
                         });
                         return;
                     }
