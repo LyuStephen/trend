@@ -6043,7 +6043,11 @@
                             v: s.data[i],
                             h: (s.highData && s.highData[i]) || 0,
                             l: (s.lowData && s.lowData[i]) || 0,
-                            vol: (s.volumeData && s.volumeData[i]) || 0
+                            vol: (s.volumeData && s.volumeData[i]) || 0,
+                            // ★ 新增：一并记录 PE / 成交额 / 换手率，避免重建时错位丢失
+                            pe: (s.peData && s.peData[i]) || 0,
+                            amt: (s.amountData && s.amountData[i]) || 0,
+                            to: (s.turnoverData && s.turnoverData[i]) || 0
                         };
                     });
                     oldDataBySeries[s.name] = oldMap;
@@ -6056,35 +6060,50 @@
                     const oldMap = oldDataBySeries[s.name] || {};
                     const kline = klineMap[s.name] || {};
                     const newData = [], newHigh = [], newLow = [], newVol = [];
+                    // ★ 新增：PE / 成交额 / 换手率同样按日期重建，避免错位
+                    const newPE = [], newAmt = [], newTo = [];
                     let lastKnown = {
                         v: (s.data && s.data[0] !== undefined) ? s.data[0] : 1,
                         h: (s.highData && s.highData[0]) || 0,
                         l: (s.lowData && s.lowData[0]) || 0,
-                        vol: (s.volumeData && s.volumeData[0]) || 0
+                        vol: (s.volumeData && s.volumeData[0]) || 0,
+                        pe: (s.peData && s.peData[0]) || 0,
+                        amt: (s.amountData && s.amountData[0]) || 0,
+                        to: (s.turnoverData && s.turnoverData[0]) || 0
                     };
                     newDates.forEach(d => {
                         if (oldMap[d] !== undefined) {
+                            // ★ 已有日期：全字段保留（用户/历史值不会被 K 线或 0 覆盖）
                             newData.push(oldMap[d].v); newHigh.push(oldMap[d].h);
                             newLow.push(oldMap[d].l); newVol.push(oldMap[d].vol);
-                            lastKnown = {v: oldMap[d].v, h: oldMap[d].h, l: oldMap[d].l, vol: oldMap[d].vol};
+                            newPE.push(oldMap[d].pe); newAmt.push(oldMap[d].amt); newTo.push(oldMap[d].to);
+                            lastKnown = {
+                                v: oldMap[d].v, h: oldMap[d].h, l: oldMap[d].l, vol: oldMap[d].vol,
+                                pe: oldMap[d].pe, amt: oldMap[d].amt, to: oldMap[d].to
+                            };
                         } else if (kline[d]) {
+                            // ★ 新日期 + K 线数据：价格用 K 线；PE/金额/换手率历史无源，补 0（不是"覆盖"，是"空缺"）
                             newData.push(kline[d].close); newHigh.push(kline[d].high);
                             newLow.push(kline[d].low); newVol.push(kline[d].vol);
-                            lastKnown = {v: kline[d].close, h: kline[d].high, l: kline[d].low, vol: kline[d].vol};
+                            newPE.push(0); newAmt.push(0); newTo.push(0);
+                            lastKnown = {
+                                v: kline[d].close, h: kline[d].high, l: kline[d].low, vol: kline[d].vol,
+                                pe: 0, amt: 0, to: 0
+                            };
                         } else {
+                            // ★ 新日期 + 无 K 线：全字段顺延上一日
                             newData.push(lastKnown.v); newHigh.push(lastKnown.h);
                             newLow.push(lastKnown.l); newVol.push(lastKnown.vol);
+                            newPE.push(lastKnown.pe); newAmt.push(lastKnown.amt); newTo.push(lastKnown.to);
                         }
                     });
                     s.data = newData;
                     s.highData = newHigh;
                     s.lowData = newLow;
                     s.volumeData = newVol;
-                    ['peData', 'amountData', 'turnoverData'].forEach(k => {
-                        if (!Array.isArray(s[k])) s[k] = emptyArr(newDates.length);
-                        while (s[k].length < newDates.length) s[k].push(0);
-                        while (s[k].length > newDates.length) s[k].pop();
-                    });
+                    s.peData = newPE;          // ★ 直接用新数组，不用末尾 push
+                    s.amountData = newAmt;
+                    s.turnoverData = newTo;
                     s._changeCache = null;
                     s.refStats = null;
                 });
