@@ -3353,8 +3353,7 @@
                         return v / _mergedAvg[i] * 100;
                     });
                     _pctCalc = _amtCalc.map((v, i) => {
-                        // 互补：仅当该日无实际成交额时显示估算值
-                        if (_amtActual[i] != null && _amtActual[i] > 0) return null;
+                        // ★ 取消互斥：每天只要有估算值都计算百分比，与实际%形成双线对比
                         if (v == null || v <= 0 || _mergedAvg[i] == null || _mergedAvg[i] <= 0) return null;
                         return v / _mergedAvg[i] * 100;
                     });
@@ -7346,7 +7345,7 @@
                                     series.push(amtCalcSeries);
                                 }
                             } else {
-                                // 主轴+次轴模式：保持原有两条（实际+计算）
+                                // 主轴+次轴模式：实际成交额（实线）+ 估算成交额（虚线）
                                 if (actual.some(v => v !== null)) {
                                     const seriesName = key + '_AMT';
                                     seriesMeta[seriesName] = {key: key, type: 'amt'};
@@ -7354,8 +7353,9 @@
                                         name: seriesName, type: 'line', yAxisIndex: 1, data: actual,
                                         smooth: true, symbol: 'circle', symbolSize: 3, showSymbol: true,
                                         connectNulls: false,
-                                        lineStyle: {color: s.color, width: 1.5, type: 'dashed', opacity: 0.5},
-                                        itemStyle: {color: s.color, opacity: 0.5},
+                                        // ★ 实际成交额：实线 + 更高不透明度，与"估算"虚线明确区分
+                                        lineStyle: {color: s.color, width: 1.5, type: 'solid', opacity: 0.6},
+                                        itemStyle: {color: s.color, opacity: 0.6},
                                         z: 1, silent: true
                                     });
                                 }
@@ -7481,7 +7481,7 @@
                                                 // 成交量%（单值）
                                                 display = `${periodLabel} ${obj.vol.toFixed(1)}%`;
                                             } else if (obj.real != null && obj.real > 0 && obj.calc != null && obj.calc > 0) {
-                                                // 罕见：同一日既有实际又有估算
+                                                // 常态（取消互斥后）：同一日实际% 与 计算% 并存
                                                 display = `${periodLabel} 实${obj.real.toFixed(1)}%/算${obj.calc.toFixed(1)}%`;
                                             } else if (obj.real != null && obj.real > 0) {
                                                 display = `${periodLabel} ${obj.real.toFixed(1)}%(实)`;
