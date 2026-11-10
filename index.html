@@ -1125,9 +1125,20 @@
         }
 
         @keyframes pulse-dot {
-            0% { opacity: 1; transform: scale(1); }
-            50% { opacity: 0.4; transform: scale(1.3); }
-            100% { opacity: 1; transform: scale(1); }
+            0% {
+                opacity: 1;
+                transform: scale(1);
+            }
+
+            50% {
+                opacity: 0.4;
+                transform: scale(1.3);
+            }
+
+            100% {
+                opacity: 1;
+                transform: scale(1);
+            }
         }
 
         .ranking-panel {
@@ -1236,7 +1247,8 @@
                 --ctrl-btn-fullscreen-size: 18px;
             }
 
-            html, body {
+            html,
+            body {
                 height: 100%;
             }
 
@@ -2053,6 +2065,7 @@
         }
 
         @media (max-width: 820px) {
+
             .mobile-tabbar,
             .mobile-fab-theme {
                 display: flex;
@@ -2095,7 +2108,9 @@
                     <span class="ranking-date-picker" id="baseDatePicker" style="margin-left:10px;">
                         <span>🚩 起点</span>
                         <input type="date" id="baseDateInput">
-                        <button class="btn-outline" id="resetBaseDateBtn" title="重置到 2026-06-23 并清除更早数据" style="font-size:var(--font-size-btn-xs); padding:1px 6px; margin-left:4px; cursor:pointer;">🔄 重置</button>
+                        <button class="btn-outline" id="resetBaseDateBtn" title="重置到 2026-06-23 并清除更早数据"
+                            style="font-size:var(--font-size-btn-xs); padding:1px 6px; margin-left:4px; cursor:pointer;">🔄
+                            重置</button>
                     </span>
                 </div>
                 <div class="header-actions">
@@ -2107,8 +2122,12 @@
                     <select class="axis-mode-select" id="volumeModeSelect" title="切换趋势图次坐标轴">
                         <option value="volume">📊 次轴:成交量</option>
                         <option value="amount">💵 次轴:成交额</option>
-                        <option value="volumePct">📈 次轴:成交量%</option>
-                        <option value="amountPct">📈 次轴:成交额%</option>
+                        <option value="volumePct250">📈 次轴:成交量% 52周</option>
+                        <option value="volumePct30">📈 次轴:成交量% 30日</option>
+                        <option value="volumePct7">📈 次轴:成交量% 7日</option>
+                        <option value="amountPct250">📈 次轴:成交额% 52周</option>
+                        <option value="amountPct30">📈 次轴:成交额% 30日</option>
+                        <option value="amountPct7">📈 次轴:成交额% 7日</option>
                     </select>
                     <button class="btn-outline" id="toggleAvatarBtn" title="切换趋势图末端头像显示">🖼️ 隐藏头像</button>
                     <button class="grid-toggle" id="gridToggle">📏</button>
@@ -2199,8 +2218,9 @@
                         <span style="font-size:var(--font-size-tag); color:var(--text-muted);"
                             id="lastUpdateTime"></span>
                     </div>
-                    
-                    <div style="font-size:var(--font-size-tag); color:var(--text-secondary); margin-bottom:8px; padding:4px 8px; background:var(--hover-bg); border-radius:6px;">
+
+                    <div
+                        style="font-size:var(--font-size-tag); color:var(--text-secondary); margin-bottom:8px; padding:4px 8px; background:var(--hover-bg); border-radius:6px;">
                         💡 优化提示：由于历史数据较多，表格默认仅渲染<b>最近 40 天</b>的列以保证页面流畅。完整历史数据请通过图表缩放查看或导出。
                     </div>
 
@@ -2432,7 +2452,7 @@
         //  ★ 字体与常量配置
         // ================================================================
         const MAX_TABLE_COLS = 40;
-        
+
         const FONT_CONFIG = {
             desktop: {
                 title: 20, subtitle: 16, legend: 13, axis: 12, label: 12, tooltip: 13,
@@ -2445,6 +2465,24 @@
                 tableCell: 10, input: 10, helper: 10, btnSm: 10, btnXs: 9,
             }
         };
+        function isPctMode(mode) {
+            return typeof mode === 'string' && (mode.indexOf('volumePct') === 0 || mode.indexOf('amountPct') === 0);
+        }
+        function isVolPctMode(mode) {return typeof mode === 'string' && mode.indexOf('volumePct') === 0;}
+        function isAmtPctMode(mode) {return typeof mode === 'string' && mode.indexOf('amountPct') === 0;}
+        function getPctPeriod(mode) {
+            if (typeof mode !== 'string') return 250;
+            if (mode.endsWith('250')) return 250;
+            if (mode.endsWith('30')) return 30;
+            if (mode.endsWith('7')) return 7;
+            return 250;
+        }
+        function getSecondaryAxisName() {
+            if (volumeDisplayMode === 'volume') return '成交量';
+            if (volumeDisplayMode === 'amount') return '成交额';
+            const periodLabel = {250: '52周', 30: '30日', 7: '7日'}[getPctPeriod(volumeDisplayMode)] || '';
+            return (isVolPctMode(volumeDisplayMode) ? '成交量(%) ' : '成交额(%) ') + periodLabel;
+        }
 
         function getFontConfig() {
             return window.innerWidth <= 820 ? FONT_CONFIG.mobile : FONT_CONFIG.desktop;
@@ -2474,10 +2512,10 @@
             }
         })();
 
-        document.getElementById('yPlusBtn').addEventListener('click', function () { adjustYAxis(1); });
-        document.getElementById('yMinusBtn').addEventListener('click', function () { adjustYAxis(-1); });
-        document.getElementById('xPlusBtn').addEventListener('click', function () { adjustXZoom(1); });
-        document.getElementById('xMinusBtn').addEventListener('click', function () { adjustXZoom(-1); });
+        document.getElementById('yPlusBtn').addEventListener('click', function () {adjustYAxis(1);});
+        document.getElementById('yMinusBtn').addEventListener('click', function () {adjustYAxis(-1);});
+        document.getElementById('xPlusBtn').addEventListener('click', function () {adjustXZoom(1);});
+        document.getElementById('xMinusBtn').addEventListener('click', function () {adjustXZoom(-1);});
 
         function adjustYAxis(delta) {
             const range = yMax - yMin;
@@ -2511,9 +2549,9 @@
                     newStart = Math.max(0, mid - step);
                     newEnd = Math.min(100, mid + step);
                     if (newStart >= newEnd) return;
-                } else { return; }
+                } else {return;}
             }
-            myChart.dispatchAction({ type: 'dataZoom', start: newStart, end: newEnd, dataZoomIndex: 0 });
+            myChart.dispatchAction({type: 'dataZoom', start: newStart, end: newEnd, dataZoomIndex: 0});
         }
 
         const DEFAULT_AVATAR_SVG = 'data:image/svg+xml,' + encodeURIComponent(
@@ -2540,7 +2578,7 @@
         });
 
         function makeCircularImage(src, callback) {
-            if (src === DEFAULT_AVATAR_SVG) { callback(DEFAULT_AVATAR_SVG); return; }
+            if (src === DEFAULT_AVATAR_SVG) {callback(DEFAULT_AVATAR_SVG); return;}
             const img = new Image();
             img.crossOrigin = 'anonymous';
             img.onload = function () {
@@ -2562,7 +2600,7 @@
                     callback(DEFAULT_AVATAR_SVG);
                 }
             };
-            img.onerror = function () { callback(DEFAULT_AVATAR_SVG); };
+            img.onerror = function () {callback(DEFAULT_AVATAR_SVG);};
             img.src = src;
         }
 
@@ -2589,7 +2627,7 @@
                 }
                 callback(result);
             };
-            img.onerror = function () { callback(dataUrl); };
+            img.onerror = function () {callback(dataUrl);};
             img.src = dataUrl;
         }
 
@@ -2632,16 +2670,16 @@
             '飘小仙': '', '年化1%': ''
         };
 
-        function emptyArr(n) { return new Array(n || 0).fill(0); }
+        function emptyArr(n) {return new Array(n || 0).fill(0);}
 
         const TIME_SERIES_ARR_KEYS = ['peData', 'volumeData', 'amountData', 'turnoverData'];
 
         // ★ 统一空 refStats 生成器（避免内存泄漏的字段引用共享）
         function emptyRefStats() {
             return {
-                price: { high: null, low: null, avg250: null, avg30: null, avg7: null },
-                volume: { high: null, low: null, avg250: null, avg30: null, avg7: null },
-                amount: { high: null, low: null, avg250: null, avg30: null, avg7: null }
+                price: {high: null, low: null, avg250: null, avg30: null, avg7: null},
+                volume: {high: null, low: null, avg250: null, avg30: null, avg7: null},
+                amount: {high: null, low: null, avg250: null, avg30: null, avg7: null}
             };
         }
 
@@ -2701,7 +2739,7 @@
             if (!e.ctrlKey && !e.metaKey) ctrlPressed = false;
             if (!e.shiftKey) shiftPressed = false;
         });
-        window.addEventListener('blur', function () { ctrlPressed = false; shiftPressed = false; });
+        window.addEventListener('blur', function () {ctrlPressed = false; shiftPressed = false;});
 
         const chartDom = document.getElementById('trendChart');
         const myChart = echarts.init(chartDom);
@@ -2782,11 +2820,11 @@
         let danmakuImagesCache = {};
         let danmakuEnabled = true;
 
-        function isMobileView() { return window.innerWidth <= 820; }
+        function isMobileView() {return window.innerWidth <= 820;}
 
         function getDanmakuConfig() {
             const mobile = isMobileView();
-            return { count: mobile ? 2 : 6, speedFactor: mobile ? 0.6 : 1.0, avatarSize: mobile ? 24 : 30 };
+            return {count: mobile ? 2 : 6, speedFactor: mobile ? 0.6 : 1.0, avatarSize: mobile ? 24 : 30};
         }
 
         function getAllDanmaku() {
@@ -2813,7 +2851,7 @@
             const unique = [];
             const seen = new Set();
             all.forEach(item => {
-                if (!seen.has(item.text)) { seen.add(item.text); unique.push(item); }
+                if (!seen.has(item.text)) {seen.add(item.text); unique.push(item);}
             });
             if (unique.length === 0) return [];
             const shuffled = unique.sort(() => Math.random() - 0.5);
@@ -2945,7 +2983,7 @@
             if (!danmakuEnabled) return;
             const width = chartContainer.clientWidth;
             const height = chartContainer.clientHeight;
-            if (width === 0 || height === 0) { setTimeout(initDanmaku, 200); return; }
+            if (width === 0 || height === 0) {setTimeout(initDanmaku, 200); return;}
             const dpr = window.devicePixelRatio || 1;
             danmakuCanvas.width = width * dpr;
             danmakuCanvas.height = height * dpr;
@@ -2959,13 +2997,13 @@
                 danmakuItems.push(new Danmaku(item.text, item.avatarUrl, item.name, item.color, width, height));
             });
             if (danmakuItems.length > 0) startDanmakuAnimation();
-            else { stopDanmakuAnimation(); ctx.clearRect(0, 0, width, height); }
+            else {stopDanmakuAnimation(); ctx.clearRect(0, 0, width, height);}
         }
 
         function startDanmakuAnimation() {
             if (!danmakuEnabled || danmakuAnimationId) return;
             function animate() {
-                if (!danmakuEnabled || danmakuItems.length === 0) { stopDanmakuAnimation(); return; }
+                if (!danmakuEnabled || danmakuItems.length === 0) {stopDanmakuAnimation(); return;}
                 if (document.hidden) {
                     danmakuAnimationId = requestAnimationFrame(animate);
                     return;
@@ -2980,14 +3018,14 @@
                     ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
                 }
                 ctx.clearRect(0, 0, width, height);
-                danmakuItems.forEach(d => { d.update(width, height); d.draw(ctx); });
+                danmakuItems.forEach(d => {d.update(width, height); d.draw(ctx);});
                 danmakuAnimationId = requestAnimationFrame(animate);
             }
             danmakuAnimationId = requestAnimationFrame(animate);
         }
 
         function stopDanmakuAnimation() {
-            if (danmakuAnimationId) { cancelAnimationFrame(danmakuAnimationId); danmakuAnimationId = null; }
+            if (danmakuAnimationId) {cancelAnimationFrame(danmakuAnimationId); danmakuAnimationId = null;}
             danmakuCanvas.width = 1;
             danmakuCanvas.height = 1;
         }
@@ -3014,7 +3052,7 @@
             }
         });
 
-        window.addEventListener('resize', function () { if (danmakuEnabled) resetDanmaku(); });
+        window.addEventListener('resize', function () {if (danmakuEnabled) resetDanmaku();});
 
         // ================================================================
         //  辅助
@@ -3027,18 +3065,18 @@
             const d = new Date(dateStr); d.setDate(d.getDate() - 1);
             return d.toISOString().slice(0, 10);
         }
-        function randomColor() { return '#' + Math.floor(Math.random() * 16777215).toString(16).padStart(6, '0'); }
+        function randomColor() {return '#' + Math.floor(Math.random() * 16777215).toString(16).padStart(6, '0');}
         function generateSeriesName() {
             const base = '指标 '; const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-            for (let ch of chars) { const name = base + ch; if (!seriesKeys.includes(name)) return name; }
+            for (let ch of chars) {const name = base + ch; if (!seriesKeys.includes(name)) return name;}
             return base + (seriesKeys.length + 1);
         }
-        function getSeries(key) { return seriesList.find(s => s.name === key); }
-        function calcTotalChange(base, value) { if (base === 0) return 0; return ((value - base) / base) * 100; }
-        function calcDailyChange(prev, curr) { if (prev === 0) return 0; return ((curr - prev) / prev) * 100; }
+        function getSeries(key) {return seriesList.find(s => s.name === key);}
+        function calcTotalChange(base, value) {if (base === 0) return 0; return ((value - base) / base) * 100;}
+        function calcDailyChange(prev, curr) {if (prev === 0) return 0; return ((curr - prev) / prev) * 100;}
 
         function getLatest52WeekHL(series) {
-            if (!series) return { high: null, low: null };
+            if (!series) return {high: null, low: null};
             // ★ 优先读 refStats
             if (series.refStats && series.refStats.price) {
                 const p = series.refStats.price;
@@ -3055,7 +3093,7 @@
                 };
             }
             if (!Array.isArray(series.high52Data) || !Array.isArray(series.low52Data)) {
-                return { high: null, low: null };
+                return {high: null, low: null};
             }
             const n = series.high52Data.length;
             let hi = null, lo = null;
@@ -3064,7 +3102,7 @@
                 if (lo === null && series.low52Data[i] > 0) lo = series.low52Data[i];
                 if (hi !== null && lo !== null) break;
             }
-            return { high: hi, low: lo };
+            return {high: hi, low: lo};
         }
 
         // ★ 计算某系列的统计数据（价格/成交量/成交额 的高/低/均值）
@@ -3073,7 +3111,7 @@
 
             function statOfArr(arr) {
                 const n = arr ? arr.length : 0;
-                if (n === 0) return { high: null, low: null, avg250: null, avg30: null, avg7: null };
+                if (n === 0) return {high: null, low: null, avg250: null, avg30: null, avg7: null};
                 const start = Math.max(0, n - 250);
                 let hi = null, lo = null;
                 for (let i = start; i < n; i++) {
@@ -3088,11 +3126,11 @@
                     let sum = 0, cnt = 0;
                     for (let i = from; i < n; i++) {
                         const v = arr[i];
-                        if (v != null && v > 0 && isFinite(v)) { sum += v; cnt++; }
+                        if (v != null && v > 0 && isFinite(v)) {sum += v; cnt++;}
                     }
                     return cnt > 0 ? sum / cnt : null;
                 }
-                return { high: hi, low: lo, avg250: avgOf(250), avg30: avgOf(30), avg7: avgOf(7) };
+                return {high: hi, low: lo, avg250: avgOf(250), avg30: avgOf(30), avg7: avgOf(7)};
             }
 
             // 价格：均值用 s.data；高低优先用 highData/lowData（更准确的日内高/低）
@@ -3103,8 +3141,8 @@
             for (let i = start250; i < n; i++) {
                 const h = s.highData ? s.highData[i] : null;
                 const l = s.lowData ? s.lowData[i] : null;
-                if (h != null && h > 0) { if (priceHi === null || h > priceHi) priceHi = h; }
-                if (l != null && l > 0) { if (priceLo === null || l < priceLo) priceLo = l; }
+                if (h != null && h > 0) {if (priceHi === null || h > priceHi) priceHi = h;}
+                if (l != null && l > 0) {if (priceLo === null || l < priceLo) priceLo = l;}
             }
             if (priceHi !== null) priceStats.high = priceHi;
             if (priceLo !== null) priceStats.low = priceLo;
@@ -3126,7 +3164,7 @@
             }
             const amtStats = statOfArr(amtArr);
 
-            return { price: priceStats, volume: volStats, amount: amtStats };
+            return {price: priceStats, volume: volStats, amount: amtStats};
         }
 
         function ensureRefStats(s) {
@@ -3146,7 +3184,7 @@
                 markLineData.push({
                     name: `${unitLabel}高`,
                     yAxis: stats.high,
-                    lineStyle: { color: '#e64340', type: 'dashed', width: 1.5, opacity: 0.75 },
+                    lineStyle: {color: '#e64340', type: 'dashed', width: 1.5, opacity: 0.75},
                     label: {
                         show: true, position: 'insideEndTop',
                         formatter: `${unitLabel}高 ${formatBigNum(stats.high)}`,
@@ -3158,7 +3196,7 @@
                 markLineData.push({
                     name: `${unitLabel}低`,
                     yAxis: stats.low,
-                    lineStyle: { color: '#07c160', type: 'dotted', width: 1.5, opacity: 0.75 },
+                    lineStyle: {color: '#07c160', type: 'dotted', width: 1.5, opacity: 0.75},
                     label: {
                         show: true, position: 'insideEndBottom',
                         formatter: `${unitLabel}低 ${formatBigNum(stats.low)}`,
@@ -3167,9 +3205,9 @@
                 });
             }
             const avgDefs = [
-                { key: 'avg250', label: `${unitLabel}52周均`, color: '#f59e0b', type: 'solid' },
-                { key: 'avg30', label: `${unitLabel}30日均`, color: '#8b5cf6', type: 'dashed' },
-                { key: 'avg7', label: `${unitLabel}7日均`, color: '#06b6d4', type: 'dotted' }
+                {key: 'avg250', label: `${unitLabel}52周均`, color: '#f59e0b', type: 'solid'},
+                {key: 'avg30', label: `${unitLabel}30日均`, color: '#8b5cf6', type: 'dashed'},
+                {key: 'avg7', label: `${unitLabel}7日均`, color: '#06b6d4', type: 'dotted'}
             ];
             avgDefs.forEach(a => {
                 const val = stats[a.key];
@@ -3177,7 +3215,7 @@
                     markLineData.push({
                         name: a.label,
                         yAxis: val,
-                        lineStyle: { color: a.color, type: a.type, width: 1.5, opacity: 0.75 },
+                        lineStyle: {color: a.color, type: a.type, width: 1.5, opacity: 0.75},
                         label: {
                             show: true, position: 'insideStartTop',
                             formatter: `${a.label} ${formatBigNum(val)}`,
@@ -3186,7 +3224,7 @@
                     });
                 }
             });
-            return markLineData.length > 0 ? { symbol: 'none', silent: true, animation: false, data: markLineData } : null;
+            return markLineData.length > 0 ? {symbol: 'none', silent: true, animation: false, data: markLineData} : null;
         }
 
         function buildMovingAverage(arr, n) {
@@ -3194,10 +3232,10 @@
             let sum = 0, cnt = 0;
             for (let i = 0; i < arr.length; i++) {
                 const vIn = arr[i];
-                if (vIn != null && vIn > 0 && isFinite(vIn)) { sum += vIn; cnt++; }
+                if (vIn != null && vIn > 0 && isFinite(vIn)) {sum += vIn; cnt++;}
                 if (i >= n) {
                     const vOut = arr[i - n];
-                    if (vOut != null && vOut > 0 && isFinite(vOut)) { sum -= vOut; cnt--; }
+                    if (vOut != null && vOut > 0 && isFinite(vOut)) {sum -= vOut; cnt--;}
                 }
                 if (cnt > 0) result[i] = sum / cnt;
             }
@@ -3233,20 +3271,20 @@
                 let sum = 0, cnt = 0;
                 for (let i = from; i < n; i++) {
                     const v = arr[i];
-                    if (v != null && v > 0 && isFinite(v)) { sum += v; cnt++; }
+                    if (v != null && v > 0 && isFinite(v)) {sum += v; cnt++;}
                 }
                 return cnt > 0 ? sum / cnt : null;
             };
-            return { high: hi, low: lo, avg250: avgOf(250), avg30: avgOf(30), avg7: avgOf(7) };
+            return {high: hi, low: lo, avg250: avgOf(250), avg30: avgOf(30), avg7: avgOf(7)};
         }
 
-        function addSecondaryPctSeriesToTrend(seriesArr, sortedKeys, isVolPct, keyVisibilityFn) {
+        function addSecondaryPctSeriesToTrend(seriesArr, sortedKeys, isVolPct, period, keyVisibilityFn) {
             const prefix = isVolPct ? '_VOL_PCT' : '_AMT_PCT';
-            const periods = [
-                { n: 250, type: 'solid', width: 1.5, opacity: 0.75, z: 3 },
-                { n: 30, type: 'dashed', width: 1.3, opacity: 0.55, z: 2 },
-                { n: 7, type: 'dotted', width: 1.1, opacity: 0.40, z: 1 }
-            ];
+            const p = period === 30
+                ? {n: 30, type: 'dashed', width: 1.3, opacity: 0.55, z: 2}
+                : (period === 7
+                    ? {n: 7, type: 'dotted', width: 1.1, opacity: 0.40, z: 1}
+                    : {n: 250, type: 'solid', width: 1.5, opacity: 0.75, z: 3});
             const addedIndices = [];
             sortedKeys.forEach(key => {
                 const s = getSeries(key);
@@ -3264,59 +3302,57 @@
                     });
                 }
                 if (!arr.some(v => v != null && v > 0)) return;
-                periods.forEach(p => {
-                    const avg = buildMovingAverage(arr, p.n);
-                    const pct = arr.map((v, i) => {
-                        if (v == null || v <= 0 || avg[i] == null || avg[i] <= 0) return null;
-                        return v / avg[i] * 100;
-                    });
-                    if (!pct.some(v => v !== null)) return;
-                    const idx = seriesArr.length;
-                    seriesArr.push({
-                        name: key + prefix + p.n,
-                        type: 'line', yAxisIndex: 1, data: pct, smooth: true,
-                        symbol: 'circle', symbolSize: 2, showSymbol: false, connectNulls: false,
-                        lineStyle: { width: p.width, type: p.type, opacity: p.opacity },
-                        itemStyle: { opacity: p.opacity }, z: p.z, silent: true
-                    });
-                    addedIndices.push(idx);
+                const avg = buildMovingAverage(arr, p.n);
+                const pct = arr.map((v, i) => {
+                    if (v == null || v <= 0 || avg[i] == null || avg[i] <= 0) return null;
+                    return v / avg[i] * 100;
                 });
+                if (!pct.some(v => v !== null)) return;
+                const idx = seriesArr.length;
+                seriesArr.push({
+                    name: key + prefix + p.n,
+                    type: 'line', yAxisIndex: 1, data: pct, smooth: true,
+                    symbol: 'circle', symbolSize: 2, showSymbol: false, connectNulls: false,
+                    lineStyle: {width: p.width, type: p.type, opacity: p.opacity},
+                    itemStyle: {opacity: p.opacity}, z: p.z, silent: true
+                });
+                addedIndices.push(idx);
             });
             return addedIndices;
         }
 
         function getCurrentSecondaryRange() {
-            if (volumeDisplayMode === 'volumePct' || volumeDisplayMode === 'amountPct') {
-                return { min: 0, max: 200 };
+            if (isPctMode(volumeDisplayMode)) {
+                return {min: 0, max: 200};
             }
             let min = Infinity, max = -Infinity;
             const keys = trendLegendSelected.size === 0
                 ? seriesKeys
                 : seriesKeys.filter(k => trendLegendSelected.has(k));
-            if (keys.length === 0) return { min: 0, max: 100 };
+            if (keys.length === 0) return {min: 0, max: 100};
             keys.forEach(key => {
                 const s = getSeries(key);
                 if (!s) return;
                 if (volumeDisplayMode === 'volume') {
                     (s.volumeData || []).forEach(v => {
-                        if (v != null && v > 0) { min = Math.min(min, v); max = Math.max(max, v); }
+                        if (v != null && v > 0) {min = Math.min(min, v); max = Math.max(max, v);}
                     });
                 } else {
                     const isIdx = isIndexCode(s.code);
                     (s.amountData || []).forEach(v => {
-                        if (v != null && v > 0) { min = Math.min(min, v); max = Math.max(max, v); }
+                        if (v != null && v > 0) {min = Math.min(min, v); max = Math.max(max, v);}
                     });
                     if (!isIdx) {
                         (s.volumeData || []).forEach((v, i) => {
                             const a = calcAmountFromVolume(v, s.data[i], s.code);
-                            if (a != null && a > 0) { min = Math.min(min, a); max = Math.max(max, a); }
+                            if (a != null && a > 0) {min = Math.min(min, a); max = Math.max(max, a);}
                         });
                     }
                 }
             });
-            if (min === Infinity || max === -Infinity) return { min: 0, max: 100 };
+            if (min === Infinity || max === -Infinity) return {min: 0, max: 100};
             const pad = (max - min) * 0.1 || 100;
-            return { min: Math.max(0, min - pad), max: max + pad };
+            return {min: Math.max(0, min - pad), max: max + pad};
         }
 
         function getBaseIdx() {
@@ -3408,7 +3444,7 @@
 
         const ANNUAL_RATE = 0.01;
         const ANNUAL_SERIES_PREFIX = '年化';
-        function isAnnualSeries(name) { return typeof name === 'string' && name.indexOf(ANNUAL_SERIES_PREFIX) === 0; }
+        function isAnnualSeries(name) {return typeof name === 'string' && name.indexOf(ANNUAL_SERIES_PREFIX) === 0;}
         function calcAnnualSeries(datesArr, rate) {
             if (!datesArr || datesArr.length === 0) return [];
             const baseTime = new Date(datesArr[0]).getTime();
@@ -3445,11 +3481,11 @@
             refreshAnnualSeries();
         }
 
-        function getLatestIdx() { return dates.length - 1; }
-        function getTodayStr() { const d = new Date(); return d.toISOString().slice(0, 10); }
+        function getLatestIdx() {return dates.length - 1;}
+        function getTodayStr() {const d = new Date(); return d.toISOString().slice(0, 10);}
 
         function sortAllData() {
-            const combined = dates.map((d, idx) => ({ date: d, index: idx }));
+            const combined = dates.map((d, idx) => ({date: d, index: idx}));
             combined.sort((a, b) => a.date.localeCompare(b.date));
             const sortedDates = combined.map(item => item.date);
             seriesList.forEach(s => {
@@ -3533,9 +3569,9 @@
                         latest52High: (typeof s.latest52High === 'number') ? s.latest52High : null,
                         latest52Low: (typeof s.latest52Low === 'number') ? s.latest52Low : null,
                         refStats: s.refStats ? {
-                            price: { ...s.refStats.price },
-                            volume: { ...s.refStats.volume },
-                            amount: { ...s.refStats.amount }
+                            price: {...s.refStats.price},
+                            volume: {...s.refStats.volume},
+                            amount: {...s.refStats.amount}
                         } : null,
                         high52Data: [], low52Data: []
                     };
@@ -3640,8 +3676,13 @@
             statsDisplayMode = state.statsDisplayMode || 'count';
             priceTablePeMode = state.priceTablePeMode || 'vs';
             priceTableTurnoverMode = state.priceTableTurnoverMode || 'vs';
-            volumeDisplayMode = ['volume', 'amount', 'volumePct', 'amountPct'].includes(state.volumeDisplayMode)
-                ? state.volumeDisplayMode : 'volume';
+            const _legacyVolMap = {'volumePct': 'volumePct250', 'amountPct': 'amountPct250'};
+            let _vdm = state.volumeDisplayMode;
+            if (_legacyVolMap[_vdm]) _vdm = _legacyVolMap[_vdm];
+            const _validVolumeModes = ['volume', 'amount',
+                'volumePct250', 'volumePct30', 'volumePct7',
+                'amountPct250', 'amountPct30', 'amountPct7'];
+            volumeDisplayMode = _validVolumeModes.includes(_vdm) ? _vdm : 'volume';
             if (state.detailsOpen) {
                 rawDetails.open = state.detailsOpen.raw !== undefined ? state.detailsOpen.raw : false;
                 dailyDetails.open = state.detailsOpen.daily !== undefined ? state.detailsOpen.daily : false;
@@ -3719,7 +3760,7 @@
             try {
                 const state = JSON.parse(saved);
                 return loadStateFromObject(state);
-            } catch (e) { return false; }
+            } catch (e) {return false;}
         }
 
         rawDetails.addEventListener('toggle', saveState);
@@ -3812,7 +3853,12 @@
 
         document.addEventListener('change', function (e) {
             if (e.target && e.target.id === 'volumeModeSelect') {
+                const prev = volumeDisplayMode;
                 volumeDisplayMode = e.target.value;
+                if (prev !== volumeDisplayMode) {
+                    secondaryYMin = null;
+                    secondaryYMax = null;
+                }
                 updateViewUI();
                 saveState();
             }
@@ -3835,7 +3881,7 @@
         if (baseDateInputEl) {
             baseDateInputEl.addEventListener('change', function () {
                 const val = this.value;
-                if (!val || !/^\d{4}-\d{2}-\d{2}$/.test(val)) { this.value = baseDate; return; }
+                if (!val || !/^\d{4}-\d{2}-\d{2}$/.test(val)) {this.value = baseDate; return;}
                 const lastDate = dates[dates.length - 1];
                 if (lastDate && val > lastDate) {
                     alert(`起点不能晚于最新数据日期 ${lastDate}`);
@@ -3848,7 +3894,7 @@
                             `是否自动补齐日期？\n` +
                             `（补齐后各指标将用首日值占位，随后可点【校验历史数据】拉取真实价格）`
                         );
-                        if (!ok) { this.value = baseDate; return; }
+                        if (!ok) {this.value = baseDate; return;}
                         if (!extendDatesToBaseDate(val)) {
                             alert('扩展日期失败');
                             this.value = baseDate; return;
@@ -3859,14 +3905,14 @@
                     }
                 }
                 baseDate = val;
-                seriesList.forEach(s => { s._changeCache = null; s.refStats = null; });
+                seriesList.forEach(s => {s._changeCache = null; s.refStats = null;});
                 renderSeriesManager();
                 renderTables();
                 renderChart();
                 focusChartToBaseDate();
                 resetDanmaku();
                 saveState();
-                setTimeout(() => { verifyHistoricalData(); }, 300);
+                setTimeout(() => {verifyHistoricalData();}, 300);
             });
         }
 
@@ -3874,7 +3920,7 @@
             const DEFAULT_BASE = '2026-06-23';
             if (!confirm(`确定要把起点重置为 ${DEFAULT_BASE}，并清除此日期前的所有数据吗？`)) return;
             if (!dates.includes(DEFAULT_BASE)) {
-                if (!dates.length) { alert('没有数据'); return; }
+                if (!dates.length) {alert('没有数据'); return;}
                 if (DEFAULT_BASE < dates[0]) {
                     if (!extendDatesToBaseDate(DEFAULT_BASE)) {
                         alert('扩展日期失败');
@@ -3904,7 +3950,7 @@
             focusChartToBaseDate();
             resetDanmaku();
             saveState();
-            setTimeout(() => { verifyHistoricalData(); }, 300);
+            setTimeout(() => {verifyHistoricalData();}, 300);
         }
 
         const resetBaseDateBtnEl = document.getElementById('resetBaseDateBtn');
@@ -3923,7 +3969,7 @@
                 if (typeof s.name !== 'string' || !s.name) return false;
                 if (typeof s.color !== 'string' || !/^#[0-9a-fA-F]{6}$/.test(s.color)) return false;
                 if (!Array.isArray(s.data) || s.data.length !== state.dates.length) return false;
-                for (let v of s.data) { if (typeof v !== 'number' || !isFinite(v)) return false; }
+                for (let v of s.data) {if (typeof v !== 'number' || !isFinite(v)) return false;}
                 if (s.avatarUrl && typeof s.avatarUrl !== 'string') return false;
                 if (s.remark && typeof s.remark !== 'string') return false;
                 if (s.code && typeof s.code !== 'string') return false;
@@ -3975,7 +4021,7 @@
         function exportJson() {
             const state = getCurrentState();
             const json = formatStateJson(state);
-            const blob = new Blob([json], { type: 'application/json' });
+            const blob = new Blob([json], {type: 'application/json'});
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
@@ -3991,7 +4037,7 @@
             reader.onload = function (e) {
                 try {
                     const state = JSON.parse(e.target.result);
-                    if (!validateState(state)) { alert('数据格式无效'); return; }
+                    if (!validateState(state)) {alert('数据格式无效'); return;}
                     if (loadStateFromObject(state)) {
                         processAllAvatars(() => {
                             renderSeriesManager();
@@ -4002,15 +4048,15 @@
                             alert('JSON 数据导入成功！');
                         });
                     }
-                } catch (err) { alert('文件解析失败'); }
+                } catch (err) {alert('文件解析失败');}
             };
             reader.readAsText(file);
         }
 
         exportJsonBtn.addEventListener('click', exportJson);
-        importJsonBtn.addEventListener('click', function () { importJsonFileInput.click(); });
+        importJsonBtn.addEventListener('click', function () {importJsonFileInput.click();});
         importJsonFileInput.addEventListener('change', function (e) {
-            if (this.files && this.files[0]) { importJson(this.files[0]); }
+            if (this.files && this.files[0]) {importJson(this.files[0]);}
             this.value = '';
         });
 
@@ -4044,14 +4090,14 @@
                     target.style.maxHeight = newHeight + 'px';
                     saveState();
                 }
-                function onEnd() { isResizing = false; handle.classList.remove('active'); }
+                function onEnd() {isResizing = false; handle.classList.remove('active');}
                 handle.addEventListener('mousedown', function (e) {
                     onStart(e.clientY);
                     document.addEventListener('mousemove', onMouseMove);
                     document.addEventListener('mouseup', onMouseUp);
                     e.preventDefault();
                 });
-                function onMouseMove(e) { onMove(e.clientY); }
+                function onMouseMove(e) {onMove(e.clientY);}
                 function onMouseUp() {
                     onEnd();
                     document.removeEventListener('mousemove', onMouseMove);
@@ -4061,10 +4107,10 @@
                     const touch = e.touches[0];
                     if (!touch) return;
                     onStart(touch.clientY);
-                    document.addEventListener('touchmove', onTouchMove, { passive: false });
-                    document.addEventListener('touchend', onTouchEnd, { passive: false });
+                    document.addEventListener('touchmove', onTouchMove, {passive: false});
+                    document.addEventListener('touchend', onTouchEnd, {passive: false});
                     e.preventDefault();
-                }, { passive: false });
+                }, {passive: false});
                 function onTouchMove(e) {
                     const touch = e.touches[0];
                     if (!touch) return;
@@ -4106,14 +4152,14 @@
                 myChart.resize();
                 saveState();
             }
-            function onEnd() { isResizing = false; resizer.classList.remove('active'); }
+            function onEnd() {isResizing = false; resizer.classList.remove('active');}
             resizer.addEventListener('mousedown', function (e) {
                 onStart(e.clientX);
                 document.addEventListener('mousemove', onMouseMove);
                 document.addEventListener('mouseup', onMouseUp);
                 e.preventDefault();
             });
-            function onMouseMove(e) { onMove(e.clientX); }
+            function onMouseMove(e) {onMove(e.clientX);}
             function onMouseUp() {
                 onEnd();
                 document.removeEventListener('mousemove', onMouseMove);
@@ -4123,10 +4169,10 @@
                 const touch = e.touches[0];
                 if (!touch) return;
                 onStart(touch.clientX);
-                document.addEventListener('touchmove', onTouchMove, { passive: false });
-                document.addEventListener('touchend', onTouchEnd, { passive: false });
+                document.addEventListener('touchmove', onTouchMove, {passive: false});
+                document.addEventListener('touchend', onTouchEnd, {passive: false});
                 e.preventDefault();
-            }, { passive: false });
+            }, {passive: false});
             function onTouchMove(e) {
                 const touch = e.touches[0];
                 if (!touch) return;
@@ -4146,7 +4192,7 @@
                 const requestFullscreen = container.requestFullscreen || container.webkitRequestFullscreen ||
                     container.mozRequestFullScreen || container.msRequestFullscreen;
                 if (requestFullscreen) {
-                    requestFullscreen.call(container).catch(err => { alert('全屏请求被拒绝: ' + err.message); });
+                    requestFullscreen.call(container).catch(err => {alert('全屏请求被拒绝: ' + err.message);});
                 } else alert('您的浏览器不支持全屏 API');
             } else {
                 const exitFullscreen = document.exitFullscreen || document.webkitExitFullscreen ||
@@ -4162,7 +4208,7 @@
             } else {
                 fullscreenBtn.textContent = '⛶';
                 fullscreenBtn.title = '全屏图表';
-                setTimeout(() => { myChart.resize(); resetDanmaku(); updateAvatarPositions(); }, 100);
+                setTimeout(() => {myChart.resize(); resetDanmaku(); updateAvatarPositions();}, 100);
             }
         });
 
@@ -4170,14 +4216,14 @@
         //  头像
         // ================================================================
         function processAvatarUrl(src, callback) {
-            if (!src || src === DEFAULT_AVATAR_SVG) { callback(DEFAULT_AVATAR_SVG); return; }
-            makeCircularImage(src, (circularUrl) => { callback(circularUrl); });
+            if (!src || src === DEFAULT_AVATAR_SVG) {callback(DEFAULT_AVATAR_SVG); return;}
+            makeCircularImage(src, (circularUrl) => {callback(circularUrl);});
         }
         // ★ 修改：统一对相对路径头像做圆形裁剪（avatarData 不入 localStorage，不增加持久化内存）
         function processAllAvatars(callback) {
             let count = 0;
             const total = seriesList.length;
-            if (total === 0) { callback(); return; }
+            if (total === 0) {callback(); return;}
             seriesList.forEach((s) => {
                 if (s.avatarUrl && s.avatarUrl !== DEFAULT_AVATAR_SVG) {
                     processAvatarUrl(s.avatarUrl, (circularUrl) => {
@@ -4206,7 +4252,7 @@
         let searchTimeout = null;
         let activeSearchScript = null;
         function searchStock(keyword, callback) {
-            if (!keyword || keyword.length < 1) { callback([]); return; }
+            if (!keyword || keyword.length < 1) {callback([]); return;}
             if (activeSearchScript) {
                 document.head.removeChild(activeSearchScript);
                 activeSearchScript = null;
@@ -4217,7 +4263,7 @@
             script.src = url;
             script.onload = function () {
                 const data = window.suggestdata;
-                if (data && Array.isArray(data)) callback(data.map(item => ({ code: item[0], name: item[1] })));
+                if (data && Array.isArray(data)) callback(data.map(item => ({code: item[0], name: item[1]})));
                 else callback([]);
                 window.suggestdata = null;
                 document.head.removeChild(script);
@@ -4284,11 +4330,11 @@
                 if (code) {
                     link = getXueqiuLink(code);
                     if (link !== '#') btnDisabled = '';
-                    if (market === 'a') { btnClass += ' market-a'; btnText = 'A'; }
-                    else if (market === 'hk') { btnClass += ' market-hk'; btnText = 'H'; }
-                    else if (market === 'us') { btnClass += ' market-us'; btnText = 'U'; }
-                    else { btnText = '?'; btnClass += ' market-unknown'; }
-                } else { btnText = '?'; btnClass += ' market-unknown'; }
+                    if (market === 'a') {btnClass += ' market-a'; btnText = 'A';}
+                    else if (market === 'hk') {btnClass += ' market-hk'; btnText = 'H';}
+                    else if (market === 'us') {btnClass += ' market-us'; btnText = 'U';}
+                    else {btnText = '?'; btnClass += ' market-unknown';}
+                } else {btnText = '?'; btnClass += ' market-unknown';}
                 let danmakuTags = '';
                 if (s.danmaku && s.danmaku.length > 0) {
                     s.danmaku.forEach((dm, i) => {
@@ -4341,7 +4387,7 @@
                     const seriesName = this.dataset.series;
                     const input = this.parentElement.querySelector('.danmaku-input');
                     const text = input.value.trim();
-                    if (text) { addDanmaku(seriesName, text); input.value = ''; }
+                    if (text) {addDanmaku(seriesName, text); input.value = '';}
                 });
             });
             seriesManager.querySelectorAll('.danmaku-del').forEach(el => {
@@ -4356,7 +4402,7 @@
                         e.preventDefault();
                         const seriesName = this.dataset.series;
                         const text = this.value.trim();
-                        if (text) { addDanmaku(seriesName, text); this.value = ''; }
+                        if (text) {addDanmaku(seriesName, text); this.value = '';}
                     }
                 });
             });
@@ -4379,7 +4425,7 @@
                         const newOrder = [];
                         items.forEach(item => newOrder.push(item.querySelector('.series-name-input').value));
                         const newSeriesList = [];
-                        newOrder.forEach(name => { const s = getSeries(name); if (s) newSeriesList.push(s); });
+                        newOrder.forEach(name => {const s = getSeries(name); if (s) newSeriesList.push(s);});
                         if (newSeriesList.length === seriesList.length) {
                             seriesList = newSeriesList;
                             seriesKeys = seriesList.map(s => s.name);
@@ -4396,7 +4442,7 @@
                 inp.addEventListener('blur', function () {
                     const oldName = this.dataset.oldname;
                     const newName = this.value.trim();
-                    if (!newName || newName === oldName) { this.value = oldName; return; }
+                    if (!newName || newName === oldName) {this.value = oldName; return;}
                     if (seriesKeys.includes(newName) && newName !== oldName) {
                         alert('指标名称已存在'); this.value = oldName; return;
                     }
@@ -4425,14 +4471,14 @@
                         saveState();
                     }
                 });
-                inp.addEventListener('keydown', function (e) { if (e.key === 'Enter') this.blur(); });
+                inp.addEventListener('keydown', function (e) {if (e.key === 'Enter') this.blur();});
             });
             seriesManager.querySelectorAll('.color-picker').forEach(picker => {
                 picker.addEventListener('input', function () {
                     const parent = this.closest('.series-item');
                     const name = parent.querySelector('.series-name-input').value;
                     const s = getSeries(name);
-                    if (s) { s.color = this.value; renderTables(); renderChart(); saveState(); }
+                    if (s) {s.color = this.value; renderTables(); renderChart(); saveState();}
                 });
             });
             seriesManager.querySelectorAll('.code-wrapper').forEach(wrapper => {
@@ -4442,11 +4488,11 @@
                     const keyword = this.value.trim();
                     const currentName = this.dataset.series;
                     const s = getSeries(currentName);
-                    if (s) { s.code = keyword; saveState(); updateMarketButton(this); }
+                    if (s) {s.code = keyword; saveState(); updateMarketButton(this);}
                     if (searchTimeout) clearTimeout(searchTimeout);
-                    if (keyword.length < 1) { dropdown.classList.remove('show'); return; }
+                    if (keyword.length < 1) {dropdown.classList.remove('show'); return;}
                     searchTimeout = setTimeout(() => {
-                        searchStock(keyword, (results) => { renderDropdown(results, dropdown, input, input.dataset.series); });
+                        searchStock(keyword, (results) => {renderDropdown(results, dropdown, input, input.dataset.series);});
                     }, 200);
                 });
                 document.addEventListener('click', function (e) {
@@ -4472,7 +4518,7 @@
                     }
                 });
                 function highlightItem(items, idx) {
-                    items.forEach((item, i) => { item.style.background = i === idx ? 'var(--dropdown-hover)' : ''; });
+                    items.forEach((item, i) => {item.style.background = i === idx ? 'var(--dropdown-hover)' : '';});
                 }
                 function updateMarketButton(inp) {
                     const wrapper2 = inp.closest('.code-wrapper');
@@ -4481,13 +4527,13 @@
                     const market = getMarketType(code);
                     const link = getXueqiuLink(code);
                     btn.dataset.link = link;
-                    if (link === '#') { btn.disabled = true; btn.style.opacity = '0.4'; }
-                    else { btn.disabled = false; btn.style.opacity = '1'; }
+                    if (link === '#') {btn.disabled = true; btn.style.opacity = '0.4';}
+                    else {btn.disabled = false; btn.style.opacity = '1';}
                     btn.className = 'market-btn';
-                    if (market === 'a') { btn.classList.add('market-a'); btn.textContent = 'A'; }
-                    else if (market === 'hk') { btn.classList.add('market-hk'); btn.textContent = 'H'; }
-                    else if (market === 'us') { btn.classList.add('market-us'); btn.textContent = 'U'; }
-                    else { btn.textContent = '?'; btn.classList.add('market-unknown'); }
+                    if (market === 'a') {btn.classList.add('market-a'); btn.textContent = 'A';}
+                    else if (market === 'hk') {btn.classList.add('market-hk'); btn.textContent = 'H';}
+                    else if (market === 'us') {btn.classList.add('market-us'); btn.textContent = 'U';}
+                    else {btn.textContent = '?'; btn.classList.add('market-unknown');}
                 }
             });
             seriesManager.querySelectorAll('.upload-btn input[type="file"]').forEach(input => {
@@ -4535,16 +4581,16 @@
 
         function renderDropdown(results, dropdown, input, seriesName) {
             dropdown.innerHTML = '';
-            if (!results || results.length === 0) { dropdown.classList.remove('show'); return; }
+            if (!results || results.length === 0) {dropdown.classList.remove('show'); return;}
             results.slice(0, 10).forEach(item => {
                 const div = document.createElement('div');
                 div.className = 'code-dropdown-item';
                 div.innerHTML = `<span class="stock-code">${item.code}</span><span class="stock-name">${item.name}</span>`;
-                div.addEventListener('mousedown', function (e) { e.preventDefault(); });
+                div.addEventListener('mousedown', function (e) {e.preventDefault();});
                 div.addEventListener('click', function () {
                     input.value = item.code;
                     const s = getSeries(input.dataset.series);
-                    if (s) { s.code = item.code; saveState(); input.dispatchEvent(new Event('input')); }
+                    if (s) {s.code = item.code; saveState(); input.dispatchEvent(new Event('input'));}
                     dropdown.classList.remove('show');
                 });
                 dropdown.appendChild(div);
@@ -4629,22 +4675,22 @@
             pe: peDetails, amount: amountDetails, turnover: turnoverDetails
         };
         const tableRenderMap = {
-            raw: function () { renderRawTable(); },
-            daily: function () { renderDailyTable(); },
-            total: function () { renderTotalTable(); },
-            rank: function () { renderRankTable(); },
-            stats: function () { renderStatsTable(); },
-            tempCalc: function () { renderTempCalcTable(); },
-            pe: function () { renderExtraTable('pe'); },
-            amount: function () { renderExtraTable('amount'); },
-            turnover: function () { renderExtraTable('turnover'); }
+            raw: function () {renderRawTable();},
+            daily: function () {renderDailyTable();},
+            total: function () {renderTotalTable();},
+            rank: function () {renderRankTable();},
+            stats: function () {renderStatsTable();},
+            tempCalc: function () {renderTempCalcTable();},
+            pe: function () {renderExtraTable('pe');},
+            amount: function () {renderExtraTable('amount');},
+            turnover: function () {renderExtraTable('turnover');}
         };
 
         function markTablesDirty(keys) {
             if (!keys) {
                 Object.keys(tableDirty).forEach(k => tableDirty[k] = true);
             } else {
-                keys.forEach(k => { if (tableDirty[k] !== undefined) tableDirty[k] = true; });
+                keys.forEach(k => {if (tableDirty[k] !== undefined) tableDirty[k] = true;});
             }
         }
 
@@ -4654,7 +4700,7 @@
                 if (!details) return;
                 if (!force && !details.open) return;
                 if (force || tableDirty[k]) {
-                    try { tableRenderMap[k](); } catch (e) { console.warn('render table failed:', k, e); }
+                    try {tableRenderMap[k]();} catch (e) {console.warn('render table failed:', k, e);}
                     tableDirty[k] = false;
                 }
             });
@@ -4690,9 +4736,9 @@
                 displayDates.forEach((date) => {
                     const i = dates.indexOf(date);
                     let value; let disabled = ''; let inputClass = '';
-                    if (type === 'raw') { value = s.data[i]; inputClass = 'raw-input'; }
+                    if (type === 'raw') {value = s.data[i]; inputClass = 'raw-input';}
                     else if (type === 'daily') {
-                        if (i === 0) { value = 0; disabled = 'disabled'; }
+                        if (i === 0) {value = 0; disabled = 'disabled';}
                         else value = calcDailyChange(s.data[i - 1], s.data[i]);
                         inputClass = 'daily-input';
                     } else {
@@ -4716,7 +4762,7 @@
             updateSelectionUI();
             if (rawScroll) {
                 rawScroll.scrollTop = rawScroll.scrollHeight;
-                requestAnimationFrame(() => { rawScroll.scrollLeft = rawScroll.scrollWidth; });
+                requestAnimationFrame(() => {rawScroll.scrollLeft = rawScroll.scrollWidth;});
             }
         }
         function renderDailyTable() {
@@ -4725,7 +4771,7 @@
             updateSelectionUI();
             if (dailyScroll) {
                 dailyScroll.scrollTop = dailyScroll.scrollHeight;
-                requestAnimationFrame(() => { dailyScroll.scrollLeft = dailyScroll.scrollWidth; });
+                requestAnimationFrame(() => {dailyScroll.scrollLeft = dailyScroll.scrollWidth;});
             }
         }
         function renderTotalTable() {
@@ -4734,7 +4780,7 @@
             updateSelectionUI();
             if (totalScroll) {
                 totalScroll.scrollTop = totalScroll.scrollHeight;
-                requestAnimationFrame(() => { totalScroll.scrollLeft = totalScroll.scrollWidth; });
+                requestAnimationFrame(() => {totalScroll.scrollLeft = totalScroll.scrollWidth;});
             }
         }
 
@@ -4863,7 +4909,7 @@
                             if (editor2) editor2.textContent = newDate;
                         }
                     });
-                seriesList.forEach(s => { s._changeCache = null; s.refStats = null; });
+                seriesList.forEach(s => {s._changeCache = null; s.refStats = null;});
                 markTablesDirty();
                 sortAllData();
                 renderChart();
@@ -4873,7 +4919,7 @@
         }
         function handleDateEditorKeydown(editor, e) {
             if (editor.contentEditable !== 'true') return;
-            if (e.key === 'Enter') { e.preventDefault(); editor.blur(); }
+            if (e.key === 'Enter') {e.preventDefault(); editor.blur();}
             if (e.key === 'Escape') {
                 editor.textContent = editor.closest('th').dataset.col;
                 editor.blur();
@@ -4994,19 +5040,19 @@
 
         function renderExtraTable(type) {
             const map = {
-                pe: { arrKey: 'peData', digits: 4, table: { head: peHead, body: peBody } },
-                amount: { arrKey: 'amountData', digits: 2, table: { head: amountHead, body: amountBody } },
-                turnover: { arrKey: 'turnoverData', digits: 4, table: { head: turnoverHead, body: turnoverBody } }
+                pe: {arrKey: 'peData', digits: 4, table: {head: peHead, body: peBody}},
+                amount: {arrKey: 'amountData', digits: 2, table: {head: amountHead, body: amountBody}},
+                turnover: {arrKey: 'turnoverData', digits: 4, table: {head: turnoverHead, body: turnoverBody}}
             }[type];
             if (!map) return;
-            const { arrKey, digits, table } = map;
+            const {arrKey, digits, table} = map;
             const head = table.head;
             const body = table.body;
             if (!head || !body) return;
 
             const displayDates = getDisplayDates();
             let headHtml = `<tr><th style="text-align:left; padding-left:8px;">📊 指标</th>`;
-            displayDates.forEach(d => { headHtml += `<th>${d}</th>`; });
+            displayDates.forEach(d => {headHtml += `<th>${d}</th>`;});
             headHtml += `</tr>`;
             head.innerHTML = headHtml;
 
@@ -5030,10 +5076,10 @@
         }
 
         function renderRankTable() {
-            if (seriesKeys.length === 0 || dates.length === 0) { rankHead.innerHTML = ''; rankBody.innerHTML = ''; return; }
+            if (seriesKeys.length === 0 || dates.length === 0) {rankHead.innerHTML = ''; rankBody.innerHTML = ''; return;}
             const displayDates = getDisplayDates();
             let headHtml = `<tr><th style="text-align:left; padding-left:8px;">📊 指标</th>`;
-            displayDates.forEach(d => { headHtml += `<th style="cursor:default;">${d}</th>`; });
+            displayDates.forEach(d => {headHtml += `<th style="cursor:default;">${d}</th>`;});
             headHtml += `</tr>`;
             rankHead.innerHTML = headHtml;
 
@@ -5046,11 +5092,11 @@
                     if (!s) return;
                     const base = getBaseValue(s);
                     const curr = s.data[i];
-                    changes.push({ key, change: calcTotalChange(base, curr) });
+                    changes.push({key, change: calcTotalChange(base, curr)});
                 });
                 const sorted = changes.sort((a, b) => b.change - a.change);
                 const dayRank = {};
-                sorted.forEach((item, idx) => { dayRank[item.key] = idx + 1; });
+                sorted.forEach((item, idx) => {dayRank[item.key] = idx + 1;});
                 rankMap[i] = dayRank;
             }
 
@@ -5064,15 +5110,15 @@
                 displayDates.forEach((date) => {
                     const idx = dates.indexOf(date);
                     let displayText = ''; let rankColor = '#1e293b';
-                    if (idx <= baseIdxRank) { displayText = '—'; rankColor = 'var(--text-muted)'; }
+                    if (idx <= baseIdxRank) {displayText = '—'; rankColor = 'var(--text-muted)';}
                     else {
                         const rank = rankMap[idx]?.[key];
                         if (rank !== undefined) {
-                            if (rank === 1) { rankColor = '#f59e0b'; displayText = '🥇'; }
-                            else if (rank === 2) { rankColor = '#94a3b8'; displayText = '🥈'; }
-                            else if (rank === 3) { rankColor = '#cd7f32'; displayText = '🥉'; }
-                            else { displayText = rank; rankColor = '#1e293b'; }
-                        } else { displayText = '—'; rankColor = 'var(--text-muted)'; }
+                            if (rank === 1) {rankColor = '#f59e0b'; displayText = '🥇';}
+                            else if (rank === 2) {rankColor = '#94a3b8'; displayText = '🥈';}
+                            else if (rank === 3) {rankColor = '#cd7f32'; displayText = '🥉';}
+                            else {displayText = rank; rankColor = '#1e293b';}
+                        } else {displayText = '—'; rankColor = 'var(--text-muted)';}
                     }
                     bodyHtml += `<td style="text-align:center; font-weight:600; color:${rankColor}; font-size:var(--font-size-table-cell);">${displayText}</td>`;
                 });
@@ -5081,7 +5127,7 @@
             rankBody.innerHTML = bodyHtml;
             if (rankScroll) {
                 rankScroll.scrollTop = rankScroll.scrollHeight;
-                requestAnimationFrame(() => { rankScroll.scrollLeft = rankScroll.scrollWidth; });
+                requestAnimationFrame(() => {rankScroll.scrollLeft = rankScroll.scrollWidth;});
             }
         }
 
@@ -5089,7 +5135,7 @@
             const head = document.getElementById('tempCalcHead');
             const body = document.getElementById('tempCalcBody');
             if (!head || !body) return;
-            if (seriesKeys.length === 0 || dates.length === 0) { head.innerHTML = ''; body.innerHTML = ''; return; }
+            if (seriesKeys.length === 0 || dates.length === 0) {head.innerHTML = ''; body.innerHTML = ''; return;}
             const baseIdx = getBaseIdx();
             const displayDates = getDisplayDates();
             let headHtml = `<tr><th style="text-align:left; padding-left:8px;">📊 指标</th>`;
@@ -5124,7 +5170,7 @@
         }
 
         function renderStatsTable() {
-            if (seriesKeys.length === 0) { statsHead.innerHTML = ''; statsBody.innerHTML = ''; return; }
+            if (seriesKeys.length === 0) {statsHead.innerHTML = ''; statsBody.innerHTML = ''; return;}
             const totalDays = dates.length;
             const baseIdxStats = getBaseIdx();
             const tradingDays = Math.max(0, totalDays - baseIdxStats - 1);
@@ -5148,14 +5194,14 @@
             });
 
             const firstPlaceDays = {};
-            seriesKeys.forEach(key => { firstPlaceDays[key] = 0; });
+            seriesKeys.forEach(key => {firstPlaceDays[key] = 0;});
             for (let i = baseIdxStats; i < dates.length; i++) {
                 const changes = [];
                 seriesKeys.forEach(key => {
                     const s = getSeries(key);
                     if (!s) return;
                     const base = getBaseValue(s);
-                    changes.push({ key, change: calcTotalChange(base, s.data[i]) });
+                    changes.push({key, change: calcTotalChange(base, s.data[i])});
                 });
                 const sorted = changes.sort((a, b) => b.change - a.change);
                 if (sorted.length > 0) {
@@ -5191,7 +5237,7 @@
             </tr>`;
 
             const formatValue = (count, total = tradingDays) => {
-                if (isPercent) { if (total === 0) return '0.0%'; return (count / total * 100).toFixed(1) + '%'; }
+                if (isPercent) {if (total === 0) return '0.0%'; return (count / total * 100).toFixed(1) + '%';}
                 return count;
             };
 
@@ -5209,15 +5255,15 @@
                     const totalChangePct = calcTotalChange(base, s.data[latestIdx]);
                     assets = INITIAL_CAPITAL * (1 + totalChangePct / 100);
                 }
-                return { key, color, firstCount, posCount, negCount, beatCount, assets };
+                return {key, color, firstCount, posCount, negCount, beatCount, assets};
             }).filter(Boolean);
             statsRows.sort((a, b) => b.assets - a.assets);
 
             let bodyHtml = '';
             statsRows.forEach(row => {
-                const { key, color, firstCount, posCount, negCount, beatCount, assets } = row;
+                const {key, color, firstCount, posCount, negCount, beatCount, assets} = row;
                 const assetsStr = isFinite(assets)
-                    ? assets.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+                    ? assets.toLocaleString('zh-CN', {minimumFractionDigits: 2, maximumFractionDigits: 2})
                     : '—';
                 const assetsColor = assets > INITIAL_CAPITAL ? '#dc2626'
                     : (assets < INITIAL_CAPITAL ? '#16a34a' : 'var(--text-secondary)');
@@ -5235,7 +5281,7 @@
             statsBody.innerHTML = bodyHtml;
             if (statsScroll) {
                 statsScroll.scrollTop = statsScroll.scrollHeight;
-                requestAnimationFrame(() => { statsScroll.scrollLeft = statsScroll.scrollWidth; });
+                requestAnimationFrame(() => {statsScroll.scrollLeft = statsScroll.scrollWidth;});
             }
         }
 
@@ -5244,9 +5290,9 @@
         // ================================================================
         function deleteSelectedSeries() {
             const selectedItems = document.querySelectorAll('.series-item.selected');
-            if (selectedItems.length === 0) { alert('请先在系列管理列表中点击选中要删除的指标'); return; }
+            if (selectedItems.length === 0) {alert('请先在系列管理列表中点击选中要删除的指标'); return;}
             const names = Array.from(selectedItems).map(item => item.dataset.series);
-            if (seriesKeys.length - names.length < 1) { alert('至少保留一个指标'); return; }
+            if (seriesKeys.length - names.length < 1) {alert('至少保留一个指标'); return;}
             if (!confirm(`确定要删除选中的 ${names.length} 个指标吗？`)) return;
             names.forEach(name => {
                 const idx = seriesKeys.indexOf(name);
@@ -5266,10 +5312,10 @@
         }
 
         function deleteDateColumn() {
-            if (selectedCols.size === 0) { alert('请先选择要删除的日期列（Ctrl+点击列表头多选）'); return; }
-            if (dates.length - selectedCols.size < 2) { alert('至少保留 2 列日期（含基准日）'); return; }
+            if (selectedCols.size === 0) {alert('请先选择要删除的日期列（Ctrl+点击列表头多选）'); return;}
+            if (dates.length - selectedCols.size < 2) {alert('至少保留 2 列日期（含基准日）'); return;}
             const toDelete = Array.from(selectedCols).filter(d => d !== baseDate);
-            if (toDelete.length === 0) { alert('不能删除基准日（起点）'); return; }
+            if (toDelete.length === 0) {alert('不能删除基准日（起点）'); return;}
             if (!confirm(`确定要删除 ${toDelete.length} 个日期列吗？`)) return;
             const sorted = toDelete.sort((a, b) => dates.indexOf(b) - dates.indexOf(a));
             for (const date of sorted) {
@@ -5304,7 +5350,7 @@
             if (insertIndex === 0) insertIndex = 1;
             let prevDate = dates[insertIndex - 1] || dates[dates.length - 1];
             const newDate = getNextDate(prevDate);
-            if (dates.includes(newDate)) { alert(`日期 ${newDate} 已存在，请手动编辑日期`); return; }
+            if (dates.includes(newDate)) {alert(`日期 ${newDate} 已存在，请手动编辑日期`); return;}
             dates.splice(insertIndex, 0, newDate);
             seriesList.forEach(s => {
                 const prevVal = s.data[insertIndex - 1] || s.data[0] || 1;
@@ -5370,7 +5416,7 @@
                 return prefix + body;
             }
             if (/^\d{5}$/.test(c)) return 'hk' + c;
-            if (/^\d{6}$/.test(c)) { const prefix = c.startsWith('6') ? 'sh' : 'sz'; return prefix + c; }
+            if (/^\d{6}$/.test(c)) {const prefix = c.startsWith('6') ? 'sh' : 'sz'; return prefix + c;}
             if (/^[a-zA-Z]+$/.test(c)) return 'us' + c.toUpperCase();
             return c;
         }
@@ -5420,7 +5466,7 @@
             const codeStr = formatted.join(',');
             const url = `https://qt.gtimg.cn/q=${codeStr}`;
             try {
-                const response = await fetch(url, { headers: { 'Referer': 'https://finance.sina.com.cn' } });
+                const response = await fetch(url, {headers: {'Referer': 'https://finance.sina.com.cn'}});
                 if (!response.ok) throw new Error('网络响应异常');
                 const rawData = await response.text();
                 return parseTencentData(rawData);
@@ -5432,9 +5478,9 @@
 
         function fetchSinaQuotes(codes) {
             return new Promise((resolve, reject) => {
-                if (!codes || codes.length === 0) { resolve({}); return; }
+                if (!codes || codes.length === 0) {resolve({}); return;}
                 const aStockCodes = codes.filter(c => /^(sh|sz)/i.test(c));
-                if (aStockCodes.length === 0) { reject(new Error('新浪接口不支持美股/港股，请使用腾讯接口')); return; }
+                if (aStockCodes.length === 0) {reject(new Error('新浪接口不支持美股/港股，请使用腾讯接口')); return;}
                 const formatted = aStockCodes.map(c => formatStockCode(c));
                 const codeStr = formatted.join(',');
                 const script = document.createElement('script');
@@ -5442,9 +5488,9 @@
                 let resolved = false;
                 const timeout = setTimeout(() => {
                     cleanup();
-                    if (!resolved) { resolved = true; reject(new Error('新浪接口超时')); }
+                    if (!resolved) {resolved = true; reject(new Error('新浪接口超时'));}
                 }, 8000);
-                const cleanup = () => { if (script.parentNode) script.parentNode.removeChild(script); clearTimeout(timeout); };
+                const cleanup = () => {if (script.parentNode) script.parentNode.removeChild(script); clearTimeout(timeout);};
                 script.onload = function () {
                     const result = {};
                     formatted.forEach(code => {
@@ -5464,11 +5510,11 @@
                         delete window[varName];
                     });
                     cleanup();
-                    if (!resolved) { resolved = true; resolve(result); }
+                    if (!resolved) {resolved = true; resolve(result);}
                 };
                 script.onerror = function () {
                     cleanup();
-                    if (!resolved) { resolved = true; reject(new Error('新浪接口加载失败')); }
+                    if (!resolved) {resolved = true; reject(new Error('新浪接口加载失败'));}
                 };
                 document.head.appendChild(script);
             });
@@ -5497,13 +5543,13 @@
             const overlay = document.getElementById('autoRefreshOverlay');
             if (overlay) {
                 if (!autoRefresh) overlay.style.display = 'none';
-                else { overlay.style.display = 'flex'; void overlay.offsetHeight; }
+                else {overlay.style.display = 'flex'; void overlay.offsetHeight;}
             }
             alignDataLengths();
             if (isRefreshing) return;
 
             const codeMap = {};
-            seriesList.forEach(s => { if (s.code && s.code.trim()) codeMap[s.name] = s.code.trim(); });
+            seriesList.forEach(s => {if (s.code && s.code.trim()) codeMap[s.name] = s.code.trim();});
             const codes = Object.values(codeMap);
             if (codes.length === 0) {
                 setStatus('info', '没有股票代码，请先输入');
@@ -5522,10 +5568,10 @@
                     quotes = await fetchTencentQuotes(codes);
                     usedApi = '腾讯';
                     const hasData = Object.values(quotes).some(q => q && q.price > 0);
-                    if (!hasData) { quotes = await fetchSinaQuotes(codes); usedApi = '新浪'; }
+                    if (!hasData) {quotes = await fetchSinaQuotes(codes); usedApi = '新浪';}
                 } catch (err) {
-                    try { quotes = await fetchSinaQuotes(codes); usedApi = '新浪'; }
-                    catch (err2) { setStatus('error', '获取数据失败，请稍后重试'); throw new Error('获取数据失败'); }
+                    try {quotes = await fetchSinaQuotes(codes); usedApi = '新浪';}
+                    catch (err2) {setStatus('error', '获取数据失败，请稍后重试'); throw new Error('获取数据失败');}
                 }
 
                 let latestDataDate = null;
@@ -5559,7 +5605,7 @@
                 }
 
                 const targetIdx = dates.indexOf(targetDate);
-                if (targetIdx === -1) { setStatus('error', '日期处理异常'); throw new Error('日期索引错误'); }
+                if (targetIdx === -1) {setStatus('error', '日期处理异常'); throw new Error('日期索引错误');}
 
                 let updatedCount = 0;
                 const todayStr = getTodayStr();
@@ -5584,7 +5630,7 @@
                         if (/^\d{5}$/.test(formattedCode) && !formattedCode.startsWith('hk')) formattedCode = 'hk' + formattedCode;
                         const qfqUrl = `https://web.ifzq.gtimg.cn/appstock/app/fqkline/get?param=${formattedCode},day,${targetDate},${targetDate},1,qfq`;
                         try {
-                            const resp = await fetch(qfqUrl, { mode: 'cors', headers: { 'Referer': 'https://finance.sina.com.cn' } });
+                            const resp = await fetch(qfqUrl, {mode: 'cors', headers: {'Referer': 'https://finance.sina.com.cn'}});
                             if (resp.ok) {
                                 const json = await resp.json();
                                 const dataKey = formattedCode;
@@ -5602,13 +5648,13 @@
                         } catch (e) { }
                     }
                     setStatus('loading', `获取价格中 (${index + 1}/${total})...`);
-                    return { name, price, s };
+                    return {name, price, s};
                 });
 
                 const results = await Promise.all(tasks);
                 for (const result of results) {
                     if (!result) continue;
-                    const { name, price, s } = result;
+                    const {name, price, s} = result;
                     if (price > 0) {
                         s.data[targetIdx] = price;
                         s._changeCache = null;
@@ -5640,8 +5686,8 @@
                 sortAllData();
 
                 // ★ 实时刷新后重算 refStats（数据已变化）
-                seriesList.forEach(s => { s.refStats = null; });
-                seriesList.forEach(s => { ensureRefStats(s); });
+                seriesList.forEach(s => {s.refStats = null;});
+                seriesList.forEach(s => {ensureRefStats(s);});
 
                 if (autoRefresh && dates.length > 0) {
                     const latestDate = dates[dates.length - 1];
@@ -5722,7 +5768,7 @@
         // ================================================================
         async function verifyHistoricalData() {
             const codeMap = {};
-            seriesList.forEach(s => { if (s.code && s.code.trim()) codeMap[s.name] = s.code.trim(); });
+            seriesList.forEach(s => {if (s.code && s.code.trim()) codeMap[s.name] = s.code.trim();});
             const names = Object.keys(codeMap);
             if (names.length === 0) {
                 alert('⚠️ 请先为指标输入股票代码\n\n格式示例：\n• A股：sh000001、sz000625\n• 港股：hk01810\n• 美股：usNVDA');
@@ -5770,14 +5816,14 @@
 
                 let klineCode = formattedCode;
                 if (formattedCode.startsWith('us')) {
-                    const usKlineCodeMap = { 'usNVDA': 'usNVDA.OQ' };
+                    const usKlineCodeMap = {'usNVDA': 'usNVDA.OQ'};
                     klineCode = usKlineCodeMap[formattedCode] || (formattedCode + '.OQ');
                 }
 
                 const url = `https://web.ifzq.gtimg.cn/appstock/app/newfqkline/get?_var=kline_dayqfq&param=${klineCode},day,${startDate},${endDate},${count},qfq`;
 
                 try {
-                    const response = await fetch(url, { mode: 'cors', headers: { 'Referer': 'https://finance.sina.com.cn' } });
+                    const response = await fetch(url, {mode: 'cors', headers: {'Referer': 'https://finance.sina.com.cn'}});
                     if (!response.ok) throw new Error(`HTTP ${response.status}`);
                     const rawText = await response.text();
                     const jsonMatch = rawText.match(/=\s*(\{[\s\S]*\})\s*;?\s*$/);
@@ -5792,15 +5838,15 @@
                         const baseKey = dataKey.replace(/\.[A-Z]+$/i, '');
                         const candidates = [dataKey, dataKey.toLowerCase(), dataKey.toUpperCase(),
                             baseKey, baseKey.toLowerCase(), baseKey.toUpperCase()];
-                        for (const k of candidates) { if (json?.data?.[k]) { node = json.data[k]; break; } }
+                        for (const k of candidates) {if (json?.data?.[k]) {node = json.data[k]; break;} }
                     }
                     if (node?.qfqday && Array.isArray(node.qfqday)) klineData = node.qfqday;
                     else if (node?.day && Array.isArray(node.day)) klineData = node.day;
                     else {
                         for (const key of Object.keys(json.data || {})) {
                             const n = json.data[key];
-                            if (n?.qfqday && Array.isArray(n.qfqday)) { klineData = n.qfqday; break; }
-                            if (n?.day && Array.isArray(n.day)) { klineData = n.day; break; }
+                            if (n?.qfqday && Array.isArray(n.qfqday)) {klineData = n.qfqday; break;}
+                            if (n?.day && Array.isArray(n.day)) {klineData = n.day; break;}
                         }
                     }
                     if (!klineData || klineData.length === 0) {
@@ -5818,7 +5864,7 @@
                             const low = parseFloat(row[4]);
                             const vol = parseFloat(row[5]) || 0;
                             if (dateStr && !isNaN(close) && !isNaN(high) && !isNaN(low) && close > 0) {
-                                dataMap[dateStr] = { close, high, low, vol };
+                                dataMap[dateStr] = {close, high, low, vol};
                             }
                         }
                     });
@@ -5836,7 +5882,7 @@
 
             const existingSet = new Set(dates);
             const missingDates = [];
-            allKlineDates.forEach(d => { if (!existingSet.has(d)) missingDates.push(d); });
+            allKlineDates.forEach(d => {if (!existingSet.has(d)) missingDates.push(d);});
             let addedDateCount = 0;
             let addedListStr = '';
             const needDates = missingDates.filter(d => d >= baseDate);
@@ -5872,11 +5918,11 @@
                         if (oldMap[d] !== undefined) {
                             newData.push(oldMap[d].v); newHigh.push(oldMap[d].h);
                             newLow.push(oldMap[d].l); newVol.push(oldMap[d].vol);
-                            lastKnown = { v: oldMap[d].v, h: oldMap[d].h, l: oldMap[d].l, vol: oldMap[d].vol };
+                            lastKnown = {v: oldMap[d].v, h: oldMap[d].h, l: oldMap[d].l, vol: oldMap[d].vol};
                         } else if (kline[d]) {
                             newData.push(kline[d].close); newHigh.push(kline[d].high);
                             newLow.push(kline[d].low); newVol.push(kline[d].vol);
-                            lastKnown = { v: kline[d].close, h: kline[d].high, l: kline[d].low, vol: kline[d].vol };
+                            lastKnown = {v: kline[d].close, h: kline[d].high, l: kline[d].low, vol: kline[d].vol};
                         } else {
                             newData.push(lastKnown.v); newHigh.push(lastKnown.h);
                             newLow.push(lastKnown.l); newVol.push(lastKnown.vol);
@@ -5927,8 +5973,8 @@
                 }
                 s._changeCache = null;
                 s.refStats = null;
-                if (matched > 0) { updatedCount++; s.updateStatus = 'success'; }
-                else { s.updateStatus = 'error'; errors.push(`${name}: 无匹配数据`); }
+                if (matched > 0) {updatedCount++; s.updateStatus = 'success';}
+                else {s.updateStatus = 'error'; errors.push(`${name}: 无匹配数据`);}
             }
 
             // ★ 重新计算 refStats（包含最新 52 周高低/均值，及次轴高低/均值）
@@ -5944,7 +5990,7 @@
                 s.low52Data = [];
             }
 
-            Object.keys(klineMap).forEach(k => { klineMap[k] = null; delete klineMap[k]; });
+            Object.keys(klineMap).forEach(k => {klineMap[k] = null; delete klineMap[k];});
             allKlineDates.clear();
 
             const px = getSeries('飘小仙');
@@ -5990,10 +6036,10 @@
             const dot = statusDot;
             const text = statusText;
             dot.className = 'dot';
-            if (type === 'loading') { dot.classList.add('active'); text.textContent = msg || '刷新中...'; }
-            else if (type === 'success') { dot.classList.add('active'); text.textContent = msg || '已更新'; }
-            else if (type === 'error') { dot.classList.add('error'); text.textContent = msg || '错误'; }
-            else { dot.classList.add('idle'); text.textContent = msg || '就绪'; }
+            if (type === 'loading') {dot.classList.add('active'); text.textContent = msg || '刷新中...';}
+            else if (type === 'success') {dot.classList.add('active'); text.textContent = msg || '已更新';}
+            else if (type === 'error') {dot.classList.add('error'); text.textContent = msg || '错误';}
+            else {dot.classList.add('idle'); text.textContent = msg || '就绪';}
         }
 
         // ================================================================
@@ -6015,7 +6061,7 @@
                     const change = calcTotalChange(base, latestVal);
                     const coord = myChart.convertToPixel('grid', [latestIdx, change]);
                     if (coord && !isNaN(coord[0]) && !isNaN(coord[1])) {
-                        avatarPositions.push({ seriesName: key, color: s.color, remark: s.remark || '', coord, change });
+                        avatarPositions.push({seriesName: key, color: s.color, remark: s.remark || '', coord, change});
                     }
                 });
             });
@@ -6062,7 +6108,7 @@
                     customTooltip.style.top = top + 'px';
                 } else customTooltip.style.display = 'none';
             });
-            chartContainer.addEventListener('mouseleave', function () { customTooltip.style.display = 'none'; });
+            chartContainer.addEventListener('mouseleave', function () {customTooltip.style.display = 'none';});
             myChart.on('dataZoom', updateAvatarPositions);
         }
 
@@ -6108,7 +6154,7 @@
             }
             if (!targetDate || !dates.includes(targetDate)) {
                 myChart.setOption({
-                    title: { text: '暂无日期数据', left: 'center', top: 'center', textStyle: { color: 'var(--text-muted)', fontSize: font('title') } },
+                    title: {text: '暂无日期数据', left: 'center', top: 'center', textStyle: {color: 'var(--text-muted)', fontSize: font('title')}},
                     series: []
                 }, true);
                 return;
@@ -6124,7 +6170,7 @@
                 let price = s.data[idx] || 0;
                 let high = (s.highData && s.highData[idx] !== undefined) ? s.highData[idx] : 0;
                 let low = (s.lowData && s.lowData[idx] !== undefined) ? s.lowData[idx] : 0;
-                if (key === '飘小仙') { change = 0; price = 1; high = 1; low = 1; }
+                if (key === '飘小仙') {change = 0; price = 1; high = 1; low = 1;}
                 else if (price > 0) {
                     if (!(high > 0)) high = price;
                     if (!(low > 0)) low = price;
@@ -6187,7 +6233,7 @@
                     color: isDark ? '#cbd5e1' : '#1e293b'
                 },
                 barWidth: 16,
-                itemStyle: { shadowBlur: 4, shadowColor: 'rgba(0,0,0,0.1)' },
+                itemStyle: {shadowBlur: 4, shadowColor: 'rgba(0,0,0,0.1)'},
                 z: 2
             };
 
@@ -6211,8 +6257,8 @@
                     const width = Math.abs(coordLow[0] - coordHigh[0]);
                     const y = coordLow[1] - barHeight / 2;
                     return {
-                        type: 'rect', shape: { x, y, width, height: barHeight },
-                        style: { fill: 'rgba(180, 180, 180, 0.35)', stroke: 'none' }, z: 1
+                        type: 'rect', shape: {x, y, width, height: barHeight},
+                        style: {fill: 'rgba(180, 180, 180, 0.35)', stroke: 'none'}, z: 1
                     };
                 },
                 z: 1
@@ -6220,7 +6266,7 @@
 
             const option = {
                 tooltip: {
-                    trigger: 'axis', axisPointer: { type: 'shadow' },
+                    trigger: 'axis', axisPointer: {type: 'shadow'},
                     formatter: function (params) {
                         const bar = params.find(p => p.seriesType === 'bar');
                         if (!bar) return '';
@@ -6232,7 +6278,7 @@
                         const highColor = item.highChange > 0 ? upColor : (item.highChange < 0 ? downColor : neutralColor);
                         const lowColor = item.lowChange > 0 ? upColor : (item.lowChange < 0 ? downColor : neutralColor);
                         const assetColor = item.assetChange > 0 ? upColor : (item.assetChange < 0 ? downColor : neutralColor);
-                        const assetStr = Math.abs(item.assetChange).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                        const assetStr = Math.abs(item.assetChange).toLocaleString('zh-CN', {minimumFractionDigits: 2, maximumFractionDigits: 2});
                         const assetSign = item.assetChange > 0 ? '+' : (item.assetChange < 0 ? '-' : '');
                         return `<strong>${item.name}</strong><br/>
                         当日涨跌幅: <strong style="color:${changeColor}">${item.change > 0 ? '+' : ''}${item.change.toFixed(2)}%</strong><br/>
@@ -6242,19 +6288,19 @@
                     },
                     backgroundColor: isDark ? '#2d3748' : '#ffffff',
                     borderColor: isDark ? '#334155' : '#eef2f6',
-                    textStyle: { color: isDark ? '#e2e8f0' : '#1e293b', fontSize: font('tooltip') }
+                    textStyle: {color: isDark ? '#e2e8f0' : '#1e293b', fontSize: font('tooltip')}
                 },
-                grid: { left: leftMargin, right: rightMargin, top: 20, bottom: 30 },
+                grid: {left: leftMargin, right: rightMargin, top: 20, bottom: 30},
                 xAxis: {
                     type: 'value', min: xMin, max: xMax,
                     axisLabel: {
                         formatter: value => value.toFixed(1) + '%',
                         color: isDark ? '#94a3b8' : '#475569',
                         fontSize: font('axis'),
-                        ...(isMobile ? { rotate: 45, margin: 8, interval: 'auto' } : {})
+                        ...(isMobile ? {rotate: 45, margin: 8, interval: 'auto'} : {})
                     },
-                    splitLine: { show: showGrid, lineStyle: { color: isDark ? '#334155' : '#eef2f6', opacity: 0.6 } },
-                    axisLine: { lineStyle: { color: isDark ? '#334155' : '#eef2f6' } }
+                    splitLine: {show: showGrid, lineStyle: {color: isDark ? '#334155' : '#eef2f6', opacity: 0.6}},
+                    axisLine: {lineStyle: {color: isDark ? '#334155' : '#eef2f6'}}
                 },
                 yAxis: {
                     type: 'category', data: names,
@@ -6270,14 +6316,14 @@
                             return prefix + value;
                         }
                     },
-                    axisLine: { lineStyle: { color: isDark ? '#334155' : '#eef2f6' } },
-                    axisTick: { show: false }, splitLine: { show: false }
+                    axisLine: {lineStyle: {color: isDark ? '#334155' : '#eef2f6'}},
+                    axisTick: {show: false}, splitLine: {show: false}
                 },
                 series: [barSeries, rangeSeries]
             };
 
             myChart.setOption(option, true);
-            myChart.setOption({ graphic: [] });
+            myChart.setOption({graphic: []});
             myChart.on('finished', function onFinished() {
                 myChart.off('finished', onFinished);
                 const avatarSize = isMobile ? 22 : 28;
@@ -6290,15 +6336,15 @@
                     if (coord && !isNaN(coord[0]) && !isNaN(coord[1]) && avatar !== DEFAULT_AVATAR_SVG) {
                         graphicElements.push({
                             type: 'image',
-                            style: { image: avatar, x: leftMargin + 4, y: coord[1] - avatarSize / 2, width: avatarSize, height: avatarSize, borderRadius: avatarSize / 2 },
+                            style: {image: avatar, x: leftMargin + 4, y: coord[1] - avatarSize / 2, width: avatarSize, height: avatarSize, borderRadius: avatarSize / 2},
                             z: 100, zlevel: 10
                         });
                     }
                 });
-                if (graphicElements.length > 0) myChart.setOption({ graphic: graphicElements });
+                if (graphicElements.length > 0) myChart.setOption({graphic: graphicElements});
             });
             myChart.resize();
-            setTimeout(() => { resetDanmaku(); }, 100);
+            setTimeout(() => {resetDanmaku();}, 100);
             renderPriceTable(items, targetDate);
         }
 
@@ -6357,7 +6403,7 @@
 
                 let peCell, turnoverCell;
                 let peColor = 'var(--text-secondary)', turnoverColor = 'var(--text-secondary)';
-                if (item.name === '飘小仙') { peCell = '1'; turnoverCell = '1'; }
+                if (item.name === '飘小仙') {peCell = '1'; turnoverCell = '1';}
                 else {
                     if (priceTablePeMode === 'vs') {
                         if (shPe > 0 && pe > 0) {
@@ -6415,7 +6461,7 @@
             const s = getSeries(targetName);
             if (!s || s.data.length < 2) {
                 myChart.setOption({
-                    title: { text: '请选择一个系列查看瀑布图', left: 'center', top: 'center', textStyle: { color: 'var(--text-muted)', fontSize: font('title') } },
+                    title: {text: '请选择一个系列查看瀑布图', left: 'center', top: 'center', textStyle: {color: 'var(--text-muted)', fontSize: font('title')}},
                     series: []
                 }, true);
                 return;
@@ -6447,14 +6493,14 @@
             const totalSelected = selectedKeys.length;
 
             const colorPairsList = [
-                { up: '#e64340', down: '#07c160' },
-                { up: '#f472b6', down: '#14b8a6' },
-                { up: '#f59e0b', down: '#3b82f6' },
-                { up: '#ec4899', down: '#8b5cf6' },
-                { up: '#f97316', down: '#6366f1' },
+                {up: '#e64340', down: '#07c160'},
+                {up: '#f472b6', down: '#14b8a6'},
+                {up: '#f59e0b', down: '#3b82f6'},
+                {up: '#ec4899', down: '#8b5cf6'},
+                {up: '#f97316', down: '#6366f1'},
             ];
             const colorPairsMap = {};
-            selectedKeys.forEach((key, idx) => { colorPairsMap[key] = colorPairsList[idx % colorPairsList.length]; });
+            selectedKeys.forEach((key, idx) => {colorPairsMap[key] = colorPairsList[idx % colorPairsList.length];});
 
             const allSeriesData = {};
             const baseIdxW0 = getBaseIdx();
@@ -6469,8 +6515,8 @@
                 let cum = null;
                 for (let i = 0; i < data.length; i++) {
                     if (i < baseIdxW0) cumDailyChanges.push(null);
-                    else if (i === baseIdxW0) { cum = 0; cumDailyChanges.push(0); }
-                    else { cum += calcDailyChange(data[i - 1], data[i]); cumDailyChanges.push(cum); }
+                    else if (i === baseIdxW0) {cum = 0; cumDailyChanges.push(0);}
+                    else {cum += calcDailyChange(data[i - 1], data[i]); cumDailyChanges.push(cum);}
                 }
                 allSeriesData[key] = {
                     totalChanges, baseData, chartData, cumDailyChanges,
@@ -6498,8 +6544,8 @@
                 const s = getSeries(seriesName);
                 const color = s ? s.color : '#3b82f6';
                 const rect = {
-                    type: 'rect', shape: { x, y, width: barWidth, height },
-                    style: { fill: color, stroke: color, lineWidth: 1, opacity: 0.8 }
+                    type: 'rect', shape: {x, y, width: barWidth, height},
+                    style: {fill: color, stroke: color, lineWidth: 1, opacity: 0.8}
                 };
                 if (waterfallShowLabels) {
                     const isUp = endY >= startY;
@@ -6525,15 +6571,15 @@
                         : (colorPairsMap[key] ? colorPairsMap[key].up : '#3b82f6');
                     allSeries.push({
                         name: key, type: 'custom', data: data.chartData,
-                        renderItem: renderItem, encode: { x: 0, y: [1, 2] },
-                        label: { show: false }, z: 2,
-                        itemStyle: { color: getSeries(key).color }
+                        renderItem: renderItem, encode: {x: 0, y: [1, 2]},
+                        label: {show: false}, z: 2,
+                        itemStyle: {color: getSeries(key).color}
                     });
                     allSeries.push({
                         name: key, type: 'line', data: data.totalChanges,
                         smooth: true, symbol: 'circle', symbolSize: 8,
-                        lineStyle: { color: color, width: 2.5 },
-                        itemStyle: { color: color }, z: 3,
+                        lineStyle: {color: color, width: 2.5},
+                        itemStyle: {color: color}, z: 3,
                         label: {
                             show: waterfallShowLabels,
                             formatter: p => p.value.toFixed(2) + '%',
@@ -6545,20 +6591,21 @@
                         name: key, type: 'line', data: data.cumDailyChanges,
                         smooth: true, symbol: 'diamond', symbolSize: 6,
                         showSymbol: false, connectNulls: false,
-                        lineStyle: { color: color, width: 1.5, type: 'dashed', opacity: 0.8 },
-                        itemStyle: { color: color, opacity: 0.8 }, z: 2,
-                        label: { show: false }
+                        lineStyle: {color: color, width: 1.5, type: 'dashed', opacity: 0.8},
+                        itemStyle: {color: color, opacity: 0.8}, z: 2,
+                        label: {show: false}
                     });
                 });
             }
 
             let pctSeriesIndices = [];
             if (showSecondary) {
-                if (volumeDisplayMode === 'volumePct' || volumeDisplayMode === 'amountPct') {
-                    const isVolPct = (volumeDisplayMode === 'volumePct');
+                if (isPctMode(volumeDisplayMode)) {
+                    const isVolPct = isVolPctMode(volumeDisplayMode);
+                    const period = getPctPeriod(volumeDisplayMode);
                     const selectedSet = new Set(selectedKeys);
                     const keyVis = (k) => selectedSet.has(k);
-                    pctSeriesIndices = addSecondaryPctSeriesToTrend(allSeries, waterfallSortedKeys, isVolPct, keyVis);
+                    pctSeriesIndices = addSecondaryPctSeriesToTrend(allSeries, waterfallSortedKeys, isVolPct, period, keyVis);
                 } else {
                     selectedKeys.forEach(key => {
                         const s2 = getSeries(key);
@@ -6568,8 +6615,8 @@
                                 name: key + '_VOL', type: 'line', yAxisIndex: 1,
                                 data: s2.volumeData || emptyArr(dates.length),
                                 smooth: true, symbol: 'circle', symbolSize: 3, showSymbol: true,
-                                lineStyle: { color: s2.color, width: 1.2, opacity: 0.45, type: 'dashed' },
-                                itemStyle: { color: s2.color, opacity: 0.45 },
+                                lineStyle: {color: s2.color, width: 1.2, opacity: 0.45, type: 'dashed'},
+                                itemStyle: {color: s2.color, opacity: 0.45},
                                 z: 1, silent: true
                             });
                         } else {
@@ -6581,8 +6628,8 @@
                                     name: key + '_AMT', type: 'line', yAxisIndex: 1, data: actual,
                                     smooth: true, symbol: 'circle', symbolSize: 3, showSymbol: true,
                                     connectNulls: false,
-                                    lineStyle: { color: s2.color, width: 1.5, opacity: 0.5, type: 'dashed' },
-                                    itemStyle: { color: s2.color, opacity: 0.5 },
+                                    lineStyle: {color: s2.color, width: 1.5, opacity: 0.5, type: 'dashed'},
+                                    itemStyle: {color: s2.color, opacity: 0.5},
                                     z: 1, silent: true
                                 });
                             }
@@ -6591,8 +6638,8 @@
                                     name: key + '_AMT_CALC', type: 'line', yAxisIndex: 1, data: est,
                                     smooth: true, symbol: 'circle', symbolSize: 3, showSymbol: true,
                                     connectNulls: false,
-                                    lineStyle: { color: s2.color, width: 1.2, opacity: 0.35, type: 'dashed' },
-                                    itemStyle: { color: s2.color, opacity: 0.35 },
+                                    lineStyle: {color: s2.color, width: 1.2, opacity: 0.35, type: 'dashed'},
+                                    itemStyle: {color: s2.color, opacity: 0.35},
                                     z: 1, silent: true
                                 });
                             }
@@ -6607,8 +6654,8 @@
             for (let i = baseIdxW0; i < dates.length; i++) {
                 const changes = seriesKeys.map(key => {
                     const series = getSeries(key);
-                    if (!series) return { key, change: -Infinity };
-                    return { key, change: calcTotalChange(getBaseValue(series), series.data[i]) };
+                    if (!series) return {key, change: -Infinity};
+                    return {key, change: calcTotalChange(getBaseValue(series), series.data[i])};
                 });
                 const maxChange = Math.max(...changes.map(c => c.change));
                 changes.filter(c => c.change === maxChange).forEach(c => {
@@ -6643,7 +6690,7 @@
                         children: [
                             {
                                 type: 'rect',
-                                shape: { width: cardWidth, height: cardHeight },
+                                shape: {width: cardWidth, height: cardHeight},
                                 style: {
                                     fill: isDark ? 'rgba(30,41,59,0.85)' : 'rgba(255,255,255,0.85)',
                                     stroke: isDark ? '#334155' : '#eef2f6', lineWidth: 1, cornerRadius: 6
@@ -6651,16 +6698,16 @@
                             },
                             {
                                 type: 'image',
-                                style: { image: avatarSrc, x: 8, y: 8, width: avatarSize, height: avatarSize, borderRadius: avatarSize / 2 },
+                                style: {image: avatarSrc, x: 8, y: 8, width: avatarSize, height: avatarSize, borderRadius: avatarSize / 2},
                                 z: 10
                             },
                             {
                                 type: 'text', left: leftOffset, top: isMobile ? 10 : 12,
-                                style: { text: `🏆 登顶 ${firstPlaceDays} 天`, fontSize, fill: isDark ? '#e2e8f0' : '#1e293b', fontWeight: 'bold' }
+                                style: {text: `🏆 登顶 ${firstPlaceDays} 天`, fontSize, fill: isDark ? '#e2e8f0' : '#1e293b', fontWeight: 'bold'}
                             },
                             {
                                 type: 'text', left: leftOffset, top: isMobile ? 28 : 32,
-                                style: { text: '📈 总变化率 ', fontSize, fill: isDark ? '#e2e8f0' : '#1e293b', textBaseline: 'top' }
+                                style: {text: '📈 总变化率 ', fontSize, fill: isDark ? '#e2e8f0' : '#1e293b', textBaseline: 'top'}
                             },
                             {
                                 type: 'text', left: valueLeft, top: isMobile ? 28 : 32,
@@ -6672,11 +6719,11 @@
                             },
                             {
                                 type: 'text', left: leftOffset, top: isMobile ? 46 : 52,
-                                style: { text: '📊 跑赢上证 ', fontSize, fill: isDark ? '#e2e8f0' : '#1e293b', textBaseline: 'top' }
+                                style: {text: '📊 跑赢上证 ', fontSize, fill: isDark ? '#e2e8f0' : '#1e293b', textBaseline: 'top'}
                             },
                             {
                                 type: 'text', left: valueLeft, top: isMobile ? 46 : 52,
-                                style: { text: diffToSH, fontSize, fill: diff >= 0 ? '#e64340' : '#07c160', fontWeight: 'bold', textBaseline: 'top' }
+                                style: {text: diffToSH, fontSize, fill: diff >= 0 ? '#e64340' : '#07c160', fontWeight: 'bold', textBaseline: 'top'}
                             }
                         ]
                     });
@@ -6763,7 +6810,7 @@
                             if (ts) {
                                 const base = getBaseValue(ts);
                                 if (base !== 0) {
-                                    const { high, low } = getLatest52WeekHL(ts);
+                                    const {high, low} = getLatest52WeekHL(ts);
                                     if (high !== null) html += `<span style="color:#94a3b8;">┈ 52周高 ${calcTotalChange(base, high).toFixed(2)}%</span><br/>`;
                                     if (low !== null) html += `<span style="color:#94a3b8;">┈ 52周低 ${calcTotalChange(base, low).toFixed(2)}%</span><br/>`;
                                     const rs = ensureRefStats(ts);
@@ -6799,39 +6846,37 @@
                     },
                     backgroundColor: isDark ? '#2d3748' : '#ffffff',
                     borderColor: isDark ? '#334155' : '#eef2f6',
-                    textStyle: { color: isDark ? '#e2e8f0' : '#1e293b', fontSize: font('tooltip') }
+                    textStyle: {color: isDark ? '#e2e8f0' : '#1e293b', fontSize: font('tooltip')}
                 },
                 legend: {
                     data: waterfallSortedKeys, selected: legendSelected,
                     icon: 'circle', top: 0, left: 'center',
                     itemWidth: 10, itemHeight: 10,
-                    textStyle: { fontSize: font('legend'), color: 'var(--text-secondary)' }
+                    textStyle: {fontSize: font('legend'), color: 'var(--text-secondary)'}
                 },
                 grid: {
                     left: showMain ? 70 : 20, right: showSecondary ? 70 : 20,
                     top: 45, bottom: isMobile ? 55 : 50
                 },
                 xAxis: {
-                    type: 'category', data: dates, axisTick: { alignWithLabel: true }, splitLine: { show: false },
+                    type: 'category', data: dates, axisTick: {alignWithLabel: true}, splitLine: {show: false},
                     axisLabel: {
                         color: isDark ? '#94a3b8' : '#475569', fontSize: font('axis'),
                         formatter: val => val.split('-').slice(1).join('-')
                     },
-                    axisLine: { lineStyle: { color: isDark ? '#334155' : '#eef2f6' } }
+                    axisLine: {lineStyle: {color: isDark ? '#334155' : '#eef2f6'}}
                 },
                 yAxis: [
                     {
                         type: 'value', min: yMin, max: yMax, show: showMain,
-                        axisLabel: { color: isDark ? '#94a3b8' : '#475569', fontSize: font('axis'), formatter: value => value.toFixed(1) + '%' },
-                        splitLine: { show: showGrid, lineStyle: { color: isDark ? '#334155' : '#eef2f6', type: 'solid', opacity: 0.6 } },
-                        axisLine: { show: false }, axisTick: { show: false }
+                        axisLabel: {color: isDark ? '#94a3b8' : '#475569', fontSize: font('axis'), formatter: value => value.toFixed(1) + '%'},
+                        splitLine: {show: showGrid, lineStyle: {color: isDark ? '#334155' : '#eef2f6', type: 'solid', opacity: 0.6}},
+                        axisLine: {show: false}, axisTick: {show: false}
                     },
                     {
                         type: 'value',
-                        name: volumeDisplayMode === 'volume' ? '成交量'
-                            : volumeDisplayMode === 'amount' ? '成交额'
-                                : volumeDisplayMode === 'volumePct' ? '成交量(%)' : '成交额(%)',
-                        nameTextStyle: { fontSize: font('tag'), color: isDark ? '#94a3b8' : '#475569' },
+                        name: getSecondaryAxisName(),
+                        nameTextStyle: {fontSize: font('tag'), color: isDark ? '#94a3b8' : '#475569'},
                         position: 'right', show: showSecondary,
                         min: secondaryYMin, max: secondaryYMax,
                         axisLabel: {
@@ -6842,8 +6887,8 @@
                                 return v;
                             }
                         },
-                        splitLine: { show: false }, axisLine: { show: false },
-                        axisTick: { show: false }, axisPointer: { show: false }
+                        splitLine: {show: false}, axisLine: {show: false},
+                        axisTick: {show: false}, axisPointer: {show: false}
                     }
                 ],
                 dataZoom: [{
@@ -6852,14 +6897,14 @@
                     borderColor: isDark ? '#334155' : '#eef2f6',
                     backgroundColor: isDark ? '#1e293b' : '#f8fafc',
                     fillerColor: 'rgba(59,130,246,0.12)',
-                    handleStyle: { color: '#3b82f6', borderColor: '#3b82f6' },
-                    textStyle: { color: isDark ? '#94a3b8' : '#475569', fontSize: font('tag') },
+                    handleStyle: {color: '#3b82f6', borderColor: '#3b82f6'},
+                    textStyle: {color: isDark ? '#94a3b8' : '#475569', fontSize: font('tag')},
                     minSpan: 1, maxSpan: 100
                 }],
                 visualMap: pctSeriesIndices.length > 0 ? [{
                     show: false, seriesIndex: pctSeriesIndices, dimension: 1,
-                    pieces: [{ max: 99.999, color: '#07c160' }, { min: 100, color: '#e64340' }],
-                    outOfRange: { color: '#94a3b8' }
+                    pieces: [{max: 99.999, color: '#07c160'}, {min: 100, color: '#e64340'}],
+                    outOfRange: {color: '#94a3b8'}
                 }] : [],
                 series: allSeries, graphic
             };
@@ -6874,7 +6919,7 @@
                 if (!name || !seriesKeys.includes(name)) return;
                 if (shiftPressed && waterfallSortedKeys.length > 1) {
                     if (waterfallSelectedSet.size === 0) {
-                        waterfallSortedKeys.forEach(k => { if (k !== name) waterfallSelectedSet.add(k); });
+                        waterfallSortedKeys.forEach(k => {if (k !== name) waterfallSelectedSet.add(k);});
                     } else {
                         if (waterfallSelectedSet.has(name)) waterfallSelectedSet.delete(name);
                         else waterfallSelectedSet.add(name);
@@ -6886,7 +6931,7 @@
                 } else {
                     const onlyThis = waterfallSelectedSet.size === 1 && waterfallSelectedSet.has(name);
                     if (onlyThis) waterfallSelectedSet.clear();
-                    else { waterfallSelectedSet.clear(); waterfallSelectedSet.add(name); }
+                    else {waterfallSelectedSet.clear(); waterfallSelectedSet.add(name);}
                 }
                 if (waterfallSelectedSet.size === 0 && waterfallSortedKeys.length > 0 && !shiftPressed) {
                     waterfallSelectedSet.add(waterfallSortedKeys[0]);
@@ -6909,7 +6954,7 @@
                     renderChart();
                 }
             });
-            setTimeout(() => { resetDanmaku(); }, 100);
+            setTimeout(() => {resetDanmaku();}, 100);
         }
 
         // ================================================================
@@ -6952,22 +6997,22 @@
                     const changeData = getChangeData(s);
                     const latestChange = changeData[latestIdx];
                     const avatarSize = isMobileView() ? 20 : 42;
-                    seriesMeta[key] = { key: key, type: 'main' };
+                    seriesMeta[key] = {key: key, type: 'main'};
                     series.push({
                         name: s.name, type: 'line', data: changeData,
                         smooth: true, symbol: 'circle', symbolSize: 8,
-                        lineStyle: { color: s.color, width: 2.5 },
-                        itemStyle: { color: s.color },
+                        lineStyle: {color: s.color, width: 2.5},
+                        itemStyle: {color: s.color},
                         areaStyle: {
                             color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-                                { offset: 0, color: s.color + '30' },
-                                { offset: 1, color: s.color + '05' }
+                                {offset: 0, color: s.color + '30'},
+                                {offset: 1, color: s.color + '05'}
                             ])
                         },
                         markPoint: showAvatars ? {
                             symbol: 'image://' + getAvatarSrcForChart(s),
                             symbolSize: avatarSize,
-                            label: { show: false }, tooltip: { show: false },
+                            label: {show: false}, tooltip: {show: false},
                             data: [{
                                 name: s.name + '_latest',
                                 coord: [latestDate, latestChange],
@@ -6994,7 +7039,7 @@
                 if (ts) {
                     const base = getBaseValue(ts);
                     if (base !== 0) {
-                        const { high, low } = getLatest52WeekHL(ts);
+                        const {high, low} = getLatest52WeekHL(ts);
                         const mainSeries = series.find(s => s.name === tKey);
                         if (mainSeries) {
                             const markLineData = [];
@@ -7003,7 +7048,7 @@
                                 const v = calcTotalChange(base, high);
                                 markLineData.push({
                                     name: '52周高', yAxis: v,
-                                    lineStyle: { color: c, type: 'dashed', width: 2, opacity: 0.7 },
+                                    lineStyle: {color: c, type: 'dashed', width: 2, opacity: 0.7},
                                     label: {
                                         show: true, position: 'insideEndTop',
                                         formatter: `52周高 ${v.toFixed(2)}%`,
@@ -7015,7 +7060,7 @@
                                 const v = calcTotalChange(base, low);
                                 markLineData.push({
                                     name: '52周低', yAxis: v,
-                                    lineStyle: { color: c, type: 'dotted', width: 2, opacity: 0.7 },
+                                    lineStyle: {color: c, type: 'dotted', width: 2, opacity: 0.7},
                                     label: {
                                         show: true, position: 'insideEndBottom',
                                         formatter: `52周低 ${v.toFixed(2)}%`,
@@ -7027,9 +7072,9 @@
                             const rs = ensureRefStats(ts);
                             if (rs && rs.price) {
                                 const avgDefs = [
-                                    { key: 'avg250', label: '52周均', color: '#f59e0b', type: 'solid' },
-                                    { key: 'avg30', label: '30日均', color: '#8b5cf6', type: 'dashed' },
-                                    { key: 'avg7', label: '7日均', color: '#06b6d4', type: 'dotted' }
+                                    {key: 'avg250', label: '52周均', color: '#f59e0b', type: 'solid'},
+                                    {key: 'avg30', label: '30日均', color: '#8b5cf6', type: 'dashed'},
+                                    {key: 'avg7', label: '7日均', color: '#06b6d4', type: 'dotted'}
                                 ];
                                 avgDefs.forEach(a => {
                                     const val = rs.price[a.key];
@@ -7037,7 +7082,7 @@
                                         const v = calcTotalChange(base, val);
                                         markLineData.push({
                                             name: a.label, yAxis: v,
-                                            lineStyle: { color: a.color, type: a.type, width: 1.5, opacity: 0.75 },
+                                            lineStyle: {color: a.color, type: a.type, width: 1.5, opacity: 0.75},
                                             label: {
                                                 show: true, position: 'insideStartTop',
                                                 formatter: `${a.label} ${v.toFixed(2)}%`,
@@ -7048,7 +7093,7 @@
                                 });
                             }
                             if (markLineData.length > 0) {
-                                mainSeries.markLine = { symbol: 'none', silent: true, animation: false, data: markLineData };
+                                mainSeries.markLine = {symbol: 'none', silent: true, animation: false, data: markLineData};
                             }
                         }
                     }
@@ -7057,10 +7102,11 @@
 
             let pctSeriesIndices = [];
             if (showSecondary) {
-                if (volumeDisplayMode === 'volumePct' || volumeDisplayMode === 'amountPct') {
-                    const isVolPct = (volumeDisplayMode === 'volumePct');
+                if (isPctMode(volumeDisplayMode)) {
+                    const isVolPct = isVolPctMode(volumeDisplayMode);
+                    const period = getPctPeriod(volumeDisplayMode);
                     const keyVis = (k) => trendLegendSelected.size === 0 || trendLegendSelected.has(k);
-                    pctSeriesIndices = addSecondaryPctSeriesToTrend(series, sortedKeys, isVolPct, keyVis);
+                    pctSeriesIndices = addSecondaryPctSeriesToTrend(series, sortedKeys, isVolPct, period, keyVis);
                 } else {
                     // ★ 仅次轴模式下，将次轴曲线使用"原始指标名"命名，图例项可点击单选多选
                     const visibleForSecondary = visibleKeys;
@@ -7075,13 +7121,13 @@
 
                         if (volumeDisplayMode === 'volume') {
                             const seriesName = showMain ? (key + '_VOL') : key;
-                            seriesMeta[seriesName] = { key: key, type: 'vol' };
+                            seriesMeta[seriesName] = {key: key, type: 'vol'};
                             const volSeries = {
                                 name: seriesName, type: 'line', yAxisIndex: 1,
                                 data: s.volumeData || emptyArr(dates.length),
                                 smooth: true, symbol: 'circle', symbolSize: 3, showSymbol: true,
-                                lineStyle: { color: s.color, width: 1.2, opacity: 0.45, type: 'dashed' },
-                                itemStyle: { color: s.color, opacity: 0.45 },
+                                lineStyle: {color: s.color, width: 1.2, opacity: 0.45, type: 'dashed'},
+                                itemStyle: {color: s.color, opacity: 0.45},
                                 z: 1, silent: true
                             };
                             if (isSingle) {
@@ -7105,13 +7151,13 @@
                                 } else if (!isIdx && est.some(v => v != null && v > 0)) {
                                     dataArr = est; metaType = 'amtCalc';
                                 } else return;
-                                seriesMeta[key] = { key: key, type: metaType };
+                                seriesMeta[key] = {key: key, type: metaType};
                                 const amtSeries = {
                                     name: key, type: 'line', yAxisIndex: 1, data: dataArr,
                                     smooth: true, symbol: 'circle', symbolSize: 3, showSymbol: true,
                                     connectNulls: false,
-                                    lineStyle: { color: s.color, width: 1.5, type: 'dashed', opacity: 0.5 },
-                                    itemStyle: { color: s.color, opacity: 0.5 },
+                                    lineStyle: {color: s.color, width: 1.5, type: 'dashed', opacity: 0.5},
+                                    itemStyle: {color: s.color, opacity: 0.5},
                                     z: 1, silent: true
                                 };
                                 if (isSingle) {
@@ -7126,25 +7172,25 @@
                                 // 主轴+次轴模式：保持原有两条（实际+计算）
                                 if (actual.some(v => v !== null)) {
                                     const seriesName = key + '_AMT';
-                                    seriesMeta[seriesName] = { key: key, type: 'amt' };
+                                    seriesMeta[seriesName] = {key: key, type: 'amt'};
                                     series.push({
                                         name: seriesName, type: 'line', yAxisIndex: 1, data: actual,
                                         smooth: true, symbol: 'circle', symbolSize: 3, showSymbol: true,
                                         connectNulls: false,
-                                        lineStyle: { color: s.color, width: 1.5, type: 'dashed', opacity: 0.5 },
-                                        itemStyle: { color: s.color, opacity: 0.5 },
+                                        lineStyle: {color: s.color, width: 1.5, type: 'dashed', opacity: 0.5},
+                                        itemStyle: {color: s.color, opacity: 0.5},
                                         z: 1, silent: true
                                     });
                                 }
                                 if (!isIdx && est.some(v => v !== null)) {
                                     const seriesName = key + '_AMT_CALC';
-                                    seriesMeta[seriesName] = { key: key, type: 'amtCalc' };
+                                    seriesMeta[seriesName] = {key: key, type: 'amtCalc'};
                                     series.push({
                                         name: seriesName, type: 'line', yAxisIndex: 1, data: est,
                                         smooth: true, symbol: 'circle', symbolSize: 3, showSymbol: true,
                                         connectNulls: false,
-                                        lineStyle: { color: s.color, width: 1.2, type: 'dashed', opacity: 0.35 },
-                                        itemStyle: { color: s.color, opacity: 0.35 },
+                                        lineStyle: {color: s.color, width: 1.2, type: 'dashed', opacity: 0.35},
+                                        itemStyle: {color: s.color, opacity: 0.35},
                                         z: 1, silent: true
                                     });
                                 }
@@ -7166,7 +7212,7 @@
                     backgroundColor: isDark ? '#2d3748' : '#ffffff',
                     borderColor: isDark ? '#334155' : '#eef2f6',
                     borderWidth: 1,
-                    textStyle: { color: isDark ? '#e2e8f0' : '#1e293b', fontSize: font('tooltip') },
+                    textStyle: {color: isDark ? '#e2e8f0' : '#1e293b', fontSize: font('tooltip')},
                     formatter: function (params) {
                         if (!params || params.length === 0) return '';
                         const date = params[0].axisValue;
@@ -7231,7 +7277,7 @@
                                     if (pct) {
                                         const ps = [];
                                         let calcNote = '';
-                                        if (volumeDisplayMode === 'amountPct' && dateIdx >= 0) {
+                                        if (isAmtPctMode(volumeDisplayMode) && dateIdx >= 0) {
                                             const actual = (sk.amountData || [])[dateIdx];
                                             if (!(actual != null && actual > 0)) {
                                                 const calc = calcAmountFromVolume((sk.volumeData || [])[dateIdx], sk.data[dateIdx], sk.code);
@@ -7257,7 +7303,7 @@
                                 if (ts) {
                                     const base = getBaseValue(ts);
                                     if (base !== 0) {
-                                        const { high, low } = getLatest52WeekHL(ts);
+                                        const {high, low} = getLatest52WeekHL(ts);
                                         if (high !== null) out += `<span style="color:#94a3b8;">┈ 52周高 ${calcTotalChange(base, high).toFixed(2)}%</span><br/>`;
                                         if (low !== null) out += `<span style="color:#94a3b8;">┈ 52周低 ${calcTotalChange(base, low).toFixed(2)}%</span><br/>`;
                                         const rs = ensureRefStats(ts);
@@ -7297,7 +7343,7 @@
                     data: sortedKeys, selected: legendSelected,
                     icon: 'circle', top: 0, left: 'center',
                     itemWidth: 10, itemHeight: 10,
-                    textStyle: { fontSize: font('legend'), color: isDark ? '#94a3b8' : '#475569' }
+                    textStyle: {fontSize: font('legend'), color: isDark ? '#94a3b8' : '#475569'}
                 },
                 grid: {
                     left: showMain ? 70 : 20, right: showSecondary ? 70 : 20,
@@ -7305,30 +7351,28 @@
                 },
                 xAxis: {
                     type: 'category', data: dates, boundaryGap: false,
-                    axisLine: { lineStyle: { color: isDark ? '#334155' : '#eef2f6' } },
+                    axisLine: {lineStyle: {color: isDark ? '#334155' : '#eef2f6'}},
                     axisLabel: {
                         color: isDark ? '#94a3b8' : '#475569',
                         fontSize: font('axis'),
-                        formatter: function (val) { const p = val.split('-'); return p[1] + '-' + p[2]; }
+                        formatter: function (val) {const p = val.split('-'); return p[1] + '-' + p[2];}
                     },
-                    axisTick: { alignWithLabel: true }, splitLine: { show: false }
+                    axisTick: {alignWithLabel: true}, splitLine: {show: false}
                 },
                 yAxis: [
                     {
                         type: 'value', min: yMin, max: yMax, show: showMain,
                         axisLabel: {
                             color: isDark ? '#94a3b8' : '#475569', fontSize: font('axis'),
-                            formatter: function (value) { return value.toFixed(1) + '%'; }
+                            formatter: function (value) {return value.toFixed(1) + '%';}
                         },
-                        splitLine: { show: showGrid, lineStyle: { color: isDark ? '#334155' : '#eef2f6', type: 'solid', opacity: 0.6 } },
-                        axisLine: { show: false }, axisTick: { show: false }
+                        splitLine: {show: showGrid, lineStyle: {color: isDark ? '#334155' : '#eef2f6', type: 'solid', opacity: 0.6}},
+                        axisLine: {show: false}, axisTick: {show: false}
                     },
                     {
                         type: 'value',
-                        name: volumeDisplayMode === 'volume' ? '成交量'
-                            : volumeDisplayMode === 'amount' ? '成交额'
-                                : volumeDisplayMode === 'volumePct' ? '成交量(%)' : '成交额(%)',
-                        nameTextStyle: { fontSize: font('tag'), color: isDark ? '#94a3b8' : '#475569' },
+                        name: getSecondaryAxisName(),
+                        nameTextStyle: {fontSize: font('tag'), color: isDark ? '#94a3b8' : '#475569'},
                         position: 'right', show: showSecondary,
                         min: secondaryYMin, max: secondaryYMax,
                         axisLabel: {
@@ -7339,8 +7383,8 @@
                                 return v;
                             }
                         },
-                        splitLine: { show: false }, axisLine: { show: false },
-                        axisTick: { show: false }, axisPointer: { show: false }
+                        splitLine: {show: false}, axisLine: {show: false},
+                        axisTick: {show: false}, axisPointer: {show: false}
                     }
                 ],
                 dataZoom: [{
@@ -7349,14 +7393,14 @@
                     borderColor: isDark ? '#334155' : '#eef2f6',
                     backgroundColor: isDark ? '#1e293b' : '#f8fafc',
                     fillerColor: 'rgba(59,130,246,0.12)',
-                    handleStyle: { color: '#3b82f6', borderColor: '#3b82f6' },
-                    textStyle: { color: isDark ? '#94a3b8' : '#475569', fontSize: font('tag') },
+                    handleStyle: {color: '#3b82f6', borderColor: '#3b82f6'},
+                    textStyle: {color: isDark ? '#94a3b8' : '#475569', fontSize: font('tag')},
                     minSpan: 1, maxSpan: 100
                 }],
                 visualMap: pctSeriesIndices.length > 0 ? [{
                     show: false, seriesIndex: pctSeriesIndices, dimension: 1,
-                    pieces: [{ max: 99.999, color: '#07c160' }, { min: 100, color: '#e64340' }],
-                    outOfRange: { color: '#94a3b8' }
+                    pieces: [{max: 99.999, color: '#07c160'}, {min: 100, color: '#e64340'}],
+                    outOfRange: {color: '#94a3b8'}
                 }] : [],
                 series
             };
@@ -7372,7 +7416,7 @@
                 if (!name) return;
                 if (shiftPressed && sortedKeys.length > 1) {
                     if (trendLegendSelected.size === 0) {
-                        sortedKeys.forEach(k => { if (k !== name) trendLegendSelected.add(k); });
+                        sortedKeys.forEach(k => {if (k !== name) trendLegendSelected.add(k);});
                     } else {
                         if (trendLegendSelected.has(name)) trendLegendSelected.delete(name);
                         else trendLegendSelected.add(name);
@@ -7384,7 +7428,7 @@
                 } else {
                     const onlyThis = trendLegendSelected.size === 1 && trendLegendSelected.has(name);
                     if (onlyThis) trendLegendSelected.clear();
-                    else { trendLegendSelected.clear(); trendLegendSelected.add(name); }
+                    else {trendLegendSelected.clear(); trendLegendSelected.add(name);}
                 }
                 legendChanging = true;
                 renderChart();
@@ -7412,7 +7456,7 @@
                     if (Array.isArray(s.amountData) && s.amountData.length > 1) s.amountData = [s.amountData[0], ...s.amountData.slice(0, -1)];
                 }
             });
-            try { return fn(); } finally {
+            try {return fn();} finally {
                 usBackups.forEach(b => {
                     b.series.data = b.data;
                     b.series.highData = b.highData;
@@ -7425,19 +7469,19 @@
 
         function renderChart() {
             withUSBackShift(() => {
-                if (viewMode === 'waterfall') { renderWaterfall(); return; }
-                if (viewMode === 'ranking') { renderRankingChart(); return; }
-                if (viewMode === 'volume') { viewMode = 'trend'; updateViewUI(); return; }
+                if (viewMode === 'waterfall') {renderWaterfall(); return;}
+                if (viewMode === 'ranking') {renderRankingChart(); return;}
+                if (viewMode === 'volume') {viewMode = 'trend'; updateViewUI(); return;}
                 renderTrendChart();
             });
-            setTimeout(() => { resetDanmaku(); }, 100);
+            setTimeout(() => {resetDanmaku();}, 100);
         }
 
         // ================================================================
         //  重置 Y 轴 / X 轴
         // ================================================================
         function resetYAxis() {
-            if (viewMode === 'ranking') { renderChart(); return; }
+            if (viewMode === 'ranking') {renderChart(); return;}
 
             if (axisDisplayMode === 'secondary') {
                 secondaryYMin = null;
@@ -7474,14 +7518,14 @@
                 if (ts) {
                     const base = getBaseValue(ts);
                     if (base !== 0) {
-                        const { high, low } = getLatest52WeekHL(ts);
+                        const {high, low} = getLatest52WeekHL(ts);
                         if (high !== null) allChanges.push(calcTotalChange(base, high));
                         if (low !== null) allChanges.push(calcTotalChange(base, low));
                     }
                 }
             }
 
-            if (allChanges.length === 0) { yMin = -50; yMax = 150; renderChart(); saveState(); return; }
+            if (allChanges.length === 0) {yMin = -50; yMax = 150; renderChart(); saveState(); return;}
 
             let min = Math.min(...allChanges);
             let max = Math.max(...allChanges);
@@ -7498,7 +7542,7 @@
         chartDom.addEventListener('dblclick', resetYAxis);
 
         resetZoomBtnChart.addEventListener('click', function () {
-            if (viewMode === 'ranking') { renderChart(); return; }
+            if (viewMode === 'ranking') {renderChart(); return;}
             secondaryYMin = null;
             secondaryYMax = null;
             renderChart();
@@ -7535,14 +7579,14 @@
             if (newMin >= newMax) newMin = newMax - 20;
             newMin = Math.max(-200, Math.min(100, newMin));
             newMax = Math.max(0, Math.min(300, newMax));
-            if (newMin < newMax) { yMin = newMin; yMax = newMax; renderChart(); saveState(); }
-        }, { passive: false });
+            if (newMin < newMax) {yMin = newMin; yMax = newMax; renderChart(); saveState();}
+        }, {passive: false});
 
         // ================================================================
         //  其他事件
         // ================================================================
-        mainTitleInput.addEventListener('blur', function () { mainTitle = this.value; saveState(); });
-        mainTitleInput.addEventListener('keydown', function (e) { if (e.key === 'Enter') this.blur(); });
+        mainTitleInput.addEventListener('blur', function () {mainTitle = this.value; saveState();});
+        mainTitleInput.addEventListener('keydown', function (e) {if (e.key === 'Enter') this.blur();});
 
         themeToggle.addEventListener('click', function () {
             userThemeOverride = true;
@@ -7567,10 +7611,10 @@
             expanded = !expanded;
             appContainer.classList.toggle('edit-expanded', expanded);
             this.textContent = expanded ? '🔍 缩小还原' : '🔍 放大编辑';
-            if (!expanded) { chartWrapper.style.flex = ''; controlPanel.style.flex = ''; saveState(); }
+            if (!expanded) {chartWrapper.style.flex = ''; controlPanel.style.flex = ''; saveState();}
             requestAnimationFrame(() => {
                 myChart.resize();
-                setTimeout(() => { myChart.resize(); resetDanmaku(); updateAvatarPositions(); }, 100);
+                setTimeout(() => {myChart.resize(); resetDanmaku(); updateAvatarPositions();}, 100);
             });
         });
 
@@ -7584,7 +7628,7 @@
         document.getElementById('addDateBtn').addEventListener('click', insertDateColumn);
         document.getElementById('delDateBtn').addEventListener('click', deleteDateColumn);
         document.getElementById('addColBtn').addEventListener('click', addColumn);
-        document.getElementById('refreshPriceIconBtn').addEventListener('click', function () { refreshPrices(false); });
+        document.getElementById('refreshPriceIconBtn').addEventListener('click', function () {refreshPrices(false);});
         document.getElementById('statsToggleBtn').addEventListener('click', function () {
             statsDisplayMode = statsDisplayMode === 'count' ? 'percent' : 'count';
             this.textContent = statsDisplayMode === 'percent' ? '📊 显示天数' : '📊 显示百分比';
@@ -7595,10 +7639,10 @@
         document.getElementById('verifyHistoryBtn').addEventListener('click', verifyHistoricalData);
         document.getElementById('deleteSelectedSeriesBtn').addEventListener('click', deleteSelectedSeries);
 
-        function handleResize() { myChart.resize(); resetDanmaku(); updateAvatarPositions(); }
+        function handleResize() {myChart.resize(); resetDanmaku(); updateAvatarPositions();}
         window.addEventListener('resize', handleResize);
         window.addEventListener('orientationchange', function () {
-            setTimeout(() => { myChart.resize(); resetDanmaku(); updateAvatarPositions(); }, 300);
+            setTimeout(() => {myChart.resize(); resetDanmaku(); updateAvatarPositions();}, 300);
         });
 
         document.querySelectorAll('.expand-table-btn').forEach(btn => {
@@ -7643,8 +7687,8 @@
                 let price = s.data[idx] || 0;
                 let high = (s.highData && s.highData[idx] !== undefined) ? s.highData[idx] : 0;
                 let low = (s.lowData && s.lowData[idx] !== undefined) ? s.lowData[idx] : 0;
-                if (key === '飘小仙') { change = 0; price = 1; high = 1; low = 1; }
-                else if (price > 0) { if (!(high > 0)) high = price; if (!(low > 0)) low = price; }
+                if (key === '飘小仙') {change = 0; price = 1; high = 1; low = 1;}
+                else if (price > 0) {if (!(high > 0)) high = price; if (!(low > 0)) low = price;}
                 let highChange = 0, lowChange = 0;
                 if (prevIdx >= 0) {
                     const prevClose = s.data[prevIdx];
@@ -7706,7 +7750,7 @@
                     });
                 }
                 setTimeout(buildAndRenderPriceInfo, 300);
-                setTimeout(() => { refreshPrices(true); }, 2500);
+                setTimeout(() => {refreshPrices(true);}, 2500);
                 const expandBtnEl = document.querySelector('#priceInfoDetails .expand-table-btn');
                 if (expandBtnEl) expandBtnEl.click();
                 if (seriesList.some(s => s.code && (s.latest52High === null || s.latest52Low === null))) {
@@ -7722,7 +7766,7 @@
                 .then(state => {
                     if (!validateState(state)) throw new Error('数据格式无效');
                     if (loadStateFromObject(state)) {
-                        processAllAvatars(() => { finishInit('data.json（远程）'); });
+                        processAllAvatars(() => {finishInit('data.json（远程）');});
                     } else throw new Error('loadStateFromObject 执行失败');
                 })
                 .catch(err => {
@@ -7740,12 +7784,12 @@
                             setStatus('info', '已从本地缓存恢复（远程不可用）');
                             updateViewUI();
                             saveState();
-                            setTimeout(() => { refreshPrices(true); }, 2500);
+                            setTimeout(() => {refreshPrices(true);}, 2500);
                         });
                         return;
                     }
                     resetToDefaultData();
-                    processAllAvatars(() => { finishInit('硬编码默认数据'); });
+                    processAllAvatars(() => {finishInit('硬编码默认数据');});
                 });
         }
 
@@ -7816,6 +7860,7 @@
             yMin = -50; yMax = 150;
             secondaryYMin = null; secondaryYMax = null;
             axisDisplayMode = 'main';
+            volumeDisplayMode = 'volume';
             mainTitle = '🌈 总变化率趋势';
             mainTitleInput.value = mainTitle;
             showGrid = true;
@@ -7829,11 +7874,11 @@
             trendLegendSelected = new Set();
             baseDate = dates[0] || '';
             _lastBaseDateSig = '';
-            try { localStorage.removeItem('trendState'); } catch (e) { }
+            try {localStorage.removeItem('trendState');} catch (e) { }
             userThemeOverride = false;
         }
 
-        setTimeout(function () { try { myChart.resize(); } catch (e) { } }, 150);
+        setTimeout(function () {try {myChart.resize();} catch (e) { } }, 150);
 
         // ================================================================
         //  移动端布局
@@ -7851,7 +7896,7 @@
             currentMobileView = view;
             document.body.classList.remove('m-view-chart', 'm-view-series', 'm-view-data');
             document.body.classList.add('m-view-' + view);
-            if (isMobileView()) { chartWrapper.style.flex = ''; controlPanel.style.flex = ''; }
+            if (isMobileView()) {chartWrapper.style.flex = ''; controlPanel.style.flex = '';}
             if (mobileTabbarEl) {
                 mobileTabbarEl.querySelectorAll('.tab').forEach(function (t) {
                     t.classList.toggle('active', t.getAttribute('data-view') === view);
@@ -7867,7 +7912,7 @@
                     renderVisibleTables(true);
                 }
             }
-            if (view === 'chart') setTimeout(function () { try { myChart.resize(); } catch (e) { } }, 30);
+            if (view === 'chart') setTimeout(function () {try {myChart.resize();} catch (e) { } }, 30);
         }
 
         function renderRanking() {
@@ -7878,24 +7923,24 @@
                 return;
             }
             const firstPlaceDays = {};
-            seriesKeys.forEach(function (k) { firstPlaceDays[k] = 0; });
+            seriesKeys.forEach(function (k) {firstPlaceDays[k] = 0;});
             const baseIdxR = getBaseIdx();
             for (let i = baseIdxR; i < dates.length; i++) {
                 const changes = [];
                 seriesKeys.forEach(function (k) {
                     const s = getSeries(k);
                     if (!s) return;
-                    changes.push({ k, change: calcTotalChange(getBaseValue(s), s.data[i]) });
+                    changes.push({k, change: calcTotalChange(getBaseValue(s), s.data[i])});
                 });
-                changes.sort(function (a, b) { return b.change - a.change; });
+                changes.sort(function (a, b) {return b.change - a.change;});
                 if (changes.length) firstPlaceDays[changes[0].k]++;
             }
             const items = seriesKeys.map(function (k) {
                 const s = getSeries(k);
                 if (!s) return null;
                 const change = calcTotalChange(getBaseValue(s), s.data[lastIdx]);
-                return { name: k, color: s.color, avatar: getAvatarSrc(s), change, first: firstPlaceDays[k] || 0 };
-            }).filter(Boolean).sort(function (a, b) { return b.change - a.change; });
+                return {name: k, color: s.color, avatar: getAvatarSrc(s), change, first: firstPlaceDays[k] || 0};
+            }).filter(Boolean).sort(function (a, b) {return b.change - a.change;});
 
             if (rankingDateSubEl) rankingDateSubEl.textContent = (dates[lastIdx] || '') + ' · 登顶天数';
             if (items.length === 0) {
@@ -7917,18 +7962,18 @@
         }
 
         if (mobileThemeBtnEl) {
-            mobileThemeBtnEl.addEventListener('click', function () { if (themeToggle) themeToggle.click(); });
+            mobileThemeBtnEl.addEventListener('click', function () {if (themeToggle) themeToggle.click();});
         }
         function syncMobileThemeIcon() {
             if (!mobileThemeBtnEl) return;
             mobileThemeBtnEl.textContent = document.body.classList.contains('dark') ? '☀️' : '🌙';
         }
         if (window.MutationObserver) {
-            new MutationObserver(syncMobileThemeIcon).observe(document.body, { attributes: true, attributeFilter: ['class'] });
+            new MutationObserver(syncMobileThemeIcon).observe(document.body, {attributes: true, attributeFilter: ['class']});
         }
         if (mobileTabbarEl) {
             mobileTabbarEl.querySelectorAll('.tab').forEach(function (tab) {
-                tab.addEventListener('click', function () { switchMobileView(tab.getAttribute('data-view')); });
+                tab.addEventListener('click', function () {switchMobileView(tab.getAttribute('data-view'));});
             });
         }
         function initMobileView() {
@@ -7939,10 +7984,10 @@
             }
         }
         function handleMobileBreakpointChange(e) {
-            if (e.matches) { switchMobileView(currentMobileView || 'chart'); renderRanking(); }
+            if (e.matches) {switchMobileView(currentMobileView || 'chart'); renderRanking();}
             else {
                 document.body.classList.remove('m-view-chart', 'm-view-series', 'm-view-data');
-                try { myChart.resize(); } catch (err) { }
+                try {myChart.resize();} catch (err) { }
             }
         }
         if (MOBILE_QUERY.addEventListener) MOBILE_QUERY.addEventListener('change', handleMobileBreakpointChange);
@@ -7965,7 +8010,7 @@
                 if (rafId) return;
                 rafId = requestAnimationFrame(function () {
                     rafId = null;
-                    try { myChart.resize(); } catch (e) { }
+                    try {myChart.resize();} catch (e) { }
                 });
             }
             let dragging = false, startY = 0, startRatio = 0;
@@ -7990,14 +8035,14 @@
                 if (!dragging) return;
                 dragging = false;
                 document.body.style.userSelect = '';
-                try { localStorage.setItem('m_chart_ratio', String(ratio)); } catch (e) { }
+                try {localStorage.setItem('m_chart_ratio', String(ratio));} catch (e) { }
                 scheduleResize();
             }
             spl.addEventListener('mousedown', onStart);
             window.addEventListener('mousemove', onMove);
             window.addEventListener('mouseup', onEnd);
-            spl.addEventListener('touchstart', onStart, { passive: false });
-            spl.addEventListener('touchmove', onMove, { passive: false });
+            spl.addEventListener('touchstart', onStart, {passive: false});
+            spl.addEventListener('touchmove', onMove, {passive: false});
             spl.addEventListener('touchend', onEnd);
         })();
 
@@ -8007,8 +8052,8 @@
         wrap.style.minHeight = '0';
         cont.style.flex = '1 1 0';
         cont.style.minHeight = '0';
-        setTimeout(() => { myChart.resize(); }, 100);
-        setTimeout(() => { resetDanmaku(); }, 500);
+        setTimeout(() => {myChart.resize();}, 100);
+        setTimeout(() => {resetDanmaku();}, 500);
 
         init();
         initMobileView();
@@ -8039,8 +8084,10 @@
         <div
             style="background:var(--bg-app); border-radius:28px; padding:48px 64px; text-align:center; box-shadow:0 30px 80px rgba(0,0,0,0.4); max-width:480px; width:90%;">
             <div style="font-size:56px; margin-bottom:16px; line-height:1.2;">📜</div>
-            <div style="font-size:24px; font-weight:700; color:var(--text-primary); letter-spacing:0.5px;">正在更新历史数据...</div>
-            <div id="historyUpdateStatus" style="font-size:15px; color:var(--text-muted); margin-top:10px; font-weight:400;">准备中</div>
+            <div style="font-size:24px; font-weight:700; color:var(--text-primary); letter-spacing:0.5px;">正在更新历史数据...
+            </div>
+            <div id="historyUpdateStatus"
+                style="font-size:15px; color:var(--text-muted); margin-top:10px; font-weight:400;">准备中</div>
             <div style="margin-top:20px; display:flex; justify-content:center; gap:6px;">
                 <span
                     style="display:inline-block; width:10px; height:10px; border-radius:50%; background:#3b82f6; animation:pulse-dot 1.2s infinite;"></span>
