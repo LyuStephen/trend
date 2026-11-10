@@ -2679,10 +2679,10 @@
             return {
                 price: {
                     high: null, low: null, avg250: null, avg30: null, avg7: null,
-                    intradayHigh: null, intradayLow: null
+                    intradayHigh: null, intradayLow: null, validDays: 0
                 },
-                volume: {high: null, low: null, avg250: null, avg30: null, avg7: null},
-                amount: {high: null, low: null, avg250: null, avg30: null, avg7: null}
+                volume: {high: null, low: null, avg250: null, avg30: null, avg7: null, validDays: 0},
+                amount: {high: null, low: null, avg250: null, avg30: null, avg7: null, validDays: 0}
             };
         }
 
@@ -3114,17 +3114,21 @@
 
             function statOfArr(arr) {
                 const n = arr ? arr.length : 0;
-                if (n === 0) return {high: null, low: null, avg250: null, avg30: null, avg7: null};
-                const start = Math.max(0, n - 250);
-                let hi = null, lo = null;
-                for (let i = start; i < n; i++) {
+                if (n === 0) return {high: null, low: null, avg250: null, avg30: null, avg7: null, validDays: 0};
+                // ★ 52周高低/均：以最新有效交易日为锚点，向前数 250 个"有效数据点"
+                //   跳过 0/null/NaN 占位；若有效数据不足 250 个，则用全部有效数据
+                //   validDays 反映窗口内真实交易日数量（供 UI 提示"数据不足52周"）
+                let hi = null, lo = null, sum250 = 0, cnt250 = 0;
+                for (let i = n - 1; i >= 0 && cnt250 < 250; i--) {
                     const v = arr[i];
                     if (v != null && v > 0 && isFinite(v)) {
                         if (hi === null || v > hi) hi = v;
                         if (lo === null || v < lo) lo = v;
+                        sum250 += v; cnt250++;
                     }
                 }
-                function avgOf(k) {
+                // 30日/7日：仍用"最后 30/7 条位置"语义（最近 N 个数据点）
+                function avgOfLast(k) {
                     const from = Math.max(0, n - k);
                     let sum = 0, cnt = 0;
                     for (let i = from; i < n; i++) {
@@ -3133,20 +3137,31 @@
                     }
                     return cnt > 0 ? sum / cnt : null;
                 }
-                return {high: hi, low: lo, avg250: avgOf(250), avg30: avgOf(30), avg7: avgOf(7)};
+                return {
+                    high: hi, low: lo,
+                    avg250: cnt250 > 0 ? sum250 / cnt250 : null,
+                    avg30: avgOfLast(30),
+                    avg7: avgOfLast(7),
+                    validDays: cnt250
+                };
             }
 
             // 价格：均值、高、低均基于 s.data（收盘价），保证与曲线完全一致
             const priceStats = statOfArr(s.data);
             const n = s.data ? s.data.length : 0;
-            const start250 = Math.max(0, n - 250);
             // 日内高/低单独保留（tooltip 参考，不参与 52 周高/低判定）
-            let intradayHi = null, intradayLo = null;
-            for (let i = start250; i < n; i++) {
+            // ★ 与收盘价窗口一致：从末尾向前数 250 个"有日内数据"的交易日
+            let intradayHi = null, intradayLo = null, intradayCnt = 0;
+            for (let i = n - 1; i >= 0 && intradayCnt < 250; i--) {
                 const h = s.highData ? s.highData[i] : null;
                 const l = s.lowData ? s.lowData[i] : null;
-                if (h != null && h > 0) {if (intradayHi === null || h > intradayHi) intradayHi = h;}
-                if (l != null && l > 0) {if (intradayLo === null || l < intradayLo) intradayLo = l;}
+                const hasH = (h != null && h > 0 && isFinite(h));
+                const hasL = (l != null && l > 0 && isFinite(l));
+                if (hasH || hasL) {
+                    if (hasH) {if (intradayHi === null || h > intradayHi) intradayHi = h;}
+                    if (hasL) {if (intradayLo === null || l < intradayLo) intradayLo = l;}
+                    intradayCnt++;
+                }
             }
             priceStats.intradayHigh = intradayHi;
             priceStats.intradayLow = intradayLo;
@@ -3248,29 +3263,34 @@
 
         function buildRefStats(s, isVol) {
             if (!s) return null;
+            // ★ 用 getEffectiveSeriesArr 取"等效 shift 后"的数据，与次轴曲线严格对齐
+            const volArr = getEffectiveSeriesArr(s, 'volumeData');
+            const amtArr = getEffectiveSeriesArr(s, 'amountData');
+            const priceArr = getEffectiveSeriesArr(s, 'data');
             let arr;
             if (isVol) {
-                arr = Array.isArray(s.volumeData) ? s.volumeData.slice() : [];
+                arr = volArr.slice();
             } else {
-                const actualAmt = Array.isArray(s.amountData) ? s.amountData.slice() : [];
-                arr = actualAmt.map((v, i) => {
+                arr = amtArr.map((v, i) => {
                     if (v != null && v > 0) return v;
-                    const calc = calcAmountFromVolume((s.volumeData || [])[i], s.data[i], s.code);
+                    const calc = calcAmountFromVolume(volArr[i], priceArr[i], s.code);
                     return calc != null ? calc : null;
                 });
             }
             if (!arr.some(v => v != null && v > 0)) return null;
             const n = arr.length;
-            const start = Math.max(0, n - 250);
-            let hi = null, lo = null;
-            for (let i = start; i < n; i++) {
+            // ★ 52周高低/均：从末尾向前数 250 个"有效数据点"
+            let hi = null, lo = null, sum250 = 0, cnt250 = 0;
+            for (let i = n - 1; i >= 0 && cnt250 < 250; i--) {
                 const v = arr[i];
                 if (v != null && v > 0 && isFinite(v)) {
                     if (hi === null || v > hi) hi = v;
                     if (lo === null || v < lo) lo = v;
+                    sum250 += v; cnt250++;
                 }
             }
-            const avgOf = (k) => {
+            // 30日/7日：最近 N 个位置的平均
+            function avgOfLast(k) {
                 const from = Math.max(0, n - k);
                 let sum = 0, cnt = 0;
                 for (let i = from; i < n; i++) {
@@ -3278,8 +3298,14 @@
                     if (v != null && v > 0 && isFinite(v)) {sum += v; cnt++;}
                 }
                 return cnt > 0 ? sum / cnt : null;
+            }
+            return {
+                high: hi, low: lo,
+                avg250: cnt250 > 0 ? sum250 / cnt250 : null,
+                avg30: avgOfLast(30),
+                avg7: avgOfLast(7),
+                validDays: cnt250
             };
-            return {high: hi, low: lo, avg250: avgOf(250), avg30: avgOf(30), avg7: avgOf(7)};
         }
 
         function addSecondaryPctSeriesToTrend(seriesArr, sortedKeys, isVolPct, period, keyVisibilityFn, useOriginalName, seriesMeta) {
@@ -3379,18 +3405,22 @@
             keys.forEach(key => {
                 const s = getSeries(key);
                 if (!s) return;
+                // ★ 用 getEffectiveSeriesArr 取"等效 shift 后"的数据，与次轴曲线严格对齐
+                const volArr = getEffectiveSeriesArr(s, 'volumeData');
+                const amtArr = getEffectiveSeriesArr(s, 'amountData');
+                const priceArr = getEffectiveSeriesArr(s, 'data');
                 if (volumeDisplayMode === 'volume') {
-                    (s.volumeData || []).forEach(v => {
+                    volArr.forEach(v => {
                         if (v != null && v > 0) {min = Math.min(min, v); max = Math.max(max, v);}
                     });
                 } else {
                     const isIdx = isIndexCode(s.code);
-                    (s.amountData || []).forEach(v => {
+                    amtArr.forEach(v => {
                         if (v != null && v > 0) {min = Math.min(min, v); max = Math.max(max, v);}
                     });
                     if (!isIdx) {
-                        (s.volumeData || []).forEach((v, i) => {
-                            const a = calcAmountFromVolume(v, s.data[i], s.code);
+                        volArr.forEach((v, i) => {
+                            const a = calcAmountFromVolume(v, priceArr[i], s.code);
                             if (a != null && a > 0) {min = Math.min(min, a); max = Math.max(max, a);}
                         });
                     }
@@ -6857,8 +6887,11 @@
                                 const base = getBaseValue(ts);
                                 if (base !== 0) {
                                     const {high, low} = getLatest52WeekHL(ts);
-                                    if (high !== null) html += `<span style="color:#94a3b8;">┈ 52周高 ${calcTotalChange(base, high).toFixed(2)}%</span><br/>`;
-                                    if (low !== null) html += `<span style="color:#94a3b8;">┈ 52周低 ${calcTotalChange(base, low).toFixed(2)}%</span><br/>`;
+                                    const _rs52w = ensureRefStats(ts);
+                                    const _vd52w = _rs52w && _rs52w.price ? _rs52w.price.validDays : 0;
+                                    const _dataNote52w = _vd52w >= 250 ? '' : (_vd52w > 0 ? ` <span style="color:#f59e0b;font-size:10px;">（数据不足52周·仅${_vd52w}天）</span>` : ' <span style="color:#f59e0b;font-size:10px;">（无有效数据）</span>');
+                                    if (high !== null) html += `<span style="color:#94a3b8;">┈ 52周高 ${calcTotalChange(base, high).toFixed(2)}%${_dataNote52w}</span><br/>`;
+                                    if (low !== null) html += `<span style="color:#94a3b8;">┈ 52周低 ${calcTotalChange(base, low).toFixed(2)}%${_dataNote52w}</span><br/>`;
                                     const rs = ensureRefStats(ts);
                                     if (rs && rs.price) {
                                         if (rs.price.avg250 != null) html += `<span style="color:#94a3b8;">┈ 52周均 ${calcTotalChange(base, rs.price.avg250).toFixed(2)}%</span><br/>`;
@@ -7356,8 +7389,11 @@
                                     const base = getBaseValue(ts);
                                     if (base !== 0) {
                                         const {high, low} = getLatest52WeekHL(ts);
-                                        if (high !== null) out += `<span style="color:#94a3b8;">┈ 52周高 ${calcTotalChange(base, high).toFixed(2)}%</span><br/>`;
-                                        if (low !== null) out += `<span style="color:#94a3b8;">┈ 52周低 ${calcTotalChange(base, low).toFixed(2)}%</span><br/>`;
+                                        const _rs52 = ensureRefStats(ts);
+                                        const _vd52 = _rs52 && _rs52.price ? _rs52.price.validDays : 0;
+                                        const _dataNote52 = _vd52 >= 250 ? '' : (_vd52 > 0 ? ` <span style="color:#f59e0b;font-size:10px;">（数据不足52周·仅${_vd52}天）</span>` : ' <span style="color:#f59e0b;font-size:10px;">（无有效数据）</span>');
+                                        if (high !== null) out += `<span style="color:#94a3b8;">┈ 52周高 ${calcTotalChange(base, high).toFixed(2)}%${_dataNote52}</span><br/>`;
+                                        if (low !== null) out += `<span style="color:#94a3b8;">┈ 52周低 ${calcTotalChange(base, low).toFixed(2)}%${_dataNote52}</span><br/>`;
                                         const rs = ensureRefStats(ts);
                                         if (rs && rs.price) {
                                             if (rs.price.avg250 != null) out += `<span style="color:#94a3b8;">┈ 52周均 ${calcTotalChange(base, rs.price.avg250).toFixed(2)}%</span><br/>`;
@@ -7492,34 +7528,51 @@
         // ================================================================
         //  主渲染
         // ================================================================
+        // ★ 所有需要"美股日期后移一位"的时间序列字段。
+        //   未来新增时间序列字段（如换手率、PE、自定义指标）时，
+        //   只需在此数组追加字段名，withUSBackShift 会自动处理。
+        const US_SHIFT_FIELDS = [
+            'data', 'highData', 'lowData',
+            'volumeData', 'amountData', 'turnoverData', 'peData'
+        ];
+
         function withUSBackShift(fn) {
             const usSeries = seriesList.filter(s => isUSSeries(s));
-            const usBackups = [];
+            const backups = [];
             usSeries.forEach(s => {
-                usBackups.push({
-                    series: s, data: s.data, highData: s.highData, lowData: s.lowData,
-                    volumeData: s.volumeData, amountData: s.amountData,
-                    refStats: s.refStats   // ★ 备份原 refStats
+                const backup = {__series: s, __refStats: s.refStats};
+                US_SHIFT_FIELDS.forEach(field => {
+                    const arr = s[field];
+                    if (Array.isArray(arr) && arr.length > 1) {
+                        backup[field] = arr;
+                        s[field] = [arr[0], ...arr.slice(0, -1)];
+                    }
                 });
-                if (Array.isArray(s.data) && s.data.length > 1) {
-                    s.data = [s.data[0], ...s.data.slice(0, -1)];
-                    if (Array.isArray(s.highData)) s.highData = [s.highData[0], ...s.highData.slice(0, -1)];
-                    if (Array.isArray(s.lowData)) s.lowData = [s.lowData[0], ...s.lowData.slice(0, -1)];
-                    if (Array.isArray(s.volumeData) && s.volumeData.length > 1) s.volumeData = [s.volumeData[0], ...s.volumeData.slice(0, -1)];
-                    if (Array.isArray(s.amountData) && s.amountData.length > 1) s.amountData = [s.amountData[0], ...s.amountData.slice(0, -1)];
-                }
-                s.refStats = null;   // ★ shift 期间临时清空，避免误用旧缓存
+                s.refStats = null;   // shift 期间清空缓存，避免污染
+                backups.push(backup);
             });
-            try {return fn();} finally {
-                usBackups.forEach(b => {
-                    b.series.data = b.data;
-                    b.series.highData = b.highData;
-                    b.series.lowData = b.lowData;
-                    b.series.volumeData = b.volumeData;
-                    b.series.amountData = b.amountData;
-                    b.series.refStats = b.refStats;   // ★ 渲染后恢复原 refStats（不受 shift 污染）
+            try {
+                return fn();
+            } finally {
+                backups.forEach(b => {
+                    const s = b.__series;
+                    US_SHIFT_FIELDS.forEach(field => {
+                        if (b[field]) s[field] = b[field];
+                    });
+                    s.refStats = b.__refStats;
                 });
             }
+        }
+
+        // ★ 供"非 withUSBackShift 上下文"（wheel 事件、tooltip formatter 等）读取
+        //   "等效 shift 后"的数据视图，保证辅助计算与曲线严格对齐。
+        //   非美股或长度 ≤1 → 返回原数组引用（不做拷贝，省性能）。
+        function getEffectiveSeriesArr(s, field) {
+            if (!s) return [];
+            const arr = s[field];
+            if (!Array.isArray(arr) || arr.length === 0) return [];
+            if (!isUSSeries(s) || arr.length <= 1) return arr;
+            return [arr[0], ...arr.slice(0, -1)];
         }
 
         function renderChart() {
