@@ -2198,6 +2198,10 @@
                         <span style="font-size:var(--font-size-tag); color:var(--text-muted);"
                             id="lastUpdateTime"></span>
                     </div>
+                    
+                    <div style="font-size:var(--font-size-tag); color:var(--text-secondary); margin-bottom:8px; padding:4px 8px; background:var(--hover-bg); border-radius:6px;">
+                        💡 优化提示：由于历史数据较多，表格默认仅渲染<b>最近 40 天</b>的列以保证页面流畅。完整历史数据请通过图表缩放查看或导出。
+                    </div>
 
                     <details id="priceInfoDetails" open>
                         <summary
@@ -2424,8 +2428,10 @@
 
     <script>
         // ================================================================
-        //  ★ 字体配置
+        //  ★ 字体与常量配置
         // ================================================================
+        const MAX_TABLE_COLS = 40; // 核心优化：表格最多渲染最近 40 列
+        
         const FONT_CONFIG = {
             desktop: {
                 title: 20, subtitle: 16, legend: 13, axis: 12, label: 12, tooltip: 13,
@@ -2559,7 +2565,7 @@
             const img = new Image();
             img.onload = function () {
                 let width = img.width, height = img.height;
-                const maxDim = 400;
+                const maxDim = 128; // 优化：压缩至 128px
                 if (width > maxDim || height > maxDim) {
                     const ratio = Math.min(maxDim / width, maxDim / height);
                     width = Math.round(width * ratio);
@@ -2965,7 +2971,9 @@
 
         function stopDanmakuAnimation() {
             if (danmakuAnimationId) { cancelAnimationFrame(danmakuAnimationId); danmakuAnimationId = null; }
-            ctx.clearRect(0, 0, danmakuCanvas.width, danmakuCanvas.height);
+            // 彻底释放 Canvas 后备存储
+            danmakuCanvas.width = 1;
+            danmakuCanvas.height = 1;
         }
 
         function resetDanmaku() {
@@ -3516,7 +3524,8 @@
         let _saveStateTimer = null;
         function trimStateForStorage(state) {
             state.seriesList.forEach(s => {
-                if (typeof s.avatarUrl === 'string' && s.avatarUrl.startsWith('data:image') && s.avatarUrl.length > 20000) {
+                // 保存时不存 base64，避免长字符串占用内存
+                if (typeof s.avatarUrl === 'string' && s.avatarUrl.startsWith('data:image')) {
                     s.avatarUrl = '';
                 }
             });
@@ -3534,11 +3543,7 @@
                     const state = trimStateForStorage(getCurrentState());
                     localStorage.setItem('trendState', JSON.stringify(state));
                 } catch (e) {
-                    try {
-                        const stateNoAvatar = trimStateForStorage(getCurrentState());
-                        stateNoAvatar.seriesList.forEach(s => s.avatarUrl = '');
-                        localStorage.setItem('trendState', JSON.stringify(stateNoAvatar));
-                    } catch (e2) { console.warn('二次保存失败', e2); }
+                    console.warn('保存失败', e);
                 }
             };
             if (immediate) doSave();
@@ -4001,7 +4006,15 @@
             const total = seriesList.length;
             if (total === 0) { callback(); return; }
             seriesList.forEach((s) => {
+                // 优化：如果是相对路径，直接保留相对路径，不使用 base64 转换，避免占用大量内存
                 if (s.avatarUrl && !s.avatarUrl.startsWith('data:image') && s.avatarUrl !== DEFAULT_AVATAR_SVG) {
+                    s.avatarData = null; // 直接使用 avatarUrl
+                    count++;
+                    if (count === total) callback();
+                    return;
+                }
+                // 如果上传的是 base64，才进行裁剪
+                if (s.avatarUrl && s.avatarUrl.startsWith('data:image')) {
                     processAvatarUrl(s.avatarUrl, (circularUrl) => {
                         s.avatarData = circularUrl;
                         count++;
@@ -4319,7 +4332,7 @@
                     const reader = new FileReader();
                     reader.onload = function (ev) {
                         const dataUrl = ev.target.result;
-                        compressImage(dataUrl, 200, function (compressedUrl) {
+                        compressImage(dataUrl, 30, function (compressedUrl) {
                             processAvatarUrl(compressedUrl, (circularUrl) => {
                                 const s = getSeries(key);
                                 if (s) {
@@ -4482,9 +4495,14 @@
             });
         }
 
+        function getDisplayDates() {
+            return dates.length > MAX_TABLE_COLS ? dates.slice(-MAX_TABLE_COLS) : dates;
+        }
+
         function buildDateHeadHtml() {
+            const displayDates = getDisplayDates();
             let html = `<tr><th style="text-align:left; padding-left:8px;">📊 指标</th>`;
-            dates.forEach(dateStr => {
+            displayDates.forEach(dateStr => {
                 html += `<th data-col="${dateStr}" style="cursor:pointer;">
                     <span class="date-editor" contenteditable="false">${dateStr}</span>
                 </th>`;
@@ -4494,6 +4512,7 @@
         }
 
         function buildBodyHtml(type) {
+            const displayDates = getDisplayDates();
             let html = '';
             seriesKeys.forEach((key, idx) => {
                 const s = getSeries(key);
@@ -4503,7 +4522,8 @@
                 html += `<td class="row-label" style="text-align:left; padding-left:8px; font-weight:600;">
                             <span class="color-dot" style="background:${color};"></span> ${key}
                         </td>`;
-                dates.forEach((date, i) => {
+                displayDates.forEach((date) => {
+                    const i = dates.indexOf(date);
                     let value; let disabled = ''; let inputClass = '';
                     if (type === 'raw') { value = s.data[i]; inputClass = 'raw-input'; }
                     else if (type === 'daily') {
@@ -4810,8 +4830,9 @@
             const body = table.body;
             if (!head || !body) return;
 
+            const displayDates = getDisplayDates();
             let headHtml = `<tr><th style="text-align:left; padding-left:8px;">📊 指标</th>`;
-            dates.forEach(d => { headHtml += `<th>${d}</th>`; });
+            displayDates.forEach(d => { headHtml += `<th>${d}</th>`; });
             headHtml += `</tr>`;
             head.innerHTML = headHtml;
 
@@ -4823,7 +4844,8 @@
                 const arr = Array.isArray(s[arrKey]) ? s[arrKey] : [];
                 bodyHtml += `<tr data-row="${key}"><td class="row-label" style="text-align:left; padding-left:8px; font-weight:600;">
                     <span class="color-dot" style="background:${color};"></span> ${key}</td>`;
-                dates.forEach((d, i) => {
+                displayDates.forEach((d) => {
+                    const i = dates.indexOf(d);
                     const v = (arr[i] !== undefined && isFinite(arr[i])) ? arr[i] : 0;
                     bodyHtml += `<td><input type="number" step="0.0001" value="${v.toFixed(digits)}" 
                         data-row="${key}" data-col="${d}" data-arr="${arrKey}" data-digits="${digits}" /></td>`;
@@ -4836,8 +4858,9 @@
         // 历史排名
         function renderRankTable() {
             if (seriesKeys.length === 0 || dates.length === 0) { rankHead.innerHTML = ''; rankBody.innerHTML = ''; return; }
+            const displayDates = getDisplayDates();
             let headHtml = `<tr><th style="text-align:left; padding-left:8px;">📊 指标</th>`;
-            dates.forEach(d => { headHtml += `<th style="cursor:default;">${d}</th>`; });
+            displayDates.forEach(d => { headHtml += `<th style="cursor:default;">${d}</th>`; });
             headHtml += `</tr>`;
             rankHead.innerHTML = headHtml;
 
@@ -4865,7 +4888,8 @@
                 const color = s.color || '#3b82f6';
                 bodyHtml += `<tr data-row="${key}"><td class="row-label" style="text-align:left; padding-left:8px; font-weight:600;">
                     <span class="color-dot" style="background:${color};"></span> ${key}</td>`;
-                dates.forEach((date, idx) => {
+                displayDates.forEach((date) => {
+                    const idx = dates.indexOf(date);
                     let displayText = ''; let rankColor = '#1e293b';
                     if (idx <= baseIdxRank) { displayText = '—'; rankColor = 'var(--text-muted)'; }
                     else {
@@ -4891,8 +4915,10 @@
             if (!head || !body) return;
             if (seriesKeys.length === 0 || dates.length === 0) { head.innerHTML = ''; body.innerHTML = ''; return; }
             const baseIdx = getBaseIdx();
+            const displayDates = getDisplayDates();
             let headHtml = `<tr><th style="text-align:left; padding-left:8px;">📊 指标</th>`;
-            dates.forEach((d, i) => {
+            displayDates.forEach((d) => {
+                const i = dates.indexOf(d);
                 const cls = i === baseIdx ? ' style="color:var(--selected-text);font-weight:700;"' : '';
                 headHtml += `<th${cls}>${d}</th>`;
             });
@@ -4907,7 +4933,8 @@
                 const base = getBaseValue(s);
                 bodyHtml += `<tr><td class="row-label" style="text-align:left; padding-left:8px; font-weight:600;">
                     <span class="color-dot" style="background:${color};"></span> ${key}</td>`;
-                dates.forEach((d, i) => {
+                displayDates.forEach((d) => {
+                    const i = dates.indexOf(d);
                     const change = calcTotalChange(base, s.data[i]);
                     let cellStyle = 'text-align:center; font-variant-numeric:tabular-nums;';
                     if (i === baseIdx) cellStyle += ' font-weight:700; color:var(--selected-text); background:var(--selected-bg);';
@@ -6727,6 +6754,9 @@
             });
 
             const series = [];
+            // 优化：只在系列较少时显示 markPoint 头像，避免大量 zrender 图片缓存
+            const showAvatars = (seriesKeys.length <= 3);
+
             if (showMain) {
                 sortedKeys.forEach(key => {
                     const s = getSeries(key);
@@ -6745,7 +6775,7 @@
                                 { offset: 1, color: s.color + '05' }
                             ])
                         },
-                        markPoint: {
+                        markPoint: showAvatars ? {
                             symbol: 'image://' + getAvatarSrcForChart(s),
                             symbolSize: avatarSize,
                             label: { show: false }, tooltip: { show: false },
@@ -6759,7 +6789,7 @@
                                 borderColor: '#fff', borderWidth: 2,
                                 shadowBlur: 10, shadowColor: 'rgba(0,0,0,0.15)'
                             }
-                        }
+                        } : undefined
                     });
                 });
             }
