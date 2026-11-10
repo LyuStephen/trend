@@ -7309,6 +7309,14 @@
 
             const isDark = document.body.classList.contains('dark');
 
+            // ★ 修复：用户未手动调整次轴时，自动计算含 markLine 参考线的范围，
+            //   保证 52周高/低/均线 不被视野裁掉。用户手动调过则沿用用户设置。
+            let _secAutoRange = {min: null, max: null};
+            if (showSecondary && secondaryYMin == null && secondaryYMax == null) {
+                const _auto = computeSecondaryAxisRangeWithMarkLine();
+                if (_auto) _secAutoRange = _auto;
+            }
+
             const option = {
                 tooltip: {
                     trigger: 'axis',
@@ -7485,7 +7493,8 @@
                         name: getSecondaryAxisName(),
                         nameTextStyle: {fontSize: font('tag'), color: isDark ? '#94a3b8' : '#475569'},
                         position: 'right', show: showSecondary,
-                        min: secondaryYMin, max: secondaryYMax,
+                        min: _secAutoRange.min != null ? _secAutoRange.min : secondaryYMin,
+                        max: _secAutoRange.max != null ? _secAutoRange.max : secondaryYMax,
                         axisLabel: {
                             color: isDark ? '#94a3b8' : '#475569', fontSize: font('axis'),
                             formatter: function (v) {
@@ -7667,6 +7676,66 @@
             yMin = min; yMax = max;
             renderChart();
             saveState();
+        }
+        // ★ 计算含 markLine（52周高/低/均）的次轴范围。
+        //   仅在 withUSBackShift 内部（renderTrendChart 里）被调用。
+        //   此时 s.data / s.volumeData / s.amountData 已是 shift 后数据，
+        //   与 markLine 值口径一致，直接使用原数组，不再走 getEffectiveSeriesArr。
+        function computeSecondaryAxisRangeWithMarkLine() {
+            if (axisDisplayMode === 'main') return null;          // 次轴未显示
+            const visibleKeys = trendLegendSelected.size > 0
+                ? seriesKeys.filter(k => trendLegendSelected.has(k))
+                : seriesKeys;
+            if (visibleKeys.length !== 1) return null;            // 多指标时不画 markLine
+            const s = getSeries(visibleKeys[0]);
+            if (!s) return null;
+
+            const allVals = [];
+            const rs = ensureRefStats(s);                          // 基于 shift 后数据的统计
+
+            if (isPctMode(volumeDisplayMode)) {
+                const isVolPct = isVolPctMode(volumeDisplayMode);
+                const period = getPctPeriod(volumeDisplayMode);
+                const stats = isVolPct ? (rs && rs.volume) : (rs && rs.amount);
+                if (!stats) return null;
+                const avgOfPeriod = stats['avg' + period];
+                if (avgOfPeriod == null || avgOfPeriod <= 0) return null;
+                ['high', 'low', 'avg250', 'avg30', 'avg7'].forEach(k => {
+                    const v = stats[k];
+                    if (v != null && v > 0) allVals.push(v / avgOfPeriod * 100);
+                });
+                const dataRange = getCurrentSecondaryRange();       // 百分比模式固定 {0,200}
+                allVals.push(dataRange.min, dataRange.max);
+            } else if (volumeDisplayMode === 'volume') {
+                (s.volumeData || []).forEach(v => {if (v != null && v > 0) allVals.push(v);});
+                if (rs && rs.volume) {
+                    ['high', 'low', 'avg250', 'avg30', 'avg7'].forEach(k => {
+                        const v = rs.volume[k];
+                        if (v != null && v > 0) allVals.push(v);
+                    });
+                }
+            } else {
+                (s.amountData || []).forEach(v => {if (v != null && v > 0) allVals.push(v);});
+                if (!isIndexCode(s.code)) {
+                    (s.volumeData || []).forEach((v, i) => {
+                        const a = calcAmountFromVolume(v, s.data[i], s.code);
+                        if (a != null && a > 0) allVals.push(a);
+                    });
+                }
+                if (rs && rs.amount) {
+                    ['high', 'low', 'avg250', 'avg30', 'avg7'].forEach(k => {
+                        const v = rs.amount[k];
+                        if (v != null && v > 0) allVals.push(v);
+                    });
+                }
+            }
+
+            if (allVals.length === 0) return null;
+            let min = Math.min(...allVals);
+            let max = Math.max(...allVals);
+            if (!isFinite(min) || !isFinite(max) || min === max) return null;
+            const pad = (max - min) * 0.1 || (max * 0.1) || 1;
+            return {min: Math.max(0, min - pad), max: max + pad};
         }
 
         resetYBtnChart.addEventListener('click', resetYAxis);
