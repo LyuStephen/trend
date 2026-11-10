@@ -3399,9 +3399,10 @@
                 // 实际% 曲线（成交量% 也用这里的主线）
                 if (_hasReal) {
                     const idxR = seriesArr.length;
-                    const seriesNameR = useOriginalName ? key : (key + prefix + p.n);
-                    if (useOriginalName && seriesMeta) {
-                        seriesMeta[seriesNameR] = {key: key, type: 'pct', period: p.n, amtSrc: isVolPct ? 'vol' : 'real'};
+                    // ★ 统一：次轴 series 名字一律用原始 key，与主轴同名，图例点击时一起联动
+                    const seriesNameR = key;
+                    if (seriesMeta) {
+                        seriesMeta[idxR] = {key: key, type: 'pct', period: p.n, amtSrc: isVolPct ? 'vol' : 'real'};
                     }
                     const seriesObjR = {
                         name: seriesNameR,
@@ -3420,9 +3421,10 @@
                 // ★ 计算% 曲线（仅成交额% 且存在估算数据时追加；虚线 + 更淡）
                 if (_hasCalc) {
                     const idxC = seriesArr.length;
-                    const seriesNameC = (useOriginalName ? key : (key + prefix + p.n)) + '_CALC';
-                    if (useOriginalName && seriesMeta) {
-                        seriesMeta[seriesNameC] = {key: key, type: 'pct', period: p.n, amtSrc: 'calc'};
+                    // ★ 统一：与主曲线同名，图例一起联动
+                    const seriesNameC = key;
+                    if (seriesMeta) {
+                        seriesMeta[idxC] = {key: key, type: 'pct', period: p.n, amtSrc: 'calc'};
                     }
                     const seriesObjC = {
                         name: seriesNameC,
@@ -7171,7 +7173,8 @@
                     const changeData = getChangeData(s);
                     const latestChange = changeData[latestIdx];
                     const avatarSize = isMobileView() ? 20 : 42;
-                    seriesMeta[key] = {key: key, type: 'main'};
+                    // ★ 用即将成为的 series index 作为 seriesMeta 的 key（因为次轴后续也会用同名 key）
+                    seriesMeta[series.length] = {key: key, type: 'main'};
                     series.push({
                         name: s.name, type: 'line', data: changeData,
                         smooth: true, symbol: 'circle', symbolSize: 8,
@@ -7295,8 +7298,9 @@
                         const isSingle = (singleSelectedKey === key) && !showMain;
 
                         if (volumeDisplayMode === 'volume') {
-                            const seriesName = showMain ? (key + '_VOL') : key;
-                            seriesMeta[seriesName] = {key: key, type: 'vol'};
+                            // ★ 统一：次轴 series 名字一律用原始 key，与主轴同名，图例一起联动
+                            const seriesName = key;
+                            seriesMeta[series.length] = {key: key, type: 'vol'};
                             const volSeries = {
                                 name: seriesName, type: 'line', yAxisIndex: 1,
                                 data: s.volumeData || emptyArr(dates.length),
@@ -7326,9 +7330,9 @@
                                 const _rs = ensureRefStats(s);
 
                                 if (_hasActual) {
-                                    // ★ 仅次轴模式：实际曲线用原始指标名（让 legend 能控制）
+                                    // ★ 统一：名字用原始 key，图例一起联动
                                     const seriesName = key;
-                                    seriesMeta[seriesName] = {key: key, type: 'amt'};
+                                    seriesMeta[series.length] = {key: key, type: 'amt'};
                                     const amtSeries = {
                                         name: seriesName, type: 'line', yAxisIndex: 1, data: actual,
                                         smooth: true, symbol: 'circle', symbolSize: 3, showSymbol: true,
@@ -7344,10 +7348,9 @@
                                     series.push(amtSeries);
                                 }
                                 if (_hasCalc) {
-                                    // ★ 有实际时：计算线用后缀名，作为辅助线（不受 legend 控制，但一直显示）
-                                    //   无实际时：计算线用原始名，让 legend 能正常控制
-                                    const seriesName = _hasActual ? (key + '_AMT_CALC') : key;
-                                    seriesMeta[seriesName] = {key: key, type: 'amtCalc'};
+                                    // ★ 统一：名字也用原始 key，与主曲线同名，图例一起联动
+                                    const seriesName = key;
+                                    seriesMeta[series.length] = {key: key, type: 'amtCalc'};
                                     const amtCalcSeries = {
                                         name: seriesName, type: 'line', yAxisIndex: 1, data: est,
                                         smooth: true, symbol: 'circle', symbolSize: 3, showSymbol: true,
@@ -7366,8 +7369,9 @@
                             } else {
                                 // 主轴+次轴模式：实际成交额（实线）+ 估算成交额（虚线）
                                 if (actual.some(v => v !== null)) {
-                                    const seriesName = key + '_AMT';
-                                    seriesMeta[seriesName] = {key: key, type: 'amt'};
+                                    // ★ 统一：名字用原始 key，图例一起联动
+                                    const seriesName = key;
+                                    seriesMeta[series.length] = {key: key, type: 'amt'};
                                     series.push({
                                         name: seriesName, type: 'line', yAxisIndex: 1, data: actual,
                                         smooth: true, symbol: 'circle', symbolSize: 3, showSymbol: true,
@@ -7379,8 +7383,9 @@
                                     });
                                 }
                                 if (!isIdx && est.some(v => v !== null)) {
-                                    const seriesName = key + '_AMT_CALC';
-                                    seriesMeta[seriesName] = {key: key, type: 'amtCalc'};
+                                    // ★ 统一：名字用原始 key
+                                    const seriesName = key;
+                                    seriesMeta[series.length] = {key: key, type: 'amtCalc'};
                                     series.push({
                                         name: seriesName, type: 'line', yAxisIndex: 1, data: est,
                                         smooth: true, symbol: 'circle', symbolSize: 3, showSymbol: true,
@@ -7422,22 +7427,9 @@
                         const date = params[0].axisValue;
                         const mainMap = {}, volMap = {}, amtActualMap = {}, amtCalcMap = {}, pctMap = {};
                         params.forEach(p => {
-                            const meta = seriesMeta[p.seriesName];
-                            if (!meta) {
-                                // 主轴+次轴模式下的百分比系列（带后缀名，可能带 _REAL / _CALC）
-                                const pctMatch = p.seriesName.match(/^(.+)_(VOL|AMT)_PCT(\d+)(?:_(REAL|CALC))?$/);
-                                if (pctMatch) {
-                                    const pkey = pctMatch[1], kind = pctMatch[2], period = pctMatch[3], src = pctMatch[4];
-                                    let finalSrc;
-                                    if (kind === 'VOL') finalSrc = 'vol';
-                                    else if (src === 'CALC') finalSrc = 'calc';
-                                    else finalSrc = 'real';   // AMT 无后缀默认按 real（兼容旧格式）
-                                    if (!pctMap[pkey]) pctMap[pkey] = {};
-                                    if (!pctMap[pkey][period]) pctMap[pkey][period] = {};
-                                    pctMap[pkey][period][finalSrc] = p.value;
-                                }
-                                return;
-                            }
+                            // ★ 改用 seriesIndex 读取 meta，避免同名 series（主轴 + 次轴）互相覆盖
+                            const meta = seriesMeta[p.seriesIndex];
+                            if (!meta) return;
                             if (meta.type === 'main') mainMap[meta.key] = p.value;
                             else if (meta.type === 'vol') volMap[meta.key] = p.value;
                             else if (meta.type === 'amt') amtActualMap[meta.key] = p.value;
