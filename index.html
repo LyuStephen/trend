@@ -3323,38 +3323,49 @@
                 const s = getSeries(key);
                 if (!s) return;
                 if (keyVisibilityFn && !keyVisibilityFn(key)) return;
-                let arr;
+                // ★ 成交量% / 成交额% 分两种处理
+                //   成交量%：单条（成交量是接口真值，无估算）；
+                //   成交额%：拆成"实际%"和"计算%"两条，互斥显示（某日有实际则计算线在该点为 null），
+                //            百分比基准统一用合并数据（actual 优先，缺失则 calc）的移动平均，保证两条线可比。
+                let _pctReal = null;
+                let _pctCalc = null;
+                let _mergedAvg = null;
+                const _amtActual = Array.isArray(s.amountData) ? s.amountData.slice() : [];
+                const _amtCalc = (s.volumeData || []).map((v, i) => calcAmountFromVolume(v, s.data[i], s.code));
+
                 if (isVolPct) {
-                    arr = Array.isArray(s.volumeData) ? s.volumeData.slice() : [];
+                    const arr = Array.isArray(s.volumeData) ? s.volumeData.slice() : [];
+                    if (!arr.some(v => v != null && v > 0)) return;
+                    _mergedAvg = buildMovingAverage(arr, p.n);
+                    _pctReal = arr.map((v, i) => {
+                        if (v == null || v <= 0 || _mergedAvg[i] == null || _mergedAvg[i] <= 0) return null;
+                        return v / _mergedAvg[i] * 100;
+                    });
                 } else {
-                    const actualAmt = Array.isArray(s.amountData) ? s.amountData.slice() : [];
-                    arr = actualAmt.map((v, i) => {
+                    const merged = _amtActual.map((v, i) => {
                         if (v != null && v > 0) return v;
-                        const calc = calcAmountFromVolume((s.volumeData || [])[i], s.data[i], s.code);
-                        return calc != null ? calc : null;
+                        return _amtCalc[i] != null ? _amtCalc[i] : null;
+                    });
+                    if (!merged.some(v => v != null && v > 0)) return;
+                    _mergedAvg = buildMovingAverage(merged, p.n);
+                    _pctReal = _amtActual.map((v, i) => {
+                        if (v == null || v <= 0 || _mergedAvg[i] == null || _mergedAvg[i] <= 0) return null;
+                        return v / _mergedAvg[i] * 100;
+                    });
+                    _pctCalc = _amtCalc.map((v, i) => {
+                        // 互补：仅当该日无实际成交额时显示估算值
+                        if (_amtActual[i] != null && _amtActual[i] > 0) return null;
+                        if (v == null || v <= 0 || _mergedAvg[i] == null || _mergedAvg[i] <= 0) return null;
+                        return v / _mergedAvg[i] * 100;
                     });
                 }
-                if (!arr.some(v => v != null && v > 0)) return;
-                const avg = buildMovingAverage(arr, p.n);
-                const pct = arr.map((v, i) => {
-                    if (v == null || v <= 0 || avg[i] == null || avg[i] <= 0) return null;
-                    return v / avg[i] * 100;
-                });
-                if (!pct.some(v => v !== null)) return;
-                const idx = seriesArr.length;
-                // ★ 仅次轴模式下用原始指标名，让图例能正常匹配/切换
-                const seriesName = useOriginalName ? key : (key + prefix + p.n);
-                if (useOriginalName && seriesMeta) {
-                    seriesMeta[seriesName] = {key: key, type: 'pct', period: p.n};
-                }
-                const seriesObj = {
-                    name: seriesName,
-                    type: 'line', yAxisIndex: 1, data: pct, smooth: true,
-                    symbol: 'circle', symbolSize: 2, showSymbol: false, connectNulls: false,
-                    lineStyle: {width: p.width, type: p.type, opacity: p.opacity},
-                    itemStyle: {opacity: p.opacity}, z: p.z, silent: true
-                };
+
+                const _hasReal = _pctReal && _pctReal.some(v => v !== null);
+                const _hasCalc = _pctCalc && _pctCalc.some(v => v !== null);
+                if (!_hasReal && !_hasCalc) return;
+
                 // ★ 单指标时叠加 52周/30日/7日 均值参考线（换算到当前百分比坐标）
+                let _markLineData = null;
                 if (singleVisible) {
                     const rs = ensureRefStats(s);
                     const stats = isVolPct ? (rs && rs.volume) : (rs && rs.amount);
@@ -3365,12 +3376,12 @@
                             {key: 'avg30', label: '30日均', color: '#8b5cf6', type: 'dashed'},
                             {key: 'avg7', label: '7日均', color: '#06b6d4', type: 'dotted'}
                         ];
-                        const markLineData = [];
+                        _markLineData = [];
                         avgDefs.forEach(a => {
                             const v = stats[a.key];
                             if (v != null && v > 0) {
                                 const pctVal = v / avgOfPeriod * 100;
-                                markLineData.push({
+                                _markLineData.push({
                                     name: a.label,
                                     yAxis: pctVal,
                                     lineStyle: {color: a.color, type: a.type, width: 1.5, opacity: 0.75},
@@ -3382,13 +3393,56 @@
                                 });
                             }
                         });
-                        if (markLineData.length > 0) {
-                            seriesObj.markLine = {symbol: 'none', silent: true, animation: false, data: markLineData};
-                        }
+                        if (_markLineData.length === 0) _markLineData = null;
                     }
                 }
-                seriesArr.push(seriesObj);
-                addedIndices.push(idx);
+
+                // 实际% 曲线（成交量% 也用这里的主线）
+                if (_hasReal) {
+                    const idxR = seriesArr.length;
+                    const seriesNameR = useOriginalName ? key : (key + prefix + p.n);
+                    if (useOriginalName && seriesMeta) {
+                        seriesMeta[seriesNameR] = {key: key, type: 'pct', period: p.n, amtSrc: isVolPct ? 'vol' : 'real'};
+                    }
+                    const seriesObjR = {
+                        name: seriesNameR,
+                        type: 'line', yAxisIndex: 1, data: _pctReal, smooth: true,
+                        symbol: 'circle', symbolSize: 2, showSymbol: false, connectNulls: false,
+                        lineStyle: {width: p.width, type: p.type, opacity: p.opacity},
+                        itemStyle: {opacity: p.opacity}, z: p.z, silent: true
+                    };
+                    if (_markLineData) {
+                        seriesObjR.markLine = {symbol: 'none', silent: true, animation: false, data: _markLineData};
+                    }
+                    seriesArr.push(seriesObjR);
+                    addedIndices.push(idxR);
+                }
+
+                // ★ 计算% 曲线（仅成交额% 且存在估算数据时追加；虚线 + 更淡）
+                if (_hasCalc) {
+                    const idxC = seriesArr.length;
+                    const seriesNameC = (useOriginalName ? key : (key + prefix + p.n)) + '_CALC';
+                    if (useOriginalName && seriesMeta) {
+                        seriesMeta[seriesNameC] = {key: key, type: 'pct', period: p.n, amtSrc: 'calc'};
+                    }
+                    const seriesObjC = {
+                        name: seriesNameC,
+                        type: 'line', yAxisIndex: 1, data: _pctCalc, smooth: true,
+                        symbol: 'circle', symbolSize: 2, showSymbol: false, connectNulls: false,
+                        lineStyle: {
+                            width: Math.max(1, p.width - 0.3),
+                            type: p.type === 'solid' ? 'dashed' : p.type,
+                            opacity: Math.max(0.3, p.opacity - 0.2)
+                        },
+                        itemStyle: {opacity: Math.max(0.3, p.opacity - 0.2)},
+                        z: p.z - 0.5, silent: true
+                    };
+                    if (!_hasReal && _markLineData) {
+                        seriesObjC.markLine = {symbol: 'none', silent: true, animation: false, data: _markLineData};
+                    }
+                    seriesArr.push(seriesObjC);
+                    addedIndices.push(idxC);
+                }
             });
             return addedIndices;
         }
@@ -7247,30 +7301,50 @@
                             const est = (s.volumeData || []).map((v, i) => calcAmountFromVolume(v, s.data[i], s.code));
 
                             if (!showMain) {
-                                // 仅次轴模式：合并为一个系列（actual 优先，否则估算）
-                                let dataArr, metaType;
-                                if (actual.some(v => v != null && v > 0)) {
-                                    dataArr = actual; metaType = 'amt';
-                                } else if (!isIdx && est.some(v => v != null && v > 0)) {
-                                    dataArr = est; metaType = 'amtCalc';
-                                } else return;
-                                seriesMeta[key] = {key: key, type: metaType};
-                                const amtSeries = {
-                                    name: key, type: 'line', yAxisIndex: 1, data: dataArr,
-                                    smooth: true, symbol: 'circle', symbolSize: 3, showSymbol: true,
-                                    connectNulls: false,
-                                    lineStyle: {color: s.color, width: 1.5, type: 'dashed', opacity: 0.5},
-                                    itemStyle: {color: s.color, opacity: 0.5},
-                                    z: 1, silent: true
-                                };
-                                if (isSingle) {
-                                    const rs = ensureRefStats(s);
-                                    if (rs && rs.amount) {
-                                        const ml = buildSecondaryMarkLine(rs.amount, '额');
+                                // ★ 仅次轴模式：实际与计算同时显示（两条线）
+                                const _hasActual = actual.some(v => v != null && v > 0);
+                                const _hasCalc = !isIdx && est.some(v => v != null && v > 0);
+                                if (!_hasActual && !_hasCalc) return;
+                                const _rs = ensureRefStats(s);
+
+                                if (_hasActual) {
+                                    // ★ 仅次轴模式：实际曲线用原始指标名（让 legend 能控制）
+                                    const seriesName = key;
+                                    seriesMeta[seriesName] = {key: key, type: 'amt'};
+                                    const amtSeries = {
+                                        name: seriesName, type: 'line', yAxisIndex: 1, data: actual,
+                                        smooth: true, symbol: 'circle', symbolSize: 3, showSymbol: true,
+                                        connectNulls: false,
+                                        lineStyle: {color: s.color, width: 1.5, type: 'solid', opacity: 0.6},
+                                        itemStyle: {color: s.color, opacity: 0.6},
+                                        z: 1, silent: true
+                                    };
+                                    if (isSingle && _rs && _rs.amount) {
+                                        const ml = buildSecondaryMarkLine(_rs.amount, '额');
                                         if (ml) amtSeries.markLine = ml;
                                     }
+                                    series.push(amtSeries);
                                 }
-                                series.push(amtSeries);
+                                if (_hasCalc) {
+                                    // ★ 有实际时：计算线用后缀名，作为辅助线（不受 legend 控制，但一直显示）
+                                    //   无实际时：计算线用原始名，让 legend 能正常控制
+                                    const seriesName = _hasActual ? (key + '_AMT_CALC') : key;
+                                    seriesMeta[seriesName] = {key: key, type: 'amtCalc'};
+                                    const amtCalcSeries = {
+                                        name: seriesName, type: 'line', yAxisIndex: 1, data: est,
+                                        smooth: true, symbol: 'circle', symbolSize: 3, showSymbol: true,
+                                        connectNulls: false,
+                                        lineStyle: {color: s.color, width: 1.2, type: 'dashed', opacity: 0.35},
+                                        itemStyle: {color: s.color, opacity: 0.35},
+                                        z: 1, silent: true
+                                    };
+                                    // 无实际线时才给它挂 markLine（避免与实际线重复）
+                                    if (!_hasActual && isSingle && _rs && _rs.amount) {
+                                        const ml = buildSecondaryMarkLine(_rs.amount, '额');
+                                        if (ml) amtCalcSeries.markLine = ml;
+                                    }
+                                    series.push(amtCalcSeries);
+                                }
                             } else {
                                 // 主轴+次轴模式：保持原有两条（实际+计算）
                                 if (actual.some(v => v !== null)) {
@@ -7331,12 +7405,17 @@
                         params.forEach(p => {
                             const meta = seriesMeta[p.seriesName];
                             if (!meta) {
-                                // 主轴+次轴模式下的百分比系列（带后缀名）
-                                const pctMatch = p.seriesName.match(/^(.+)_(?:VOL|AMT)_PCT(\d+)$/);
+                                // 主轴+次轴模式下的百分比系列（带后缀名，可能带 _REAL / _CALC）
+                                const pctMatch = p.seriesName.match(/^(.+)_(VOL|AMT)_PCT(\d+)(?:_(REAL|CALC))?$/);
                                 if (pctMatch) {
-                                    const pkey = pctMatch[1], period = pctMatch[2];
+                                    const pkey = pctMatch[1], kind = pctMatch[2], period = pctMatch[3], src = pctMatch[4];
+                                    let finalSrc;
+                                    if (kind === 'VOL') finalSrc = 'vol';
+                                    else if (src === 'CALC') finalSrc = 'calc';
+                                    else finalSrc = 'real';   // AMT 无后缀默认按 real（兼容旧格式）
                                     if (!pctMap[pkey]) pctMap[pkey] = {};
-                                    pctMap[pkey][period] = p.value;
+                                    if (!pctMap[pkey][period]) pctMap[pkey][period] = {};
+                                    pctMap[pkey][period][finalSrc] = p.value;
                                 }
                                 return;
                             }
@@ -7345,9 +7424,10 @@
                             else if (meta.type === 'amt') amtActualMap[meta.key] = p.value;
                             else if (meta.type === 'amtCalc') amtCalcMap[meta.key] = p.value;
                             else if (meta.type === 'pct') {
-                                // ★ 仅次轴模式下用原始名的百分比系列
                                 if (!pctMap[meta.key]) pctMap[meta.key] = {};
-                                pctMap[meta.key][String(meta.period)] = p.value;
+                                const _p = String(meta.period);
+                                if (!pctMap[meta.key][_p]) pctMap[meta.key][_p] = {};
+                                pctMap[meta.key][_p][meta.amtSrc || 'vol'] = p.value;
                             }
                         });
                         const keysInParams = new Set([
@@ -7392,18 +7472,25 @@
                                     const pct = pctMap[key];
                                     if (pct) {
                                         const ps = [];
-                                        let calcNote = '';
-                                        if (isAmtPctMode(volumeDisplayMode) && dateIdx >= 0) {
-                                            const actual = (sk.amountData || [])[dateIdx];
-                                            if (!(actual != null && actual > 0)) {
-                                                const calc = calcAmountFromVolume((sk.volumeData || [])[dateIdx], sk.data[dateIdx], sk.code);
-                                                if (calc != null) calcNote = '（算）';
+                                        ['250', '30', '7'].forEach(period => {
+                                            const obj = pct[period];
+                                            if (!obj) return;
+                                            const periodLabel = {250: '52周', 30: '30日', 7: '7日'}[period];
+                                            let display = null;
+                                            if (obj.vol != null && obj.vol > 0) {
+                                                // 成交量%（单值）
+                                                display = `${periodLabel} ${obj.vol.toFixed(1)}%`;
+                                            } else if (obj.real != null && obj.real > 0 && obj.calc != null && obj.calc > 0) {
+                                                // 罕见：同一日既有实际又有估算
+                                                display = `${periodLabel} 实${obj.real.toFixed(1)}%/算${obj.calc.toFixed(1)}%`;
+                                            } else if (obj.real != null && obj.real > 0) {
+                                                display = `${periodLabel} ${obj.real.toFixed(1)}%(实)`;
+                                            } else if (obj.calc != null && obj.calc > 0) {
+                                                display = `${periodLabel} ${obj.calc.toFixed(1)}%(算)`;
                                             }
-                                        }
-                                        if (pct['250'] != null && pct['250'] > 0) ps.push(`52周 ${pct['250'].toFixed(1)}%`);
-                                        if (pct['30'] != null && pct['30'] > 0) ps.push(`30日 ${pct['30'].toFixed(1)}%`);
-                                        if (pct['7'] != null && pct['7'] > 0) ps.push(`7日 ${pct['7'].toFixed(1)}%`);
-                                        if (ps.length > 0) parts.push(`<span style="color:#64748b;">${ps.join(' | ')}${calcNote}</span>`);
+                                            if (display) ps.push(display);
+                                        });
+                                        if (ps.length > 0) parts.push(`<span style="color:#64748b;">${ps.join(' | ')}</span>`);
                                     }
                                 }
                             }
